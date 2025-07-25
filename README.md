@@ -55,6 +55,21 @@ pip install context-ai
 ```
 
 ### Development Installation
+
+#### Quick Setup (Recommended)
+```bash
+git clone https://github.com/gabemule/context-ai
+cd context-ai
+./dev-install.sh  # 🚀 Smart installer - auto-detects and removes conflicts
+```
+
+**Smart Installation Features:**
+- 🔍 **Conflict Detection**: Automatically finds conflicting editable packages (like codex-ai)
+- 🧹 **Clean Removal**: Uninstalls conflicts before installation
+- ✅ **Verification**: Tests that context-ai command works properly
+- 📊 **Smart Reporting**: Shows what was removed and installed
+
+#### Manual Setup (Alternative)
 ```bash
 git clone https://github.com/gabemule/context-ai
 cd context-ai
@@ -62,6 +77,8 @@ make setup
 source venv/bin/activate
 make install-dev
 ```
+
+**Note**: If you get `ModuleNotFoundError` or conflicts with other local AI packages, the smart installer (`./dev-install.sh`) will resolve them automatically.
 
 ## 🔧 Configuration
 
