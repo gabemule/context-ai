@@ -5,9 +5,9 @@ Provides text chunking functionality with multiple implementation strategies.
 """
 
 from typing import Optional
-from .protocol import ChunkerProtocol, TextChunk, ChunkingStrategy, ChunkingMetadata
-from .langchain_adapter import LangChainChunker
 
+from .langchain_adapter import LangChainChunker
+from .protocol import ChunkerProtocol, ChunkingMetadata, ChunkingStrategy, TextChunk
 
 # Global chunker instance
 _chunker_instance: Optional[ChunkerProtocol] = None
@@ -28,11 +28,11 @@ def set_chunker(chunker: ChunkerProtocol) -> None:
 
 
 __all__ = [
-    'ChunkerProtocol',
-    'TextChunk', 
-    'ChunkingStrategy',
-    'ChunkingMetadata',
-    'LangChainChunker',
-    'get_chunker',
-    'set_chunker'
+    "ChunkerProtocol",
+    "TextChunk",
+    "ChunkingStrategy",
+    "ChunkingMetadata",
+    "LangChainChunker",
+    "get_chunker",
+    "set_chunker",
 ]

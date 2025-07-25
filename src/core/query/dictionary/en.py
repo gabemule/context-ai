@@ -5,49 +5,147 @@ English programming synonyms and stop words for query expansion.
 # Stop words optimized for English programming queries
 ENGLISH_STOP_WORDS = {
     # Articles (safe to remove)
-    "a", "an", "the",
-    
+    "a",
+    "an",
+    "the",
     # Common conjunctions (usually safe)
-    "and", "but",  # "or" removed - important in programming
-    
+    "and",
+    "but",  # "or" removed - important in programming
     # Prepositions (context dependent - being conservative)
-    "of", "at", "by", "for", "from", "with",
+    "of",
+    "at",
+    "by",
+    "for",
+    "from",
+    "with",
     # "in", "on", "to" removed - important in programming
-    
     # Pronouns (usually safe to remove)
-    "he", "she", "it", "they", "we", "you", "i",
-    
+    "he",
+    "she",
+    "it",
+    "they",
+    "we",
+    "you",
+    "i",
     # Common verbs (context dependent - being selective)
-    "are", "was", "were", "been", "being", "have", "has", "had",
+    "are",
+    "was",
+    "were",
+    "been",
+    "being",
+    "have",
+    "has",
+    "had",
     # "is", "be" removed - can be important in programming
-    
     # Common but usually unimportant words
-    "this", "that", "these", "those", "some", "any", "all", "each", "every",
-    "more", "most", "other", "such", "only", "own", "same", "so", "than", "too", "very",
-    "just", "now", "then", "here", "there", "over", "under",
-    "again", "further", "once", "also", "can", "could", "should", "would", "will", "shall"
+    "this",
+    "that",
+    "these",
+    "those",
+    "some",
+    "any",
+    "all",
+    "each",
+    "every",
+    "more",
+    "most",
+    "other",
+    "such",
+    "only",
+    "own",
+    "same",
+    "so",
+    "than",
+    "too",
+    "very",
+    "just",
+    "now",
+    "then",
+    "here",
+    "there",
+    "over",
+    "under",
+    "again",
+    "further",
+    "once",
+    "also",
+    "can",
+    "could",
+    "should",
+    "would",
+    "will",
+    "shall",
 }
 
 # English programming keywords that should NEVER be stop words
 ENGLISH_PROGRAMMING_KEYWORDS = {
     # Language keywords and important terms
-    "as", "if", "do", "go", "or", "is", "in", "on", "at", "to", "be", "me",
-    
+    "as",
+    "if",
+    "do",
+    "go",
+    "or",
+    "is",
+    "in",
+    "on",
+    "at",
+    "to",
+    "be",
+    "me",
     # Question words - crucial for programming queries
-    "how", "what", "where", "when", "why", "which", "who",
-    
+    "how",
+    "what",
+    "where",
+    "when",
+    "why",
+    "which",
+    "who",
     # Action words important in programming
-    "get", "set", "put", "post", "use", "add", "new", "old",
-    "run", "call", "make", "take", "give", "find", "show", "hide",
-    
+    "get",
+    "set",
+    "put",
+    "post",
+    "use",
+    "add",
+    "new",
+    "old",
+    "run",
+    "call",
+    "make",
+    "take",
+    "give",
+    "find",
+    "show",
+    "hide",
     # State/direction words important in programming
-    "up", "down", "in", "out", "on", "off",
+    "up",
+    "down",
+    "in",
+    "out",
+    "on",
+    "off",
 }
 
 # Functions & Methods
 FUNCTIONS_METHODS = {
-    "function": ["method", "func", "procedure", "routine", "callable", "subroutine", "def", "lambda"],
-    "method": ["function", "func", "procedure", "routine", "member function", "class method"],
+    "function": [
+        "method",
+        "func",
+        "procedure",
+        "routine",
+        "callable",
+        "subroutine",
+        "def",
+        "lambda",
+    ],
+    "method": [
+        "function",
+        "func",
+        "procedure",
+        "routine",
+        "member function",
+        "class method",
+    ],
     "callback": ["handler", "listener", "hook", "delegate", "event handler"],
     "hook": ["callback", "handler", "listener", "interceptor", "middleware"],
 }
@@ -64,7 +162,15 @@ CLASSES_OBJECTS = {
 # Variables & Data
 VARIABLES_DATA = {
     "variable": ["var", "field", "property", "attribute", "member", "data"],
-    "property": ["attribute", "field", "member", "variable", "accessor", "getter", "setter"],
+    "property": [
+        "attribute",
+        "field",
+        "member",
+        "variable",
+        "accessor",
+        "getter",
+        "setter",
+    ],
     "field": ["property", "attribute", "member", "variable", "column"],
     "parameter": ["param", "argument", "arg", "input", "variable"],
     "argument": ["param", "parameter", "arg", "input", "value"],
@@ -177,9 +283,20 @@ COMMON_ABBREVIATIONS = {
 # Combine all categories
 ENGLISH_SYNONYMS = {}
 for category in [
-    FUNCTIONS_METHODS, CLASSES_OBJECTS, VARIABLES_DATA, UI_COMPONENTS,
-    API_SERVICES, ERROR_HANDLING, CONFIG_SETTINGS, AUTH_SECURITY,
-    DATABASE_STORAGE, TESTING, ARCHITECTURE_PATTERNS, DEVELOPMENT_PROCESS,
-    REACT_FRONTEND, NODEJS_BACKEND, COMMON_ABBREVIATIONS
+    FUNCTIONS_METHODS,
+    CLASSES_OBJECTS,
+    VARIABLES_DATA,
+    UI_COMPONENTS,
+    API_SERVICES,
+    ERROR_HANDLING,
+    CONFIG_SETTINGS,
+    AUTH_SECURITY,
+    DATABASE_STORAGE,
+    TESTING,
+    ARCHITECTURE_PATTERNS,
+    DEVELOPMENT_PROCESS,
+    REACT_FRONTEND,
+    NODEJS_BACKEND,
+    COMMON_ABBREVIATIONS,
 ]:
     ENGLISH_SYNONYMS.update(category)

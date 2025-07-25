@@ -10,54 +10,54 @@ from typing import Optional
 def setup_logging(verbose: bool = False, log_file: Optional[str] = None) -> None:
     """
     Setup logging configuration with appropriate levels and formatting.
-    
+
     Args:
         verbose: Enable verbose (DEBUG) logging
         log_file: Optional file path to write logs to
     """
     # Determine log level
     log_level = logging.DEBUG if verbose else logging.INFO
-    
+
     # Create formatter
     formatter = logging.Formatter(
-        fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
+        fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
-    
+
     # Setup root logger
     root_logger = logging.getLogger()
     root_logger.setLevel(log_level)
-    
+
     # Clear any existing handlers
     root_logger.handlers.clear()
-    
+
     # Console handler
     console_handler = logging.StreamHandler(sys.stderr)
     console_handler.setLevel(log_level)
     console_handler.setFormatter(formatter)
     root_logger.addHandler(console_handler)
-    
+
     # File handler (optional)
     if log_file:
         file_handler = logging.FileHandler(log_file)
         file_handler.setLevel(logging.DEBUG)  # Always debug level for files
         file_handler.setFormatter(formatter)
         root_logger.addHandler(file_handler)
-    
+
     # Set levels for external libraries to reduce noise
-    logging.getLogger('httpx').setLevel(logging.WARNING)
-    logging.getLogger('anthropic').setLevel(logging.WARNING)
-    logging.getLogger('chromadb').setLevel(logging.WARNING)
-    logging.getLogger('sentence_transformers').setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("anthropic").setLevel(logging.WARNING)
+    logging.getLogger("chromadb").setLevel(logging.WARNING)
+    logging.getLogger("sentence_transformers").setLevel(logging.WARNING)
 
 
 def get_logger(name: str) -> logging.Logger:
     """
     Get a logger instance for a module.
-    
+
     Args:
         name: Logger name (typically __name__)
-    
+
     Returns:
         Logger instance
     """

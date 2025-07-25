@@ -8,17 +8,23 @@ JAVASCRIPT_GUIDELINES = """
 When providing JavaScript/TypeScript code suggestions, follow these principles:
 
 ### 📐 Architecture Principles
-- **SOLID Principles**: Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion
+- **SOLID Principles**: Single Responsibility, Open/Closed, Liskov "
+"Substitution, Interface Segregation, Dependency Inversion
 - **DRY (Don't Repeat Yourself)**: Eliminate code duplication through abstraction
-- **YAGNI (You Aren't Gonna Need It)**: Don't implement features until they're actually needed
+- **YAGNI (You Aren't Gonna Need It)**: Don't implement features until "
+"they're actually needed
 - **Clean Code**: Write self-documenting, readable code with meaningful names
 
 ### 🔧 Functional Programming Focus
-- **PREFER functional programming over classes** - Use functions, higher-order functions, and composition
-- **Immutability**: Prefer const, avoid mutations, use spread operators and pure functions
-- **Pure functions**: Functions should not have side effects and return predictable outputs
+- **PREFER functional programming over classes** - Use functions, "
+"higher-order functions, and composition
+- **Immutability**: Prefer const, avoid mutations, use spread operators "
+"and pure functions
+- **Pure functions**: Functions should not have side effects and return "
+"predictable outputs
 - **Function composition**: Break complex logic into small, composable functions
-- **Avoid classes** unless absolutely necessary (e.g., for React components, specific APIs)
+- **Avoid classes** unless absolutely necessary (e.g., for React "
+"components, specific APIs)
 
 ### 🛠️ Code Style Guidelines
 - **Arrow functions**: Prefer `const fn = () => {}` over `function fn() {}`
@@ -26,13 +32,15 @@ When providing JavaScript/TypeScript code suggestions, follow these principles:
 - **Template literals**: Use backticks for string interpolation
 - **Async/await**: Prefer over .then() chains for promises
 - **Optional chaining**: Use `?.` for safe property access
-- **Nullish coalescing**: Use `??` instead of `||` when checking for null/undefined
+- **Nullish coalescing**: Use `??` instead of `||` when checking for "
+"null/undefined
 
 ### 📦 Module Organization
 - **ES6 modules**: Use import/export syntax
 - **Named exports**: Prefer named exports over default exports for better refactoring
 - **Barrel exports**: Use index.js files to create clean public APIs
-- **Dependency injection**: Pass dependencies as parameters rather than importing globally
+- **Dependency injection**: Pass dependencies as parameters rather than "
+"importing globally
 
 ### 🎨 Naming Conventions
 - **camelCase**: For variables, functions, and methods
@@ -84,13 +92,13 @@ When providing JavaScript/TypeScript code suggestions, follow these principles:
 
 ```javascript
 // ✅ Functional approach with pure functions
-const calculateTotal = (items) => 
+const calculateTotal = (items) =>
   items.reduce((sum, item) => sum + item.price, 0);
 
-const applyDiscount = (total, discountPercent) => 
+const applyDiscount = (total, discountPercent) =>
   total * (1 - discountPercent / 100);
 
-const formatCurrency = (amount) => 
+const formatCurrency = (amount) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 
 // ✅ Composition over classes
@@ -115,7 +123,8 @@ const processPayment = async (paymentData) => {
 };
 ```
 
-**Remember**: Always prioritize readability, maintainability, and testability over clever one-liners or premature optimization.
+**Remember**: Always prioritize readability, maintainability, and testability "
+"over clever one-liners or premature optimization.
 """
 
 TYPESCRIPT_EXTENSIONS = """

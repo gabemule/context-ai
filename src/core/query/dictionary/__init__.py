@@ -6,9 +6,13 @@ are often mixed language.
 """
 
 from typing import List, Set
-from .en import ENGLISH_SYNONYMS, ENGLISH_STOP_WORDS, ENGLISH_PROGRAMMING_KEYWORDS
-from .pt_br import PORTUGUESE_SYNONYMS, PORTUGUESE_STOP_WORDS, PORTUGUESE_PROGRAMMING_KEYWORDS
 
+from .en import ENGLISH_PROGRAMMING_KEYWORDS, ENGLISH_STOP_WORDS, ENGLISH_SYNONYMS
+from .pt_br import (
+    PORTUGUESE_PROGRAMMING_KEYWORDS,
+    PORTUGUESE_STOP_WORDS,
+    PORTUGUESE_SYNONYMS,
+)
 
 # Combine all dictionaries - no language selection needed
 ALL_SYNONYMS = {}
@@ -47,7 +51,7 @@ def is_programming_keyword(word: str) -> bool:
 def should_remove_word(word: str) -> bool:
     """
     Check if word should be removed as stop word.
-    
+
     Returns True if word is stop word AND not a programming keyword.
     """
     word_lower = word.lower()
@@ -67,7 +71,7 @@ def get_programming_keywords() -> Set[str]:
 def expand_query_terms(query_words: List[str]) -> List[str]:
     """Expand a list of query words with synonyms."""
     expanded = []
-    
+
     for word in query_words:
         word_lower = word.lower()
         if word_lower in ALL_SYNONYMS:
@@ -77,7 +81,7 @@ def expand_query_terms(query_words: List[str]) -> List[str]:
             expanded.extend(ALL_SYNONYMS[word_lower])
         else:
             expanded.append(word)
-    
+
     # Remove duplicates while preserving order
     seen = set()
     unique_expanded = []
@@ -85,5 +89,5 @@ def expand_query_terms(query_words: List[str]) -> List[str]:
         if term not in seen:
             seen.add(term)
             unique_expanded.append(term)
-    
+
     return unique_expanded
