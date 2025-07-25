@@ -9,9 +9,8 @@ import sys
 from typing import List, Optional
 
 from utils.logging import setup_logging, get_logger
-from utils.exceptions import ValidationError, ConfigurationError, StorageError
-from utils.storage import get_storage_manager
-from config.settings import get_settings_manager
+from utils.error_handler import handle_command_errors
+from config.constants import EXIT_SUCCESS, EXIT_ERROR
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -64,21 +63,68 @@ Examples:
         required=True,
         help="Name for this embedding set"
     )
+    generate_parser.add_argument(
+        "--ignore-file", "-i",
+        help="Custom ignore file path (defaults to .contextignore then .gitignore)"
+    )
+    generate_parser.add_argument(
+        "--no-progress",
+        action="store_true",
+        help="Disable progress tracking and fancy output"
+    )
     
     # Select command
     select_parser = subparsers.add_parser(
         "select",
-        help="Interactively select active embeddings for queries"
+        help="Select active embeddings for queries"
+    )
+    select_parser.add_argument(
+        "embeddings",
+        nargs="*",
+        help="Embedding names to select (if not provided, shows interactive interface)"
     )
     
-    # Query command
+    # Query command - defined inline to avoid heavy imports during parser creation
     query_parser = subparsers.add_parser(
-        "query",
-        help="Query embeddings for context (returns raw context)"
+        'query',
+        help='Search embeddings for relevant context',
+        description='Query active embeddings to find relevant code and documentation context'
     )
     query_parser.add_argument(
-        "question",
-        help="Question to search for context"
+        'question',
+        help='Question or search query to find relevant context'
+    )
+    query_parser.add_argument(
+        '--format', '-f',
+        choices=["ai_friendly", "plain", "markdown", "json"],
+        default="ai_friendly",
+        help='Output format (default: ai_friendly)'
+    )
+    query_parser.add_argument(
+        '--max-results', '-n',
+        type=int,
+        default=None,
+        help='Maximum number of results to display (uses config default if not specified)'
+    )
+    query_parser.add_argument(
+        '--verbose', '-v',
+        action='store_true',
+        help='Show detailed search information and statistics'
+    )
+    query_parser.add_argument(
+        '--debug',
+        action='store_true',
+        help='Show debug information including query preprocessing details'
+    )
+    query_parser.add_argument(
+        '--copy', '-c',
+        action='store_true',
+        help='Copy results to clipboard (requires pyperclip)'
+    )
+    query_parser.add_argument(
+        '--output', '-o',
+        type=str,
+        help='Save results to file instead of printing to console'
     )
     
     # Ask command
@@ -175,235 +221,199 @@ Examples:
     return parser
 
 
+@handle_command_errors
 def handle_generate(args) -> int:
     """Handle generate command."""
-    logger = get_logger(__name__)
+    from services.embedding_service import EmbeddingService
     
-    # Basic validation
-    import os
-    if not os.path.exists(args.path):
-        raise ValidationError(f"Path does not exist: {args.path}")
-    
-    if not os.path.isdir(args.path):
-        raise ValidationError(f"Path is not a directory: {args.path}")
-    
-    if not args.name.strip():
-        raise ValidationError("Embedding name cannot be empty")
-    
-    # Invalid characters in name
-    invalid_chars = ['/', '\\', ':', '*', '?', '"', '<', '>', '|']
-    if any(char in args.name for char in invalid_chars):
-        raise ValidationError(f"Embedding name contains invalid characters: {args.name}")
-    
-    logger.info("🚀 Generating embeddings for: %s", args.path)
-    logger.info("📛 Embedding name: %s", args.name)
-    logger.warning("⚠️  Generate command not yet implemented")
-    return 0
+    service = EmbeddingService()
+    show_progress = not args.no_progress
+    service.generate_embedding(args.path, args.name, args.ignore_file, show_progress)
+    return EXIT_SUCCESS
 
 
-def handle_select(args) -> int:
-    """Handle select command with interactive checkbox selection."""
-    logger = get_logger(__name__)
-    logger.info("🎯 Select active embeddings for queries\n")
-    
-    try:
-        settings_manager = get_settings_manager()
-        available_embeddings_info = settings_manager.get_available_embeddings()
-        
-        if not available_embeddings_info:
-            logger.error("❌ No embeddings found. Generate some first with 'context-ai generate'")
-            return 1
-        
-        # Convert to display format
-        available_embeddings = [
-            (embedding.name, f"{embedding.token_count//1000}K tokens, {embedding.created_at.strftime('%d %b %Y')}")
-            for embedding in available_embeddings_info
-        ]
-        
-        import inquirer
-        
-        questions = [
-            inquirer.Checkbox(
-                'selected_embeddings',
-                message="Select embeddings to query (use space to select/deselect, enter to confirm)",
-                choices=[
-                    (f"{name} ({info})", name) 
-                    for name, info in available_embeddings
-                ],
-            ),
-        ]
-        
-        answers = inquirer.prompt(questions)
-        
-        if not answers or not answers['selected_embeddings']:
-            logger.error("❌ No embeddings selected")
-            return 1
-        
-        selected = answers['selected_embeddings']
-        
-        # Save selection
-        settings_manager.set_active_embeddings(selected)
-        logger.info("✅ Selected embeddings: %s", ', '.join(selected))
-        
-        return 0
-        
-    except ImportError:
-        logger.error("❌ inquirer not installed. Install with: pip install inquirer")
-        return 1
-    except KeyboardInterrupt:
-        logger.info("\n👋 Selection cancelled")
-        return 130
-    except ConfigurationError as e:
-        logger.error("❌ Configuration error: %s", e)
-        return 1
-
-
+@handle_command_errors
 def handle_query(args) -> int:
     """Handle query command."""
-    print(f"🔍 Querying: {args.question}")
-    print("⚠️  Query command not yet implemented")
-    return 0
+    from commands.query import execute_query_command
+    
+    execute_query_command(args)
+    return EXIT_SUCCESS
 
 
+@handle_command_errors
+def handle_select(args) -> int:
+    """Handle select command with optional direct embedding selection."""
+    from services.embedding_service import EmbeddingService
+    from config.settings import get_settings_manager
+    
+    logger = get_logger(__name__)
+    service = EmbeddingService()
+    
+    if args.embeddings:
+        # Direct selection via CLI arguments
+        embedding_names = args.embeddings
+        logger.info("🎯 Setting active embeddings: %s", ', '.join(embedding_names))
+        
+        # Validate that embeddings exist
+        available = service.list_embeddings()
+        invalid = [name for name in embedding_names if name not in available]
+        
+        if invalid:
+            logger.error("❌ Invalid embedding names: %s", ', '.join(invalid))
+            logger.info("Available embeddings: %s", ', '.join(available))
+            return EXIT_ERROR
+        
+        # Set active embeddings directly
+        settings_manager = get_settings_manager()
+        settings_manager.set_active_embeddings(embedding_names)
+        logger.info("✅ Selected embeddings: %s", ', '.join(embedding_names))
+    else:
+        # Interactive selection
+        logger.info("🎯 Select active embeddings for queries\n")
+        service.select_embeddings()
+    
+    return EXIT_SUCCESS
+
+
+
+
+@handle_command_errors
 def handle_ask(args) -> int:
     """Handle ask command."""
-    print(f"❓ Asking: {args.question}")
-    print("⚠️  Ask command not yet implemented")
-    return 0
+    from services.embedding_service import AIService
+    
+    service = AIService()
+    service.ask_question(args.question)
+    return EXIT_SUCCESS
 
 
+@handle_command_errors
 def handle_chat(args) -> int:
     """Handle chat command."""
-    print("💬 Starting chat session...")
-    print("⚠️  Chat command not yet implemented")
-    return 0
+    from services.embedding_service import AIService
+    
+    service = AIService()
+    service.start_chat()
+    return EXIT_SUCCESS
 
 
+@handle_command_errors
 def handle_config(args) -> int:
     """Handle config command."""
-    logger = get_logger(__name__)
+    from config.settings import get_settings_manager
     
-    try:
-        settings_manager = get_settings_manager()
-        
-        if args.config_action == "set":
-            if args.claude_key:
-                logger.info("🔑 Setting Claude API key...")
-                settings_manager.set_claude_api_key(args.claude_key)
-                logger.info("✅ Claude API key configured successfully")
-            else:
-                logger.error("❌ No configuration option provided")
-                return 1
-        elif args.config_action == "list":
-            logger.info("📋 Current configuration:")
-            config = settings_manager.get_config()
-            
-            # Show general config
-            logger.info("Storage path: %s", config.storage.base_path)
-            logger.info("Active provider: %s", config.active_provider)
-            logger.info("System prompt strategy: %s", config.system_prompt_strategy)
-            
-            # Show Claude config if available
-            claude_config = config.ai.get("claude")
-            if claude_config:
-                logger.info("Claude model: %s", claude_config.default_model)
-                logger.info("Claude max tokens: %s", claude_config.max_tokens)
-                logger.info("Claude API key: %s", "***configured***" if claude_config.api_key else "not set")
-            else:
-                logger.info("Claude: not configured")
-            
-            # Show active embeddings
-            active = settings_manager.get_active_embeddings()
-            if active.selected:
-                logger.info("Active embeddings: %s", ", ".join(active.selected))
-            else:
-                logger.info("Active embeddings: none selected")
-                
+    logger = get_logger(__name__)
+    settings_manager = get_settings_manager()
+    
+    if args.config_action == "set":
+        if args.claude_key:
+            logger.info("🔑 Setting Claude API key...")
+            settings_manager.set_claude_api_key(args.claude_key)
+            logger.info("✅ Claude API key configured successfully")
         else:
-            logger.error("❌ Unknown config action")
+            logger.error("❌ No configuration option provided")
             return 1
+    elif args.config_action == "list":
+        logger.info("📋 Current configuration:")
+        config = settings_manager.get_config()
+        
+        # Show general config
+        logger.info("Storage path: %s", config.storage.base_path)
+        logger.info("Active provider: %s", config.active_provider)
+        logger.info("System prompt strategy: %s", config.system_prompt_strategy)
+        
+        # Show Claude config if available
+        claude_config = config.ai.get("claude")
+        if claude_config:
+            logger.info("Claude model: %s", claude_config.default_model)
+            logger.info("Claude max tokens: %s", claude_config.max_tokens)
+            logger.info("Claude API key: %s", "***configured***" if claude_config.api_key else "not set")
+        else:
+            logger.info("Claude: not configured")
+        
+        # Show active embeddings
+        active = settings_manager.get_active_embeddings()
+        if active.selected:
+            logger.info("Active embeddings: %s", ", ".join(active.selected))
+        else:
+            logger.info("Active embeddings: none selected")
             
-    except ConfigurationError as e:
-        logger.error("❌ Configuration error: %s", e)
+    else:
+        logger.error("❌ Unknown config action")
         return 1
         
     return 0
 
 
+@handle_command_errors
 def handle_storage(args) -> int:
     """Handle storage command."""
-    logger = get_logger(__name__)
+    from utils.storage import get_storage_manager
     
-    try:
-        storage_manager = get_storage_manager()
+    logger = get_logger(__name__)
+    storage_manager = get_storage_manager()
+    
+    if args.storage_action == "info":
+        logger.info("📊 Storage Information:")
+        storage_info = storage_manager.get_storage_info()
         
-        if args.storage_action == "info":
-            logger.info("📊 Storage Information:")
-            storage_info = storage_manager.get_storage_info()
-            
-            if "error" in storage_info:
-                logger.error("❌ Error getting storage info: %s", storage_info["error"])
-                return 1
-            
-            logger.info("Base path: %s", storage_info["base_path"])
-            logger.info("Total size: %s MB", storage_info["total_size_mb"])
-            logger.info("Embeddings count: %d", storage_info["embeddings_count"])
-            
-            if storage_info["embeddings"]:
-                logger.info("Available embeddings: %s", ", ".join(storage_info["embeddings"]))
-            else:
-                logger.info("Available embeddings: none")
-            
-            # Show directory sizes
-            logger.info("Directory breakdown:")
-            for dir_name, size_bytes in storage_info["directory_sizes"].items():
-                size_mb = round(size_bytes / (1024 * 1024), 2)
-                logger.info("  %s: %s MB", dir_name, size_mb)
-                
-        elif args.storage_action == "cleanup":
-            logger.info("🧹 Cleaning up temporary files older than %d hours...", args.hours)
-            cleaned_count = storage_manager.cleanup_temp_files(args.hours)
-            logger.info("✅ Cleaned up %d temporary files", cleaned_count)
-            
-        elif args.storage_action == "reset":
-            if not args.confirm:
-                logger.error("❌ Reset requires --confirm flag")
-                logger.error("⚠️  This will DELETE ALL embeddings, configuration, and data!")
-                logger.error("Usage: context-ai storage reset --confirm")
-                return 1
-            
-            logger.warning("🚨 RESETTING ALL STORAGE - This will delete everything!")
-            success = storage_manager.reset_storage(confirm=True)
-            if success:
-                logger.info("✅ Storage reset complete")
-            else:
-                logger.error("❌ Storage reset failed")
-                return 1
-                
-        elif args.storage_action == "delete":
-            embedding_name = args.embedding_name
-            logger.info("🗑️  Deleting embedding: %s", embedding_name)
-            
-            if not storage_manager.embedding_exists(embedding_name):
-                logger.error("❌ Embedding '%s' does not exist", embedding_name)
-                return 1
-            
-            success = storage_manager.delete_embedding(embedding_name)
-            if success:
-                logger.info("✅ Embedding '%s' deleted successfully", embedding_name)
-            else:
-                logger.error("❌ Failed to delete embedding '%s'", embedding_name)
-                return 1
-                
+        if "error" in storage_info:
+            logger.error("❌ Error getting storage info: %s", storage_info["error"])
+            return 1
+        
+        logger.info("Base path: %s", storage_info["base_path"])
+        logger.info("Total size: %s MB", storage_info["total_size_mb"])
+        logger.info("Embeddings count: %d", storage_info["embeddings_count"])
+        
+        if storage_info["embeddings"]:
+            logger.info("Available embeddings: %s", ", ".join(storage_info["embeddings"]))
         else:
-            logger.error("❌ Unknown storage action: %s", args.storage_action)
+            logger.info("Available embeddings: none")
+        
+        # Show directory sizes
+        logger.info("Directory breakdown:")
+        for dir_name, size_bytes in storage_info["directory_sizes"].items():
+            size_mb = round(size_bytes / (1024 * 1024), 2)
+            logger.info("  %s: %s MB", dir_name, size_mb)
+            
+    elif args.storage_action == "cleanup":
+        logger.info("🧹 Cleaning up temporary files older than %d hours...", args.hours)
+        cleaned_count = storage_manager.cleanup_temp_files(args.hours)
+        logger.info("✅ Cleaned up %d temporary files", cleaned_count)
+        
+    elif args.storage_action == "reset":
+        if not args.confirm:
+            logger.error("❌ Reset requires --confirm flag")
+            logger.error("⚠️  This will DELETE ALL embeddings, configuration, and data!")
+            logger.error("Usage: context-ai storage reset --confirm")
+            return 1
+        
+        logger.warning("🚨 RESETTING ALL STORAGE - This will delete everything!")
+        success = storage_manager.reset_storage(confirm=True)
+        if success:
+            logger.info("✅ Storage reset complete")
+        else:
+            logger.error("❌ Storage reset failed")
             return 1
             
-    except StorageError as e:
-        logger.error("❌ Storage error: %s", e)
-        return 1
-    except Exception as e:
-        logger.error("❌ Unexpected error: %s", e)
+    elif args.storage_action == "delete":
+        embedding_name = args.embedding_name
+        logger.info("🗑️  Deleting embedding: %s", embedding_name)
+        
+        if not storage_manager.embedding_exists(embedding_name):
+            logger.error("❌ Embedding '%s' does not exist", embedding_name)
+            return 1
+        
+        success = storage_manager.delete_embedding(embedding_name)
+        if success:
+            logger.info("✅ Embedding '%s' deleted successfully", embedding_name)
+        else:
+            logger.error("❌ Failed to delete embedding '%s'", embedding_name)
+            return 1
+            
+    else:
+        logger.error("❌ Unknown storage action: %s", args.storage_action)
         return 1
         
     return 0
@@ -428,33 +438,22 @@ def main(argv: Optional[List[str]] = None) -> int:
         logger.debug("CLI arguments: %s", vars(args))
     
     # Route to command handlers
-    try:
-        if args.command == "generate":
-            return handle_generate(args)
-        elif args.command == "select":
-            return handle_select(args)
-        elif args.command == "query":
-            return handle_query(args)
-        elif args.command == "ask":
-            return handle_ask(args)
-        elif args.command == "chat":
-            return handle_chat(args)
-        elif args.command == "config":
-            return handle_config(args)
-        elif args.command == "storage":
-            return handle_storage(args)
-        else:
-            print(f"❌ Unknown command: {args.command}")
-            return 1
-    except KeyboardInterrupt:
-        logger.info("👋 Interrupted by user")
-        return 130
-    except Exception as e:
-        logger.error("❌ Error: %s", e)
-        if args.verbose:
-            logger.exception("Full traceback:")
-        else:
-            logger.info("Use --verbose for full traceback")
+    if args.command == "generate":
+        return handle_generate(args)
+    elif args.command == "select":
+        return handle_select(args)
+    elif args.command == "query":
+        return handle_query(args)
+    elif args.command == "ask":
+        return handle_ask(args)
+    elif args.command == "chat":
+        return handle_chat(args)
+    elif args.command == "config":
+        return handle_config(args)
+    elif args.command == "storage":
+        return handle_storage(args)
+    else:
+        print(f"❌ Unknown command: {args.command}")
         return 1
 
 

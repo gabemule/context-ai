@@ -353,35 +353,35 @@ Multi-project context can easily generate 8000+ token queries. Without aggressiv
 ## Phase 2: Embedding Generation
 
 ### 2.1 Text Processing Engine
-- [ ] **2.1.1** Install and configure langchain-text-splitters
-- [ ] **2.1.2** Create chunker protocol (interface comum)
-- [ ] **2.1.3** Implement LangChain adapter with language support
-- [ ] **2.1.4** Add basic metadata extraction (file type, language, chunk_index)
-- [ ] **2.1.5** Implement ignore file system (.contextignore/.gitignore support)  
-- [ ] **2.1.6** Add comprehensive language support (JS/TS, Python, CSS, JSON, YAML, MD)
-- [ ] **2.1.7** Add progress tracking for large repository processing
+- [x] **2.1.1** Install and configure langchain-text-splitters
+- [x] **2.1.2** Create chunker protocol (interface comum)
+- [x] **2.1.3** Implement LangChain adapter with language support
+- [x] **2.1.4** Add basic metadata extraction (file type, language, chunk_index)
+- [x] **2.1.5** Implement ignore file system (.contextignore/.gitignore support)  
+- [x] **2.1.6** Add comprehensive language support (JS/TS, Python, CSS, JSON, YAML, MD)
+- [x] **2.1.7** Add progress tracking for large repository processing
 
 ### 2.2 Embedding Model Integration
-- [ ] **2.2.1** Install sentence-transformers dependency
-- [ ] **2.2.2** Implement model loading and caching
-- [ ] **2.2.3** Use single model (all-MiniLM-L6-v2) for MVP
-- [ ] **2.2.4** Create embedding generation with batch processing
-- [ ] **2.2.5** Add basic model download progress indicators
+- [x] **2.2.1** Install sentence-transformers dependency
+- [x] **2.2.2** Implement model loading and caching
+- [x] **2.2.3** Use single model (all-MiniLM-L6-v2) for MVP
+- [x] **2.2.4** Create embedding generation with batch processing
+- [x] **2.2.5** Add basic model download progress indicators
 
 ### 2.3 ChromaDB Integration
-- [ ] **2.3.1** Install and configure ChromaDB
-- [ ] **2.3.2** Implement collection creation and management
-- [ ] **2.3.3** Add document and embedding storage
-- [ ] **2.3.4** Create basic metadata indexing
+- [x] **2.3.1** Install and configure ChromaDB
+- [x] **2.3.2** Implement collection creation and management
+- [x] **2.3.3** Add document and embedding storage
+- [x] **2.3.4** Create basic metadata indexing
 
 ### 2.4 Generate Command Implementation
-- [ ] **2.4.1** Create generate-embedding command structure
-- [ ] **2.4.2** Add basic path validation and error handling
-- [ ] **2.4.3** Implement simple ignore file resolution
-- [ ] **2.4.4** Add basic file type detection and filtering
-- [ ] **2.4.5** Implement progress bars and status updates
-- [ ] **2.4.6** Add embedding naming system
-- [ ] **2.4.7** Create basic completion statistics
+- [x] **2.4.1** Create generate-embedding command structure
+- [x] **2.4.2** Add basic path validation and error handling
+- [x] **2.4.3** Implement simple ignore file resolution
+- [x] **2.4.4** Add basic file type detection and filtering
+- [x] **2.4.5** Implement progress bars and status updates
+- [x] **2.4.6** Add embedding naming system
+- [x] **2.4.7** Create basic completion statistics
 
 **Phase 2 Success Criteria:**
 - ✅ Can generate embeddings from documentation directories
@@ -395,36 +395,36 @@ Multi-project context can easily generate 8000+ token queries. Without aggressiv
 ## Phase 3: Query and Selection System
 
 ### 3.1 Embedding Management
-- [ ] **3.1.1** Implement embedding listing functionality
-- [ ] **3.1.2** Create basic embedding metadata display (size, chunks, date)
-- [ ] **3.1.3** Add single embedding selection and activation system
-- [ ] **3.1.4** Implement multi-embedding selection interface
-- [ ] **3.1.5** Implement embedding deletion and cleanup
+- [x] **3.1.1** Implement embedding listing functionality
+- [x] **3.1.2** Create basic embedding metadata display (size, chunks, date)
+- [x] **3.1.3** Add single embedding selection and activation system
+- [x] **3.1.4** Implement multi-embedding selection interface
+- [x] **3.1.5** Implement embedding deletion and cleanup
 
 ### 3.2 Query Engine Development
-- [ ] **3.2.1** Implement similarity search algorithm (single embedding)
-- [ ] **3.2.2** Add multi-embedding parallel query system
-- [ ] **3.2.3** Create cross-embedding result merging and ranking
-- [ ] **3.2.4** Implement source attribution and context balancing
-- [ ] **3.2.5** Add basic query preprocessing
+- [x] **3.2.1** Implement similarity search algorithm (single embedding)
+- [x] **3.2.2** Add multi-embedding parallel query system
+- [x] **3.2.3** Create cross-embedding result merging and ranking
+- [x] **3.2.4** Implement source attribution and context balancing
+- [x] **3.2.5** Add basic query preprocessing
 
 ### 3.3 Context Formatting
-- [ ] **3.3.1** Design AI-friendly output format
-- [ ] **3.3.2** Implement context chunk assembly
-- [ ] **3.3.3** Add source attribution and linking
-- [ ] **3.3.4** Implement basic context size limiting
+- [x] **3.3.1** Design AI-friendly output format
+- [x] **3.3.2** Implement context chunk assembly
+- [x] **3.3.3** Add source attribution and linking
+- [x] **3.3.4** Implement basic context size limiting
 
 ### 3.4 Select Command Implementation
-- [ ] **3.4.1** Create basic selection interface
-- [ ] **3.4.2** Add embedding information display
-- [ ] **3.4.3** Implement active embedding switching
-- [ ] **3.4.4** Create selection validation and error handling
+- [x] **3.4.1** Create basic selection interface
+- [x] **3.4.2** Add embedding information display
+- [x] **3.4.3** Implement active embedding switching
+- [x] **3.4.4** Create selection validation and error handling
 
 ### 3.5 Query Command Implementation
-- [ ] **3.5.1** Create query command with context search processing
-- [ ] **3.5.2** Implement context retrieval and assembly
-- [ ] **3.5.3** Add output formatting for AI consumption
-- [ ] **3.5.4** Add basic debugging and verbose output modes
+- [x] **3.5.1** Create query command with context search processing
+- [x] **3.5.2** Implement context retrieval and assembly
+- [x] **3.5.3** Add output formatting for AI consumption
+- [x] **3.5.4** Add basic debugging and verbose output modes
 
 **Phase 3 Success Criteria:**
 - ✅ Can list and select between multiple embeddings
@@ -454,9 +454,9 @@ Multi-project context can easily generate 8000+ token queries. Without aggressiv
   - [ ] **4.3.1.3** Basic prompt formatting for Claude
   - [ ] **4.3.1.4** Simple retry logic and timeout handling
 - [ ] **4.3.2** API Key Configuration (Simple)
-  - [ ] **4.3.2.1** Basic Claude API key storage
+  - [x] **4.3.2.1** Basic Claude API key storage
   - [ ] **4.3.2.2** Key validation and connectivity testing
-  - [ ] **4.3.2.3** Simple configuration management
+  - [x] **4.3.2.3** Simple configuration management
 - [ ] **4.3.3** Core Ask Command Implementation
   - [ ] **4.3.3.1** Create ask command with Claude integration
   - [ ] **4.3.3.2** Basic context retrieval and assembly
@@ -538,6 +538,18 @@ For post-MVP enhancements and long-term roadmap, see [Future.md](./Future.md).
 - **Testing**: Basic tests for core functionality
 - **Constants**: Use centralized constants files to eliminate code duplication
 - **Configuration**: All magic numbers and default values in constants.py
+
+### Core Development Principles
+- **SOLID Principles**:
+  - Single Responsibility: Each class/function has one clear purpose
+  - Open/Closed: Open for extension, closed for modification
+  - Liskov Substitution: Derived classes must be substitutable for base classes
+  - Interface Segregation: Prefer specific interfaces over general ones
+  - Dependency Inversion: Depend on abstractions, not concretions
+- **DRY (Don't Repeat Yourself)**: Eliminate code duplication through constants, utilities, and abstractions
+- **YAGNI (You Aren't Gonna Need It)**: Only implement what's required for current phase
+- **Clean Code**: Self-documenting code with clear naming and simple logic
+- **Clean Architecture**: Separation of concerns with clear boundaries between layers
 
 
 ### Performance Goals (Realistic)

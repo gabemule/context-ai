@@ -8,9 +8,10 @@ from pydantic import BaseModel, Field
 
 from .constants import (
     CLAUDE_MAX_TOKENS,
-    DEFAULT_SUPPORTED_EXTENSIONS,
+    SUPPORTED_EXTENSIONS,
     DEFAULT_CHUNK_SIZE,
     DEFAULT_CHUNK_OVERLAP,
+    DEFAULT_MIN_CHUNK_SIZE,
     DEFAULT_MAX_CHUNKS,
     DEFAULT_PRIORITIZE_CROSS_PROJECT,
     DEFAULT_INCLUDE_METADATA,
@@ -32,8 +33,9 @@ class ChunkingConfig(BaseModel):
     """Configuration for text chunking."""
     chunk_size: int = Field(DEFAULT_CHUNK_SIZE, description="Maximum chunk size in characters")
     chunk_overlap: int = Field(DEFAULT_CHUNK_OVERLAP, description="Overlap between chunks")
+    min_chunk_size: int = Field(DEFAULT_MIN_CHUNK_SIZE, description="Minimum chunk size")  
     supported_extensions: List[str] = Field(
-        default=DEFAULT_SUPPORTED_EXTENSIONS,
+        default=list(SUPPORTED_EXTENSIONS),
         description="Supported file extensions"
     )
 

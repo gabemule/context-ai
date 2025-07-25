@@ -81,25 +81,46 @@ class StorageManager:
         return self.temp_dir / filename
     
     def list_embeddings(self) -> List[str]:
-        """List all available embedding names."""
+        """List all available embedding names from ChromaDB."""
         try:
-            if not self.embeddings_dir.exists():
-                return []
+            # Import here to avoid circular imports
+            from core.embeddings.vector_store import get_vector_store
             
-            embeddings = []
-            for metadata_file in self.embeddings_dir.glob("*.json"):
-                embedding_name = metadata_file.stem
-                embeddings.append(embedding_name)
+            vector_store = get_vector_store()
+            embeddings_info = vector_store.list_embeddings()
             
-            return sorted(embeddings)
+            return sorted([info["name"] for info in embeddings_info])
             
         except Exception as e:
-            self.logger.warning("Error listing embeddings: %s", e)
-            return []
+            self.logger.warning("Error listing embeddings from vector store: %s", e)
+            # Fallback to JSON files if vector store fails
+            try:
+                if not self.embeddings_dir.exists():
+                    return []
+                
+                embeddings = []
+                for metadata_file in self.embeddings_dir.glob("*.json"):
+                    embedding_name = metadata_file.stem
+                    embeddings.append(embedding_name)
+                
+                return sorted(embeddings)
+            except Exception as fallback_e:
+                self.logger.warning("Fallback to JSON files also failed: %s", fallback_e)
+                return []
     
     def embedding_exists(self, embedding_name: str) -> bool:
-        """Check if embedding exists."""
-        return self.get_embedding_metadata_path(embedding_name).exists()
+        """Check if embedding exists in ChromaDB."""
+        try:
+            from core.embeddings.vector_store import get_vector_store
+            
+            vector_store = get_vector_store()
+            info = vector_store.get_embedding_info(embedding_name)
+            return info is not None
+            
+        except Exception as e:
+            self.logger.warning("Error checking embedding existence: %s", e)
+            # Fallback to JSON file check
+            return self.get_embedding_metadata_path(embedding_name).exists()
     
     def get_storage_size(self) -> int:
         """Get total storage size in bytes."""

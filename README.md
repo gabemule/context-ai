@@ -7,22 +7,29 @@ Transform your codebase into an intelligent assistant that provides cross-projec
 ## 🚀 Quick Start
 
 ```bash
-# Install
-pip install context-ai
+# Install in development mode
+git clone https://github.com/gabemule/context-ai
+cd context-ai
+pip install -e .
 
 # Generate embeddings for your projects
 context-ai generate ./my-design-system --name "design-system-v1"
 context-ai generate ./current-project --name "project-main-v2"
 
-# Interactive embedding selection
-context-ai select
-# → Opens checkbox interface to select active embeddings
+# Select active embeddings (interactive or direct)
+context-ai select                              # Interactive checkbox interface
+context-ai select design-system-v1 project-main-v2  # Direct CLI selection
 
-# Ask questions with cross-project intelligence
+# Query for context in different formats
+context-ai query "authentication patterns" --verbose
+context-ai query "modal components" --format json --max-results 5
+context-ai query "error handling" --format markdown --output results.md
+
+# Ask questions with cross-project intelligence (Coming Soon)
 context-ai ask "Do we have existing components for file uploads?"
 context-ai ask "What's our standard approach for API error handling?"
 
-# Interactive chat mode
+# Interactive chat mode (Coming Soon)
 context-ai chat
 ```
 
@@ -96,14 +103,100 @@ make test lint type-check
 
 ## 📋 Commands
 
-- `generate` - Generate embeddings from a project directory
-- `select` - **Interactive checkbox selection** of active embeddings
-- `query` - Query embeddings for raw context
-- `ask` - Ask questions and get AI-powered answers
-- `chat` - Interactive chat session
-- `config` - Manage configuration
+### Core Commands (✅ Implemented)
 
-### Interactive Selection
+#### `generate` - Generate embeddings from projects
+```bash
+# Basic usage
+context-ai generate ./my-project --name "project-v1"
+
+# With custom ignore file  
+context-ai generate ./my-project --name "project-v1" --ignore-file .custom-ignore
+
+# Disable progress bars (for CI/CD)
+context-ai generate ./my-project --name "project-v1" --no-progress
+```
+
+#### `select` - Choose active embeddings  
+```bash
+# Interactive checkbox interface
+context-ai select
+
+# Direct CLI selection (great for scripts!)
+context-ai select embedding1 embedding2 embedding3
+
+# One-liner with query
+context-ai select my-project && context-ai query "patterns"
+```
+
+#### `query` - Search embeddings for context
+```bash
+# Basic query
+context-ai query "authentication patterns"
+
+# Different output formats
+context-ai query "components" --format json
+context-ai query "error handling" --format markdown  
+context-ai query "API integration" --format plain
+
+# Limit results and save to file
+context-ai query "modal components" --max-results 3 --output results.md
+
+# Verbose mode with debug info
+context-ai query "state management" --verbose --debug
+
+# Copy results to clipboard (requires pyperclip)
+context-ai query "validation helpers" --copy
+```
+
+#### `config` - Manage configuration
+```bash
+# Set Claude API key
+context-ai config set --claude-key sk-ant-xxxxxxxxxxxx
+
+# View current configuration  
+context-ai config list
+```
+
+#### `storage` - Manage embeddings and cleanup
+```bash
+# View storage information
+context-ai storage info
+
+# Clean up temporary files
+context-ai storage cleanup --hours 24
+
+# Delete specific embedding
+context-ai storage delete embedding-name
+
+# Reset all storage (⚠️ Destructive!)
+context-ai storage reset --confirm
+```
+
+### AI Commands (🚧 Coming Soon)
+
+#### `ask` - AI-powered Q&A (Phase 4.3)
+```bash
+context-ai ask "Do we have existing components for file uploads?"
+context-ai ask "What's our standard approach for API error handling?"
+```
+
+#### `chat` - Interactive AI chat (Phase 4.3)
+```bash
+context-ai chat
+# Opens interactive chat session with Claude
+```
+
+### Query Output Formats
+
+| Format | Description | Use Case |
+|--------|-------------|----------|
+| `ai_friendly` (default) | Rich format with source attribution | AI consumption, debugging |
+| `json` | Structured JSON with metadata | API integration, processing |  
+| `markdown` | Clean markdown format | Documentation, reports |
+| `plain` | Simple text format | Simple scripts, pipes |
+
+### Interactive Selection Interface
 
 The `select` command opens an interactive checkbox interface:
 
@@ -113,12 +206,34 @@ context-ai select
 🎯 Select active embeddings for queries
 
 [?] Select embeddings to query (use space to select/deselect, enter to confirm):
- > [x] design-system-v1 (1.2M tokens, 3 days ago)
-   [x] project-main-v2 (800K tokens, 1 day ago) 
-   [ ] api-docs-v1 (300K tokens, 1 week ago)
-   [ ] helpers-lib-v1 (150K tokens, 2 days ago)
+ > [x] design-system-v1 (153 chunks, 27 files, 25 Jul 2025)
+   [x] project-main-v2 (800 chunks, 45 files, 1 day ago) 
+   [ ] api-docs-v1 (300 chunks, 12 files, 1 week ago)
+   [ ] helpers-lib-v1 (150 chunks, 8 files, 2 days ago)
 
 ✅ Selected embeddings: design-system-v1, project-main-v2
+```
+
+### Example Workflows
+
+```bash
+# 1. Complete setup workflow
+context-ai generate ./my-frontend --name "frontend-v1"
+context-ai generate ./my-backend --name "backend-v1"  
+context-ai generate ./design-system --name "ds-v1"
+context-ai select frontend-v1 backend-v1 ds-v1
+context-ai query "authentication flow" --verbose
+
+# 2. One-liner for quick queries
+context-ai select my-project && context-ai query "error handling" --format json
+
+# 3. Batch processing for documentation
+context-ai query "components" --format markdown --output components.md
+context-ai query "API patterns" --format markdown --output api-patterns.md
+context-ai query "utilities" --format markdown --output utilities.md
+
+# 4. Debug workflow
+context-ai query "complex query" --debug --verbose --output debug.log
 ```
 
 ## 🤝 Contributing
@@ -135,6 +250,20 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 🛠️ Status
 
-**Alpha** - Core infrastructure implemented, embedding generation in progress.
+**Beta** - Core query system fully implemented and tested! 🚀
 
-See [Plan.md](Plan.md) for detailed development roadmap.
+### ✅ Completed Features
+- **Embedding generation** with sentence-transformers + ChromaDB
+- **Interactive selection** with checkbox interface + direct CLI args
+- **Multi-format queries** (AI-friendly, JSON, Markdown, Plain)
+- **Cross-embedding search** with result merging & normalization  
+- **Token counting** with tiktoken integration
+- **Multi-language support** (English/Portuguese query processing)
+- **Progress tracking** with rich UI
+- **Storage management** with cleanup utilities
+
+### 🚧 In Progress  
+- **Claude integration** for AI-powered Q&A (Phase 4.3)
+- **Chat interface** for interactive conversations
+
+See [Plan.md](Plan.md) for detailed development roadmap and [Future.md](Future.md) for post-MVP enhancements.

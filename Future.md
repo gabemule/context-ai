@@ -4,6 +4,25 @@
 
 ## 🚀 Post-MVP Enhancements
 
+### Performance Optimizations (Short-term)
+- [x] **CLI Performance**: Improve startup time from 6s to <1s ✅ **COMPLETED (0.4s)**
+  - [x] **Lazy imports optimization**: Move heavy imports to function-level only when needed ✅ **COMPLETED**
+    - [x] Moved query command parser definition inline to avoid loading query module during help
+    - [x] All command handlers now use lazy imports for heavy dependencies
+    - [x] Startup time improved from 6+ seconds to ~0.4 seconds (15x improvement)
+  - [ ] **Instance caching**: Cache heavy service instances across CLI commands
+  - [ ] **Daemon mode**: Optional background process for instant responses
+  - [ ] **Startup profiling**: Detailed analysis of import bottlenecks
+  - [ ] **Selective loading**: Only load necessary components per command
+
+### Performance Notes
+- **Major Bottleneck Identified**: Top-level imports in CLI parser creation
+  - `from commands.query import add_query_parser` was loading the entire query module chain
+  - This included heavy dependencies: ChromaDB, sentence-transformers, langchain-text-splitters
+  - Solution: Moved query parser definition inline and use lazy imports in handlers
+- **Results**: CLI help command now starts in ~0.4s instead of 6+ seconds
+- **Next Optimizations**: Command-specific operations (storage, query) still take 5+ seconds due to ChromaDB initialization
+
 ### Phase 5: Simple Multi-Provider Support (Month 2)
 - [ ] **OpenAI Integration**: Add GPT-4, GPT-4o as second provider option
   - [ ] **5.1.1** Implement OpenAI API client with basic retry logic
