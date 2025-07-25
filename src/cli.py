@@ -205,6 +205,11 @@ Examples:
         action="store_true",
         help="Show detailed processing information"
     )
+    ask_parser.add_argument(
+        "--prompt-mode", "-pm",
+        choices=["minimal", "standard", "comprehensive", "strict"],
+        help="Set prompt mode: minimal (basic), standard (default), comprehensive (full analysis), strict (enforced guidelines)"
+    )
     
     # Chat command
     chat_parser = subparsers.add_parser(
@@ -215,6 +220,11 @@ Examples:
         "--verbose", "-v",
         action="store_true",
         help="Show detailed processing information"
+    )
+    chat_parser.add_argument(
+        "--prompt-mode", "-pm",
+        choices=["minimal", "standard", "comprehensive", "strict"],
+        help="Set prompt mode: minimal (basic), standard (default), comprehensive (full analysis), strict (enforced guidelines)"
     )
     
     # Config command
@@ -425,16 +435,29 @@ def handle_ask(args) -> int:
     
     console = Console()
     
+    # Set prompt mode if specified
+    if args.prompt_mode:
+        import config.constants
+        original_mode = config.constants.PROMPT_MODE
+        config.constants.PROMPT_MODE = args.prompt_mode
+        if args.verbose:
+            logger.info("🎯 Using prompt mode: %s", args.prompt_mode)
+    
     with console.status("[bold blue]Initializing AI service...", spinner="dots"):
         service = get_ai_service()
     
-    service.ask_question(
-        question=args.question,
-        context_format=args.format,
-        verbose=args.verbose,
-        copy_to_clipboard=args.copy,
-        output_file=args.output
-    )
+    try:
+        service.ask_question(
+            question=args.question,
+            context_format=args.format,
+            verbose=args.verbose,
+            copy_to_clipboard=args.copy,
+            output_file=args.output
+        )
+    finally:
+        # Restore original mode
+        if args.prompt_mode:
+            config.constants.PROMPT_MODE = original_mode
     return EXIT_SUCCESS
 
 
@@ -449,10 +472,23 @@ def handle_chat(args) -> int:
     
     console = Console()
     
+    # Set prompt mode if specified
+    if args.prompt_mode:
+        import config.constants
+        original_mode = config.constants.PROMPT_MODE
+        config.constants.PROMPT_MODE = args.prompt_mode
+        if args.verbose:
+            logger.info("🎯 Using prompt mode: %s", args.prompt_mode)
+    
     with console.status("[bold blue]Starting chat session...", spinner="dots"):
         service = get_ai_service()
     
-    service.start_chat()
+    try:
+        service.start_chat(verbose=args.verbose)
+    finally:
+        # Restore original mode
+        if args.prompt_mode:
+            config.constants.PROMPT_MODE = original_mode
     return EXIT_SUCCESS
 
 

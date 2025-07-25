@@ -22,23 +22,66 @@ SOURCE_HEADER_TEMPLATE = "## From {source} (similarity: {similarity:.2f}):"
 FILE_INFO_TEMPLATE = "**File:** {file_path} ({language})"
 CROSS_REFERENCE_HEADER = "## Cross-reference analysis:"
 
+# Token calculation with caching for performance
+_token_cache = {}
+
 try:
     import tiktoken
     # cl100k_base provides good approximation for Claude token counting
     _token_encoder = tiktoken.get_encoding("cl100k_base")
     
     def count_tokens(text: str) -> int:
-        """Count tokens using tiktoken for accurate estimation."""
-        return len(_token_encoder.encode(text))
+        """Count tokens using tiktoken with caching for performance."""
+        from config.constants import ENABLE_TOKEN_CACHE, TOKEN_CACHE_SIZE
+        
+        if not ENABLE_TOKEN_CACHE:
+            return len(_token_encoder.encode(text))
+        
+        # Use hash of text as cache key for memory efficiency
+        text_hash = hash(text)
+        
+        if text_hash in _token_cache:
+            return _token_cache[text_hash]
+        
+        # Calculate tokens
+        token_count = len(_token_encoder.encode(text))
+        
+        # Cache with size limit (LRU-style)
+        if len(_token_cache) >= TOKEN_CACHE_SIZE:
+            # Remove oldest entry (simple FIFO for now)
+            oldest_key = next(iter(_token_cache))
+            del _token_cache[oldest_key]
+        
+        _token_cache[text_hash] = token_count
+        return token_count
         
 except ImportError:
     AVG_CHARS_PER_TOKEN = 4
     
     def count_tokens(text: str) -> int:
-        """Fallback token estimation when tiktoken unavailable."""
+        """Fallback token estimation with caching when tiktoken unavailable."""
+        from config.constants import ENABLE_TOKEN_CACHE, TOKEN_CACHE_SIZE
+        
+        if not ENABLE_TOKEN_CACHE:
+            clean_text = re.sub(r'[#*`\[\](){}]', '', text)
+            char_count = len(clean_text)
+            return max(1, char_count // AVG_CHARS_PER_TOKEN)
+        
+        text_hash = hash(text)
+        
+        if text_hash in _token_cache:
+            return _token_cache[text_hash]
+        
         clean_text = re.sub(r'[#*`\[\](){}]', '', text)
         char_count = len(clean_text)
-        return max(1, char_count // AVG_CHARS_PER_TOKEN)
+        token_count = max(1, char_count // AVG_CHARS_PER_TOKEN)
+        
+        if len(_token_cache) >= TOKEN_CACHE_SIZE:
+            oldest_key = next(iter(_token_cache))
+            del _token_cache[oldest_key]
+        
+        _token_cache[text_hash] = token_count
+        return token_count
 
 
 @dataclass

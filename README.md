@@ -44,6 +44,8 @@ context-ai chat
 - **AI-powered insights** - Powered by Claude with enhanced cross-project correlation prompts
 - **Smart token allocation** - Dynamic context sizing based on model capabilities
 - **Multiple output formats** - JSON, XML, Markdown, Plain text with clipboard support
+- **Configurable prompt modes** - From minimal to comprehensive analysis with coding guidelines
+- **JavaScript/TypeScript guidelines** - Built-in coding standards with SOLID, DRY, YAGNI principles
 
 ## 📦 Installation
 
@@ -150,6 +152,9 @@ context-ai query "state management" --verbose --debug
 
 # Copy results to clipboard (requires pyperclip)
 context-ai query "validation helpers" --copy
+
+# Debug mode with detailed preprocessing info
+context-ai query "complex patterns" --debug --verbose
 ```
 
 #### `config` - Manage configuration
@@ -159,6 +164,16 @@ context-ai config set --claude-key sk-ant-xxxxxxxxxxxx
 
 # View current configuration  
 context-ai config list
+
+# Test API key connectivity
+context-ai config test
+
+# Validate configuration and diagnose issues
+context-ai config validate
+
+# All config commands support --verbose for detailed output
+context-ai config list --verbose
+context-ai config test --verbose
 ```
 
 #### `storage` - Manage embeddings and cleanup
@@ -174,6 +189,11 @@ context-ai storage delete embedding-name
 
 # Reset all storage (⚠️ Destructive!)
 context-ai storage reset --confirm
+
+# All storage commands support --verbose for detailed output
+context-ai storage info --verbose
+context-ai storage cleanup --hours 48 --verbose
+context-ai storage delete embedding-name --verbose
 ```
 
 ### AI Commands (✅ Implemented)
@@ -184,17 +204,74 @@ context-ai storage reset --confirm
 context-ai ask "Do we have existing components for file uploads?"
 context-ai ask "What's our standard approach for API error handling?"
 
-# With advanced options
+# With advanced options and prompt modes
 context-ai ask "Compare authentication patterns" --verbose --copy
 context-ai ask "Best modal implementation?" --format markdown --output modal-analysis.md
 context-ai ask "How to handle errors?" --format json --output error-patterns.json
+
+# Different prompt modes for varying levels of analysis
+context-ai ask "How to implement login?" --prompt-mode minimal      # Fast, basic response
+context-ai ask "How to implement login?" --prompt-mode standard     # Default with guidelines
+context-ai ask "How to implement login?" --prompt-mode comprehensive # Full analysis
+context-ai ask "How to implement login?" --prompt-mode strict       # Enforced code standards
 ```
 
 #### `chat` - Interactive AI chat session
 ```bash
+# Basic chat session
 context-ai chat
-# Opens interactive chat session with Claude using active embeddings
+
+# Chat with different prompt modes (applies to entire session)
+context-ai chat --prompt-mode minimal         # Fast, basic responses throughout chat
+context-ai chat --prompt-mode standard        # Default with guidelines (recommended)
+context-ai chat --prompt-mode comprehensive   # Full architectural analysis for all questions
+context-ai chat --prompt-mode strict          # Enforced coding standards throughout session
+
+# Combine with verbose mode for detailed processing info
+context-ai chat --prompt-mode comprehensive --verbose
 ```
+
+### 🎛️ Prompt Modes
+
+Control the depth and focus of AI responses with configurable prompt modes:
+
+| Mode | Description | Best For | Features |
+|------|-------------|----------|----------|
+| `minimal` | Basic context + question only | Quick queries, simple lookups | Fastest processing, no extra instructions |
+| `standard` | Cross-project awareness + coding guidelines | Daily development work | JS/TS guidelines when detected, cross-project hints |
+| `comprehensive` | Full analysis + architectural insights | Complex queries, architecture decisions | Deep cross-project comparison, best practices |
+| `strict` | Enforced standards + code review approach | Code generation, refactoring | Strict guideline enforcement, detailed code review |
+
+```bash
+# Examples with ask command (single questions)
+context-ai ask "How to validate forms?" --prompt-mode minimal      # Quick answer
+context-ai ask "How to validate forms?" --prompt-mode standard     # With JS/TS guidelines  
+context-ai ask "How to validate forms?" --prompt-mode comprehensive # Full architectural analysis
+context-ai ask "How to validate forms?" --prompt-mode strict       # Code review quality
+
+# Examples with chat command (applies to entire session)
+context-ai chat --prompt-mode standard        # All questions use standard mode with guidelines
+context-ai chat --prompt-mode comprehensive   # All responses include full architectural analysis
+```
+
+### 📐 Built-in Coding Guidelines
+
+For JavaScript/TypeScript projects, Context-AI automatically applies coding guidelines focused on:
+
+- **SOLID, DRY, YAGNI principles** - Clean architecture fundamentals
+- **Functional programming over classes** - Modern JS/TS best practices  
+- **Pure functions and immutability** - Predictable, testable code
+- **ES6+ features** - Arrow functions, destructuring, async/await
+- **Performance optimization** - Lazy loading, memoization, debouncing
+- **Error handling patterns** - Explicit error handling, Result types
+- **Testing philosophy** - TDD, unit tests, integration tests
+
+Guidelines are automatically detected and applied when:
+- JavaScript/TypeScript files are found in context
+- Code-related keywords are used in questions
+- Implementation or development queries are made
+
+**Note**: Guidelines work identically in both `ask` (single questions) and `chat` (conversation sessions) commands. In chat mode, the selected prompt mode applies consistently throughout the entire conversation.
 
 ### Query Output Formats
 
@@ -244,7 +321,44 @@ context-ai query "utilities" --format markdown --output utilities.md
 
 # 4. Debug workflow
 context-ai query "complex query" --debug --verbose --output debug.log
+
+# 5. Interactive development sessions with different complexity levels
+context-ai chat --prompt-mode standard        # Daily development work
+context-ai chat --prompt-mode comprehensive   # Architecture planning sessions  
+context-ai chat --prompt-mode strict          # Code review and refactoring sessions
 ```
+
+## 📖 Complete Command Reference
+
+### Global Options
+- `--version` - Show program version
+- `--verbose, -v` - Enable verbose output (available on all commands)
+- `--help, -h` - Show help message
+
+### Commands Summary
+
+| Command | Purpose | Key Options |
+|---------|---------|-------------|
+| `generate` | Create embeddings | `--name`, `--ignore-file`, `--no-progress` |
+| `select` | Choose active embeddings | Interactive or direct selection |
+| `query` | Search for context | `--format`, `--max-results`, `--debug`, `--copy`, `--output` |
+| `ask` | AI Q&A with context | `--format`, `--prompt-mode`, `--copy`, `--output` |
+| `chat` | Interactive AI session | `--prompt-mode` |
+| `config` | Manage settings | `set`, `list`, `test`, `validate` subcommands |
+| `storage` | Manage data | `info`, `cleanup`, `reset`, `delete` subcommands |
+
+### Format Options (query & ask)
+- `ai_friendly` (default) - Rich context for AI processing
+- `json` - Structured JSON output  
+- `xml` - XML format
+- `markdown` - Clean markdown
+- `plain` - Simple text
+
+### Prompt Modes (ask & chat)
+- `minimal` - Basic context only
+- `standard` - Default with guidelines (recommended)
+- `comprehensive` - Full cross-project analysis  
+- `strict` - Enforced coding standards
 
 ## 🤝 Contributing
 
@@ -276,6 +390,8 @@ MIT License - see [LICENSE](LICENSE) file for details.
 - **Dynamic token allocation** based on model capabilities (up to 200k tokens)
 - **Enhanced cross-project analysis** with pattern detection and comparison
 - **Clipboard integration** and file output support
+- **Configurable prompt modes** with JavaScript/TypeScript coding guidelines
+- **Auto-detection of coding contexts** with SOLID, DRY, YAGNI principle enforcement
 
 ### 🚀 Production Ready
 All core features are implemented and tested. The system is ready for production use!

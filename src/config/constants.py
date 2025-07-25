@@ -22,6 +22,12 @@ CLAUDE_RESPONSE_TOKEN_RATIO = 0.8  # Use 80% of remaining capacity for response
 CLAUDE_MIN_RESPONSE_TOKENS = 4000  # Minimum response tokens
 CLAUDE_MAX_RESPONSE_TOKENS = 12000  # Sanity cap for response tokens
 
+# Chat history management
+CHAT_HISTORY_TOKEN_RATIO = 0.3  # Use 30% of context for chat history
+CHAT_MAX_HISTORY_TURNS = 10  # Maximum conversation turns to keep
+CHAT_MIN_HISTORY_TURNS = 3   # Minimum turns to preserve when truncating
+CHAT_SUMMARY_THRESHOLD = 5   # After N turns, start summarizing old history
+
 # Supported file extensions by language
 LANGUAGE_EXTENSIONS = {
     "python": {".py", ".pyx", ".pyi"},
@@ -62,10 +68,31 @@ DEFAULT_CHUNK_OVERLAP = 200
 DEFAULT_MIN_CHUNK_SIZE = 50
 
 # Query and search defaults
-DEFAULT_QUERY_RESULTS = 50  # Raw results from vector database
+DEFAULT_QUERY_RESULTS = 100  # Raw results from vector database (doubled for better quality)
 MAX_QUERY_RESULTS = 200     # Maximum allowed per query
-DEFAULT_DISPLAY_RESULTS = 15  # Results shown to user 
+DEFAULT_DISPLAY_RESULTS = 20  # Results shown to user (increased - only affects terminal display)
 MAX_DISPLAY_RESULTS = 50    # Maximum results to display
+
+# Performance optimization constants
+ENABLE_TOKEN_CACHE = True  # Cache token calculations to avoid re-processing
+TOKEN_CACHE_SIZE = 200  # Cache recent token calculations
+ENABLE_CONTEXT_CACHE = True  # Cache context between chat turns
+CONTEXT_CACHE_TTL = 300  # Context cache TTL in seconds
+
+# Prompt configuration
+PROMPT_MODE = "standard"  # Modes: "minimal", "standard", "comprehensive", "strict"
+ENABLE_CROSS_PROJECT_PROMPTS = True   # Add cross-project analysis instructions
+ENABLE_CODING_GUIDELINES = True       # Include coding guidelines in prompts (always when applicable)
+GUIDELINES_AUTO_DETECT = True         # Automatically detect when to apply guidelines
+GUIDELINES_LANGUAGES = ['javascript', 'typescript']  # Supported guideline languages
+
+# Prompt mode descriptions - each mode builds upon the previous
+PROMPT_MODES = {
+    "minimal": "Basic context + question only. No additional instructions or analysis prompts. Fastest processing.",
+    "standard": "Context + question + cross-project awareness when multiple projects detected. Includes coding guidelines when JS/TS detected.", 
+    "comprehensive": "Full cross-project comparison analysis + coding guidelines + architectural insights. Best for complex queries.",
+    "strict": "All features + enforced coding standards + detailed code review approach. Best for code generation tasks."
+}
 
 # Language-specific text separators for chunking
 LANGUAGE_SEPARATORS = {
