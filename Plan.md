@@ -1,11 +1,11 @@
-# Context-AI - AI-Powered Documentation Assistant
+# Context-AI - Cross-Project Code Intelligence Assistant
 
-> Transform your documentation into an intelligent, queryable knowledge base using embeddings and RAG
+> Transform your codebase into an intelligent assistant that provides cross-project context, discovers reusable components, and guides architectural decisions
 
 ## 🎯 Project Overview
 
 ### Mission
-Create a CLI tool that converts documentation into embeddings for AI-powered contextual queries, enabling developers to get precise, relevant documentation context for any question.
+Create an intelligent code assistant that provides cross-project context and insights, helping developers understand codebases, discover reusable components, and follow established patterns across multiple repositories.
 
 ### Core Features
 - **Generate embeddings** from entire repositories (code + docs)
@@ -18,11 +18,18 @@ Create a CLI tool that converts documentation into embeddings for AI-powered con
 - **Reliable and efficient** - dependable query responses
 
 ### Value Proposition
-- **Context window optimization** - only load relevant chunks
-- **Codebase exploration** - "How is authentication implemented?"
-- **Multi-project support** - switch between different repositories
-- **AI integration ready** - output formatted for Cline/Cursor/ChatGPT
-- **Offline capability** - works without internet connection
+- **Cross-project intelligence** - "How does our design system handle modals?"
+- **Component reusability** - "Do we have existing upload components I can reuse?"
+- **Pattern discovery** - "What's our standard approach for API error handling?"
+- **Architecture guidance** - "How should I structure this new feature?"
+- **Code consistency** - "What validation helpers are available across projects?"
+
+### Key Use Cases
+- **Cross-project intelligence** - "How does our design system handle modals?"
+- **Component reusability** - "Do we have existing upload components I can reuse?"
+- **Pattern discovery** - "What's our standard approach for API error handling?"
+- **Architecture guidance** - "How should I structure this new feature?"
+- **Code consistency** - "What validation helpers are available across projects?"
 
 ---
 
@@ -49,10 +56,12 @@ Context-AI CLI
 ### Technology Stack
 - **Language**: Python 3.8+
 - **CLI Framework**: argparse (Python built-in)
+- **Interactive UI**: inquirer (checkbox selections)
+- **Progress Tracking**: rich (fancy progress bars)
 - **Embeddings**: sentence-transformers
-- **Vector DB**: ChromaDB
-- **Text Processing**: langchain-text-splitters
-- **Configuration**: JSON/YAML
+- **Vector DB**: ChromaDB (single collection design)
+- **Text Processing**: langchain-text-splitters (MVP)
+- **Configuration**: JSON/YAML with pydantic validation
 - **Packaging**: setuptools/pyproject.toml
 
 ### Directory Structure
@@ -77,6 +86,10 @@ context-ai/
 │   │   ├── storage.py          # Database management
 │   │   ├── query.py            # RAG query engine
 │   │   ├── formatter.py        # Output formatting
+│   │   ├── chunking/           # Text Processing Module
+│   │   │   ├── __init__.py
+│   │   │   ├── protocol.py     # Interface comum
+│   │   │   └── langchain_adapter.py # LangChain implementation
 │   │   └── ai/                 # AI Integration Module
 │   │       ├── __init__.py
 │   │       ├── claude_client.py # Claude API integration
@@ -94,8 +107,201 @@ context-ai/
 │   ├── test_cli.py
 │   ├── test_embeddings.py
 │   ├── test_storage.py
-│   └── test_query.py
+│   ├── test_query.py
+│   └── test_chunking.py        # Chunking tests
 ```
+
+---
+
+## 🔧 Technical Specifications
+
+### CLI Interactive Interface
+```python
+# Interactive embedding selection using inquirer
+import inquirer
+
+def select_embeddings():
+    embeddings = get_available_embeddings()
+    
+    questions = [
+        inquirer.Checkbox(
+            'selected_embeddings',
+            message="Select embeddings to query",
+            choices=[
+                (f"{name} ({size} tokens, {date})", name) 
+                for name, size, date in embeddings
+            ],
+        ),
+    ]
+    
+    answers = inquirer.prompt(questions)
+    return answers['selected_embeddings']
+
+# Usage:
+# → [ ] design-system-v1 (1.2M tokens, 3 days ago)
+#   [x] project-main-v2 (800K tokens, 1 day ago) 
+#   [ ] api-docs-v1 (300K tokens, 1 week ago)
+```
+
+### ChromaDB Single Collection Design
+```python
+# Single collection for all embeddings with metadata filtering
+collection_name = "context_ai_embeddings"
+
+metadata_schema = {
+    "embedding_name": "design-system-v1",    # Primary filter
+    "file_path": "components/Button.tsx",
+    "language": "typescript", 
+    "chunk_index": 0,
+    "chunker": "langchain",
+    "created_at": "2025-01-15T10:30:00Z",
+    "file_size": 2048,
+    "chunk_type": "interface"
+}
+
+# Multi-embedding query (single operation)
+results = collection.query(
+    query_texts=["How to use Button?"],
+    where={"embedding_name": {"$in": ["design-system-v1", "project-main-v2"]}},
+    n_results=20
+)
+```
+
+### Score Normalization & Result Merging
+```python
+def merge_multi_embedding_results(results):
+    """Normalize scores and merge results from multiple embeddings"""
+    # Group results by embedding_name
+    grouped = {}
+    for i, doc in enumerate(results['documents'][0]):
+        metadata = results['metadatas'][0][i]
+        embedding_name = metadata['embedding_name']
+        score = results['distances'][0][i]
+        
+        if embedding_name not in grouped:
+            grouped[embedding_name] = []
+        
+        grouped[embedding_name].append({
+            'text': doc,
+            'score': score,
+            'metadata': metadata
+        })
+    
+    # Normalize scores per embedding
+    normalized_results = []
+    for embedding_name, embedding_results in grouped.items():
+        max_score = max(r['score'] for r in embedding_results)
+        for result in embedding_results:
+            normalized_score = result['score'] / max_score if max_score > 0 else 0
+            result['final_score'] = normalized_score * 0.9  # Weight factor
+            result['source_embedding'] = embedding_name
+            normalized_results.append(result)
+    
+    # Sort by final score
+    return sorted(normalized_results, key=lambda x: x['final_score'], reverse=True)
+```
+
+### Rich Progress Tracking
+```python
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
+
+def track_embedding_generation(files):
+    """Fancy progress tracking for embedding generation"""
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+        TextColumn("[bold blue]{task.fields[current_file]}"),
+    ) as progress:
+        
+        task = progress.add_task("Generating embeddings...", total=len(files))
+        
+        for file in files:
+            progress.update(task, current_file=file.name, advance=1)
+            # Process file...
+            progress.console.print(f"✅ Processed {file.name}")
+```
+
+### Hierarchical Configuration Schema
+```python
+from pydantic import BaseModel
+from typing import Dict, List, Optional
+
+class AIProviderConfig(BaseModel):
+    api_key: str
+    default_model: str
+    max_tokens: int = 4000
+
+class ChunkingConfig(BaseModel):
+    chunk_size: int = 2000
+    chunk_overlap: int = 200
+    supported_extensions: List[str] = [".py", ".js", ".ts", ".md", ".tsx", ".jsx"]
+
+class StorageConfig(BaseModel):
+    base_path: str = "~/.context-ai"
+    max_embeddings: int = 50
+    cleanup_after_days: int = 30
+
+class ContextAIConfig(BaseModel):
+    storage: StorageConfig = StorageConfig()
+    chunking: ChunkingConfig = ChunkingConfig()
+    ai: Dict[str, AIProviderConfig] = {}
+    active_provider: str = "claude"
+    active_embeddings: List[str] = []
+
+# Example config.json:
+{
+    "storage": {
+        "base_path": "~/.context-ai",
+        "max_embeddings": 50,
+        "cleanup_after_days": 30
+    },
+    "chunking": {
+        "chunk_size": 2000,
+        "chunk_overlap": 200,  
+        "supported_extensions": [".py", ".js", ".ts", ".md", ".tsx", ".jsx"]
+    },
+    "ai": {
+        "claude": {
+            "api_key": "sk-ant-xxxxxxxxxxxx",
+            "default_model": "claude-3-sonnet",
+            "max_tokens": 4000
+        }
+    },
+    "active_provider": "claude",
+    "active_embeddings": ["design-system-v1", "project-main-v2"]
+}
+```
+
+### Dependencies
+```toml
+# pyproject.toml
+[project]
+dependencies = [
+    "sentence-transformers>=2.2.0",
+    "chromadb>=0.4.0", 
+    "langchain-text-splitters>=0.0.1",
+    "inquirer>=3.0.0",          # Interactive CLI (~300KB)
+    "rich>=13.0.0",             # Progress bars (~2MB)
+    "pydantic>=2.0.0",          # Config validation (~1MB)
+    "anthropic>=0.3.0",         # Claude API client
+    "pathspec>=0.11.0",         # .gitignore parsing
+]
+```
+
+---
+
+## ⚠️ Critical Success Factors
+
+### Multi-Embedding Score Normalization
+The biggest technical risk is merging results from different embeddings with incompatible score distributions. This requires extensive testing and potentially machine learning approaches, not simple mathematical normalization.
+
+### Embedding Quality Dependency  
+90% of user value depends on chunking quality. Poor chunks = poor recommendations = user abandonment. Tree-sitter upgrade (Phase 7) is critical for long-term success.
+
+### Token Cost Management
+Multi-project context can easily generate 8000+ token queries. Without aggressive optimization, users will face $50+ monthly bills and churn.
 
 ---
 
@@ -148,11 +354,11 @@ context-ai/
 
 ### 2.1 Text Processing Engine
 - [ ] **2.1.1** Install and configure langchain-text-splitters
-- [ ] **2.1.2** Implement basic file discovery and reading
-- [ ] **2.1.3** Create simple code-aware chunking (basic function/component detection)
-- [ ] **2.1.4** Add basic metadata extraction (file type, language)
-- [ ] **2.1.5** Implement ignore file system (.gitignore support)
-- [ ] **2.1.6** Add comprehensive language support (JS/TS/Node, Python, CSS/Sass, JSON/YAML, MD, SQL, etc.)
+- [ ] **2.1.2** Create chunker protocol (interface comum)
+- [ ] **2.1.3** Implement LangChain adapter with language support
+- [ ] **2.1.4** Add basic metadata extraction (file type, language, chunk_index)
+- [ ] **2.1.5** Implement ignore file system (.contextignore/.gitignore support)  
+- [ ] **2.1.6** Add comprehensive language support (JS/TS, Python, CSS, JSON, YAML, MD)
 - [ ] **2.1.7** Add progress tracking for large repository processing
 
 ### 2.2 Embedding Model Integration
@@ -299,45 +505,20 @@ context-ai/
 
 ---
 
-## 🔮 Future Enhancements
+## 📈 Next Steps
 
-### Phase 5: Simple Multi-Provider Support (Month 2)
-- [ ] **OpenAI Integration**: Add GPT-4, GPT-4o as second provider option
-  - [ ] **5.1.1** Implement OpenAI API client with basic retry logic
-  - [ ] **5.1.2** Add support for key OpenAI models (GPT-4, GPT-4o)
-  - [ ] **5.1.3** Simple model selection between Claude and OpenAI
-  - [ ] **5.1.4** Basic token counting for OpenAI
-- [ ] **Simple Fallback System**: Basic provider fallback
-  - [ ] **5.2.1** Implement simple fallback: Claude → OpenAI
-  - [ ] **5.2.2** Add basic provider health checking
-  - [ ] **5.2.3** Manual provider switching commands
-  - [ ] **5.2.4** Basic error handling between providers
-
-### Phase 6: Essential Format Support (Month 3)
-- [ ] **Multi-modal Documentation**: Support for common doc formats
-  - [ ] **6.1.1** PDF support for documentation files
-  - [ ] **6.1.2** Image support (diagrams, screenshots) with OCR
-  - [ ] **6.1.3** Basic text extraction from images
-  - [ ] **6.1.4** Metadata preservation for multimedia content
-- [ ] **Real-time Updates**: Keep embeddings current
-  - [ ] **6.2.1** File watching for documentation changes
-  - [ ] **6.2.2** Auto-update embeddings on file changes
-  - [ ] **6.2.3** Smart incremental updates (only changed files)
-  - [ ] **6.2.4** Background processing for large updates
-
-**Future Development Note:**
-*Beyond Phase 6, new features will be driven by actual user feedback and demonstrated need. Focus remains on simplicity, reliability, and core value delivery rather than feature expansion.*
+For post-MVP enhancements and long-term roadmap, see [Future.md](./Future.md).
 
 ---
 
 ## 🎯 Success Criteria (MVP)
 
 ### Core Functionality
-- ✅ Tool generates embeddings from documentation successfully
-- ✅ Query system returns relevant results from embeddings
-- ✅ Claude integration works for ask and chat commands
-- ✅ Multi-embedding selection enables cross-project queries
-- ✅ Tool runs reliably on developer's local machine
+- ✅ Tool provides accurate answers about codebase patterns and architecture
+- ✅ Cross-project queries return relevant context from multiple sources  
+- ✅ Assistant naturally surfaces reusable components and helpers
+- ✅ Response quality matches or exceeds single-project tools like Copilot Chat
+- ✅ Multi-embedding result merging produces coherent, ranked outputs
 
 ### Code Quality
 - ✅ All public APIs have proper type hints
@@ -442,41 +623,38 @@ CONTEXT_DEFAULTS = [
 - **Data**: `.sql`, `.graphql`, `.gql`, `.xml`
 - **Other Languages**: `.go`, `.rs`, `.java`, `.c`, `.cpp`, `.h`
 
-### Code-Aware Chunking Examples
+### Code-Aware Chunking Examples (LangChain MVP)
 ```python
-# React Component Chunking
+# TypeScript Component Chunking
 chunk = {
-    "text": "interface ButtonProps { variant: 'primary' | 'secondary' }",
+    "text": "interface ButtonProps {\n  variant: 'primary' | 'secondary'\n  size: 'sm' | 'md' | 'lg'\n}\n\nexport const Button = ({ variant, size }: ButtonProps) => {\n  return <button className={`btn-${variant} btn-${size}`}>\n}",
     "metadata": {
         "file": "components/Button/Button.tsx",
-        "type": "interface", 
-        "component": "Button",
-        "props": ["variant"],
-        "language": "typescript"
+        "language": "typescript",
+        "chunk_index": 0,
+        "chunker": "langchain"
     }
 }
 
 # Python Function Chunking  
 chunk = {
-    "text": "def useForm(schema: Dict) -> FormState:",
+    "text": "def useForm(schema: Dict[str, Any]) -> FormState:\n    \"\"\"Custom hook for form management\"\"\"\n    state = FormState(schema)\n    return state",
     "metadata": {
         "file": "hooks/useForm.py",
-        "type": "function",
-        "name": "useForm", 
-        "params": ["schema"],
-        "language": "python"
+        "language": "python",
+        "chunk_index": 0,
+        "chunker": "langchain"
     }
 }
 
-# HTML Component Chunking
+# Documentation Chunking
 chunk = {
-    "text": "<button class='btn btn-primary' data-variant='primary'>",
+    "text": "## Button Component\n\nThe Button component provides consistent styling and behavior.\n\n### Props\n- variant: 'primary' | 'secondary'\n- size: 'sm' | 'md' | 'lg'",
     "metadata": {
-        "file": "templates/button.html",
-        "type": "element",
-        "tag": "button",
-        "classes": ["btn", "btn-primary"],
-        "language": "html"
+        "file": "docs/Button.md",
+        "language": "markdown",
+        "chunk_index": 0,
+        "chunker": "langchain"
     }
 }
 ```
@@ -486,36 +664,35 @@ chunk = {
 # Generate embeddings for different projects
 context-ai generate ./my-design-system --name "design-system-v1"
 context-ai generate ./current-project --name "project-main-v2"
-context-ai generate ./api-docs --name "api-docs-v1"
+context-ai generate ./helpers-lib --name "helpers-v1"
 
 # Configure Claude API key
 context-ai config set --claude-key sk-ant-xxxxxxxxxxxx
-context-ai config list
 
-# Single embedding selection
-context-ai select design-system-v1
+# Multi-project selection
+context-ai select design-system-v1,project-main-v2,helpers-v1
 
-# Multi-embedding selection
-context-ai select design-system-v1,project-main-v2
+# General code assistance with cross-project intelligence
+context-ai ask "How do I implement user authentication in our app?"
+context-ai ask "What's the standard way to handle form validation?"
+context-ai ask "How should I structure a new dashboard page?"
 
-# Context-only queries (original functionality)
-context-ai query "How to use Button from design-system in my current project?"
-context-ai query "What authentication patterns can I reuse from api-docs?"
+# Component and helper discovery  
+context-ai ask "Do we have existing components for file uploads?"
+context-ai ask "What date formatting utilities are available?"
+context-ai ask "Show me modal implementations across projects"
 
-# RAG Complete - Direct Questions with AI Responses
-context-ai ask "How to use Button from design-system in my current project?"
-# → Returns AI-generated answer based on retrieved context
+# Architecture and pattern guidance
+context-ai ask "What's our API calling convention?"
+context-ai ask "How do we handle error boundaries in React?"
+context-ai ask "What's the preferred state management approach?"
 
-context-ai ask "What props does the Button component accept?"
-# → Analyzes design system docs and provides answer
-
-# Interactive Chat Mode
+# Interactive problem-solving
 context-ai chat
-# → Enters interactive mode with full conversation memory
-# User: "How to use Button component?"
-# AI: "Based on your design system, the Button component accepts..."
-# User: "Can you show me an example with primary variant?"
-# AI: "Sure! Here's an example using the primary variant..."
+> "I need to build a user profile page"
+> "I found 3 similar pages in your codebase. The UserSettings component would be a great starting point..."
+> "Can you show me how to integrate the design system components?"
+> "Sure! Here's how to use the Card and Form components from your design system..."
 ```
 
 ### AI Configuration Schema (MVP - Claude Only)
@@ -523,7 +700,13 @@ context-ai chat
 {
   "claude_api_key": "sk-ant-xxxxxxxxxxxx",
   "default_model": "claude-3-sonnet",
-  "max_tokens": 4000
+  "max_tokens": 4000,
+  "system_prompt_strategy": "general_assistant_with_reusability_focus",
+  "context_assembly": {
+    "max_chunks": 8,
+    "prioritize_cross_project": true,
+    "include_metadata": true
+  }
 }
 ```
 
