@@ -148,7 +148,9 @@ class ChunkerProtocol(ABC):
                 chunks.extend(file_chunks)
             except Exception as e:
                 # Log error but continue processing other files
-                print(f"Warning: Failed to chunk {file_path}: {e}")
+                from utils.logging import get_logger
+                logger = get_logger(__name__)
+                logger.warning("⚠️  Failed to chunk %s: %s", file_path, e)
                 continue
         
         return chunks

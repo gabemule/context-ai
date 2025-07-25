@@ -6,7 +6,11 @@ Cross-project code intelligence assistant.
 
 import argparse
 import sys
+import os
 from typing import List, Optional
+
+# Silence HuggingFace tokenizers warning about forking
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 from utils.logging import setup_logging, get_logger
 from utils.error_handler import handle_command_errors
@@ -20,13 +24,39 @@ def create_parser() -> argparse.ArgumentParser:
         description="Cross-project code intelligence assistant",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Examples:
-  context-ai generate ./my-project --name "project-v1"
-  context-ai select    # Interactive checkbox selection
-  context-ai ask "How do I implement authentication?"
-  context-ai chat
-  context-ai storage info    # Show storage information
-  context-ai storage cleanup # Clean temporary files
+💡 Quick Start Examples:
+
+  📁 Generate embeddings:
+    context-ai generate ./my-project --name "project-v1"
+    context-ai generate ./docs --name "documentation"
+    
+  🎯 Select active embeddings:
+    context-ai select                    # Interactive selection
+    context-ai select project-v1 docs   # Direct selection
+    
+  🔍 Query for context:
+    context-ai query "authentication patterns" --format markdown
+    context-ai query "error handling" --copy --output results.txt
+    
+  🤖 AI-powered assistance:
+    context-ai ask "How do I implement authentication?"
+    context-ai ask "Show me validation patterns" --format json --copy
+    context-ai chat                      # Interactive chat session
+    
+  ⚙️  Configuration:
+    context-ai config set --claude-key sk-ant-xxxxx
+    context-ai config list              # Show current settings
+    context-ai config test              # Test API connectivity
+    
+  🗄️  Storage management:
+    context-ai storage info             # Show storage stats
+    context-ai storage cleanup          # Clean temporary files
+    context-ai storage delete old-embedding
+
+💡 Pro Tips: 
+  - Use --verbose with any command for detailed output
+  - Combine --copy and --output for maximum productivity
+  - JSON/XML formats are great for tool integration
         """,
     )
     
@@ -72,6 +102,11 @@ Examples:
         action="store_true",
         help="Disable progress tracking and fancy output"
     )
+    generate_parser.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Show detailed processing information"
+    )
     
     # Select command
     select_parser = subparsers.add_parser(
@@ -82,6 +117,11 @@ Examples:
         "embeddings",
         nargs="*",
         help="Embedding names to select (if not provided, shows interactive interface)"
+    )
+    select_parser.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Show detailed processing information"
     )
     
     # Query command - defined inline to avoid heavy imports during parser creation
@@ -96,7 +136,7 @@ Examples:
     )
     query_parser.add_argument(
         '--format', '-f',
-        choices=["ai_friendly", "plain", "markdown", "json"],
+        choices=["ai_friendly", "plain", "markdown", "json", "xml"],
         default="ai_friendly",
         help='Output format (default: ai_friendly)'
     )
@@ -130,17 +170,51 @@ Examples:
     # Ask command
     ask_parser = subparsers.add_parser(
         "ask",
-        help="Ask a question and get AI-powered answer"
+        help="Ask a question and get AI-powered answer",
+        description="Ask Claude a question using context from your active embeddings",
+        epilog="""
+Examples:
+  context-ai ask "How do I implement authentication?"
+  context-ai ask "Show me error handling patterns" --format json
+  context-ai ask "What validation helpers exist?" --copy --verbose
+  context-ai ask "How to structure a new feature?" --output answer.md
+        """
     )
     ask_parser.add_argument(
         "question",
         help="Question to ask"
+    )
+    ask_parser.add_argument(
+        "--format", "-f",
+        choices=["ai_friendly", "plain", "markdown", "json", "xml"],
+        default="ai_friendly",
+        help="Context format for AI processing (default: ai_friendly)"
+    )
+    ask_parser.add_argument(
+        "--copy", "-c",
+        action="store_true",
+        help="Copy response to clipboard"
+    )
+    ask_parser.add_argument(
+        "--output", "-o",
+        type=str,
+        help="Save response to file instead of printing to console"
+    )
+    ask_parser.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Show detailed processing information"
     )
     
     # Chat command
     chat_parser = subparsers.add_parser(
         "chat",
         help="Start interactive chat session"
+    )
+    chat_parser.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Show detailed processing information"
     )
     
     # Config command
@@ -162,11 +236,43 @@ Examples:
         "--claude-key",
         help="Set Claude API key"
     )
+    config_set.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Show detailed processing information"
+    )
     
     # Config list
-    config_subparsers.add_parser(
+    config_list = config_subparsers.add_parser(
         "list",
         help="List current configuration"
+    )
+    config_list.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Show detailed processing information"
+    )
+    
+    # Config test
+    config_test = config_subparsers.add_parser(
+        "test",
+        help="Test API key connectivity"
+    )
+    config_test.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Show detailed processing information"
+    )
+    
+    # Config validate
+    config_validate = config_subparsers.add_parser(
+        "validate",
+        help="Validate configuration and diagnose issues"
+    )
+    config_validate.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Show detailed processing information"
     )
     
     # Storage command
@@ -180,9 +286,14 @@ Examples:
     )
     
     # Storage info
-    storage_subparsers.add_parser(
+    info_parser = storage_subparsers.add_parser(
         "info",
         help="Show storage information"
+    )
+    info_parser.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Show detailed processing information"
     )
     
     # Storage cleanup
@@ -196,6 +307,11 @@ Examples:
         default=24,
         help="Remove temp files older than N hours (default: 24)"
     )
+    cleanup_parser.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Show detailed processing information"
+    )
     
     # Storage reset
     reset_parser = storage_subparsers.add_parser(
@@ -207,6 +323,11 @@ Examples:
         action="store_true",
         help="Confirm the reset operation"
     )
+    reset_parser.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Show detailed processing information"
+    )
     
     # Storage delete
     delete_parser = storage_subparsers.add_parser(
@@ -217,6 +338,11 @@ Examples:
         "embedding_name",
         help="Name of embedding to delete"
     )
+    delete_parser.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Show detailed processing information"
+    )
     
     return parser
 
@@ -224,9 +350,17 @@ Examples:
 @handle_command_errors
 def handle_generate(args) -> int:
     """Handle generate command."""
+    logger = get_logger(__name__)
+    logger.info("🚀 Initializing generate command...")
+    
+    from rich.console import Console
     from services.embedding_service import EmbeddingService
     
-    service = EmbeddingService()
+    console = Console()
+    
+    with console.status("[bold green]Loading embedding service...", spinner="dots"):
+        service = EmbeddingService()
+    
     show_progress = not args.no_progress
     service.generate_embedding(args.path, args.name, args.ignore_file, show_progress)
     return EXIT_SUCCESS
@@ -244,10 +378,12 @@ def handle_query(args) -> int:
 @handle_command_errors
 def handle_select(args) -> int:
     """Handle select command with optional direct embedding selection."""
+    logger = get_logger(__name__)
+    logger.info("🚀 Initializing select command...")
+    
     from services.embedding_service import EmbeddingService
     from config.settings import get_settings_manager
     
-    logger = get_logger(__name__)
     service = EmbeddingService()
     
     if args.embeddings:
@@ -281,19 +417,41 @@ def handle_select(args) -> int:
 @handle_command_errors
 def handle_ask(args) -> int:
     """Handle ask command."""
-    from services.embedding_service import AIService
+    logger = get_logger(__name__)
+    logger.info("🚀 Initializing ask command...")
     
-    service = AIService()
-    service.ask_question(args.question)
+    from rich.console import Console
+    from services.ai_service import get_ai_service
+    
+    console = Console()
+    
+    with console.status("[bold blue]Initializing AI service...", spinner="dots"):
+        service = get_ai_service()
+    
+    service.ask_question(
+        question=args.question,
+        context_format=args.format,
+        verbose=args.verbose,
+        copy_to_clipboard=args.copy,
+        output_file=args.output
+    )
     return EXIT_SUCCESS
 
 
 @handle_command_errors
 def handle_chat(args) -> int:
     """Handle chat command."""
-    from services.embedding_service import AIService
+    logger = get_logger(__name__)
+    logger.info("🚀 Initializing chat command...")
     
-    service = AIService()
+    from rich.console import Console
+    from services.ai_service import get_ai_service
+    
+    console = Console()
+    
+    with console.status("[bold blue]Starting chat session...", spinner="dots"):
+        service = get_ai_service()
+    
     service.start_chat()
     return EXIT_SUCCESS
 
@@ -338,6 +496,72 @@ def handle_config(args) -> int:
             logger.info("Active embeddings: %s", ", ".join(active.selected))
         else:
             logger.info("Active embeddings: none selected")
+    
+    elif args.config_action == "test":
+        logger.info("🔍 Testing API key connectivity...")
+        config = settings_manager.get_config()
+        claude_config = config.ai.get("claude")
+        
+        if not claude_config or not claude_config.api_key:
+            logger.error("❌ No Claude API key configured")
+            logger.info("Set your API key with: context-ai config set --claude-key YOUR_KEY")
+            return 1
+        
+        from core.ai.claude_client import get_claude_client
+        try:
+            client = get_claude_client(claude_config.api_key, claude_config.default_model)
+            if client.validate_connection():
+                logger.info("✅ Claude API key is valid and working")
+                return 0
+            else:
+                logger.error("❌ Claude API key validation failed")
+                return 1
+        except Exception as e:
+            logger.error("❌ Error testing connection: %s", e)
+            return 1
+    
+    elif args.config_action == "validate":
+        logger.info("🔧 Validating configuration...")
+        config = settings_manager.get_config()
+        issues = []
+        
+        # Check Claude configuration
+        claude_config = config.ai.get("claude")
+        if not claude_config:
+            issues.append("❌ Claude configuration missing")
+        elif not claude_config.api_key:
+            issues.append("❌ Claude API key not set")
+        elif not claude_config.api_key.startswith("sk-ant-"):
+            issues.append("❌ Claude API key format invalid")
+        else:
+            logger.info("✅ Claude API key configured")
+        
+        # Check active embeddings
+        active = settings_manager.get_active_embeddings()
+        if not active.selected:
+            issues.append("⚠️  No active embeddings selected")
+        else:
+            logger.info("✅ Active embeddings: %s", ", ".join(active.selected))
+        
+        # Check storage
+        from utils.storage import get_storage_manager
+        storage_manager = get_storage_manager()
+        storage_info = storage_manager.get_storage_info()
+        
+        if storage_info.get("embeddings_count", 0) == 0:
+            issues.append("⚠️  No embeddings generated yet")
+        else:
+            logger.info("✅ Storage: %d embeddings available", storage_info["embeddings_count"])
+        
+        # Report results
+        if issues:
+            logger.warning("Configuration issues found:")
+            for issue in issues:
+                logger.warning("  %s", issue)
+            return 1
+        else:
+            logger.info("✅ Configuration is valid and ready to use!")
+            return 0
             
     else:
         logger.error("❌ Unknown config action")
@@ -349,10 +573,16 @@ def handle_config(args) -> int:
 @handle_command_errors
 def handle_storage(args) -> int:
     """Handle storage command."""
+    logger = get_logger(__name__)
+    logger.info("🚀 Initializing storage command...")
+    
+    from rich.console import Console
     from utils.storage import get_storage_manager
     
-    logger = get_logger(__name__)
-    storage_manager = get_storage_manager()
+    console = Console()
+    
+    with console.status("[bold yellow]Loading storage info...", spinner="dots"):
+        storage_manager = get_storage_manager()
     
     if args.storage_action == "info":
         logger.info("📊 Storage Information:")
@@ -453,7 +683,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     elif args.command == "storage":
         return handle_storage(args)
     else:
-        print(f"❌ Unknown command: {args.command}")
+        logger.error("❌ Unknown command: %s", args.command)
         return 1
 
 

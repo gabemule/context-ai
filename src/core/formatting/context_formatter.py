@@ -88,19 +88,23 @@ class ContextFormatter:
                       results: List[QueryResult], 
                       query: str = "",
                       format_type: str = "ai_friendly",
-                      max_results: int = DEFAULT_DISPLAY_RESULTS) -> FormattedContext:
+                      max_results: int = DEFAULT_DISPLAY_RESULTS,
+                      max_tokens: Optional[int] = None) -> FormattedContext:
         """
         Format query results into AI-friendly context.
         
         Args:
             results: List of normalized query results
             query: Original query for context
-            format_type: Output format ("ai_friendly", "plain", "markdown")
+            format_type: Output format ("ai_friendly", "plain", "markdown", "json", "xml")
             max_results: Maximum number of results to include
+            max_tokens: Override default token limit for this formatting
             
         Returns:
             FormattedContext object with formatted content
         """
+        # Use provided max_tokens or fall back to instance default
+        token_limit = max_tokens if max_tokens is not None else self.max_tokens
         if not results:
             return FormattedContext(
                 content="No relevant context found.",
@@ -116,16 +120,23 @@ class ContextFormatter:
         
         # Format based on type
         if format_type == "ai_friendly":
-            return self._format_ai_friendly(limited_results, query)
+            return self._format_ai_friendly(limited_results, query, token_limit)
         elif format_type == "plain":
             return self._format_plain_text(limited_results)
         elif format_type == "markdown":
             return self._format_markdown(limited_results)
+        elif format_type == "json":
+            return self._format_json(limited_results, query)
+        elif format_type == "xml":
+            return self._format_xml(limited_results, query)
         else:
             raise ValueError(f"Unsupported format type: {format_type}")
     
-    def _format_ai_friendly(self, results: List[QueryResult], query: str = "") -> FormattedContext:
+    def _format_ai_friendly(self, results: List[QueryResult], query: str = "", token_limit: int = None) -> FormattedContext:
         """Format results in AI-friendly format following Plan.md example."""
+        if token_limit is None:
+            token_limit = self.max_tokens
+            
         content_parts = []
         sources = set()
         token_count = 0
@@ -158,10 +169,10 @@ class ContextFormatter:
             section_tokens = count_tokens(section)
             
             # Check if adding this section would exceed token limit
-            if token_count + section_tokens > self.max_tokens:
+            if token_count + section_tokens > token_limit:
                 truncated = True
                 self.logger.info("Context truncated at %d tokens (limit: %d)", 
-                               token_count, self.max_tokens)
+                               token_count, token_limit)
                 break
             
             content_parts.append(section)
@@ -169,10 +180,10 @@ class ContextFormatter:
         
         # Add cross-reference analysis if space permits
         if not truncated and len(sources) > 1:
-            analysis = self._generate_cross_reference_analysis(results, list(sources))
+            analysis = self._generate_cross_reference_analysis(results)
             analysis_tokens = count_tokens(analysis)
             
-            if token_count + analysis_tokens <= self.max_tokens:
+            if token_count + analysis_tokens <= token_limit:
                 content_parts.append(analysis)
                 token_count += analysis_tokens
             else:
@@ -252,39 +263,204 @@ class ContextFormatter:
             sources=sorted(list(sources))
         )
     
-    def _generate_cross_reference_analysis(self, results: List[QueryResult], sources: List[str]) -> str:
-        """Generate cross-reference analysis section."""
+    def _generate_cross_reference_analysis(self, results: List[QueryResult]) -> str:
+        """Generate enhanced cross-reference analysis section with project correlation."""
         analysis_parts = [f"\n{CROSS_REFERENCE_HEADER}"]
         
-        # Basic analysis based on metadata
-        languages = set()
-        files = set()
-        
+        # Group results by project (source_embedding)
+        projects_data = {}
         for result in results:
-            lang = result.metadata.get('language')
-            file_path = result.metadata.get('file_path')
-            if lang:
-                languages.add(lang)
-            if file_path:
-                files.add(file_path)
+            project = result.source_embedding
+            if project not in projects_data:
+                projects_data[project] = {
+                    'results': [],
+                    'languages': set(),
+                    'files': set(),
+                    'patterns': []
+                }
+            
+            projects_data[project]['results'].append(result)
+            projects_data[project]['languages'].add(result.metadata.get('language', 'unknown'))
+            projects_data[project]['files'].add(result.metadata.get('file_path', 'unknown'))
+            
+            # Extract potential patterns (function names, class names, etc.)
+            text = result.text.lower()
+            if 'function ' in text or 'def ' in text:
+                projects_data[project]['patterns'].append('functions')
+            if 'class ' in text or 'interface ' in text:
+                projects_data[project]['patterns'].append('classes/interfaces')
+            if 'component' in text or 'export default' in text:
+                projects_data[project]['patterns'].append('components')
         
-        # Add analysis points
-        if len(sources) > 1:
-            analysis_parts.append(f"- ✅ Found relevant code in {len(sources)} different projects")
+        # Project overview
+        analysis_parts.append(f"- 🔄 **Cross-Project Analysis**: Found relevant code in {len(projects_data)} projects")
         
-        if len(languages) > 1:
-            analysis_parts.append(f"- 📝 Multiple languages involved: {', '.join(sorted(languages))}")
+        # Per-project breakdown
+        for project, data in projects_data.items():
+            result_count = len(data['results'])
+            lang_list = ', '.join(sorted(data['languages']))
+            patterns = list(set(data['patterns']))
+            
+            project_line = f"  - **{project}**: {result_count} matches"
+            if lang_list != 'unknown':
+                project_line += f" ({lang_list})"
+            if patterns:
+                project_line += f" - Contains: {', '.join(patterns)}"
+            
+            analysis_parts.append(project_line)
         
-        if len(files) > 3:
-            analysis_parts.append(f"- 📁 Code spans across {len(files)} files")
-        
-        # Generic suggestions
-        analysis_parts.append("- 💡 Consider checking for consistency across implementations")
-        if "typescript" in languages or "javascript" in languages:
-            analysis_parts.append("- 🔍 Review TypeScript interfaces and prop definitions")
+        # Cross-project correlations
+        if len(projects_data) > 1:
+            analysis_parts.append("\n- 🧩 **Project Correlations**:")
+            
+            # Find common languages
+            all_languages = set()
+            common_languages = None
+            for data in projects_data.values():
+                all_languages.update(data['languages'])
+                if common_languages is None:
+                    common_languages = data['languages'].copy()
+                else:
+                    common_languages.intersection_update(data['languages'])
+            
+            if common_languages and 'unknown' not in common_languages:
+                analysis_parts.append(f"  - ✅ **Common stack**: {', '.join(sorted(common_languages))}")
+            
+            # Find common patterns
+            all_patterns = set()
+            common_patterns = None
+            for data in projects_data.values():
+                patterns_set = set(data['patterns'])
+                all_patterns.update(patterns_set)
+                if common_patterns is None:
+                    common_patterns = patterns_set.copy()
+                else:
+                    common_patterns.intersection_update(patterns_set)
+            
+            if common_patterns:
+                analysis_parts.append(f"  - 🔗 **Similar patterns**: {', '.join(common_patterns)}")
+            
+            # Suggest comparison points
+            analysis_parts.append("\n- 💡 **Comparison Opportunities**:")
+            analysis_parts.append("  - Compare implementation approaches between projects")
+            analysis_parts.append("  - Look for reusable patterns or components")
+            analysis_parts.append("  - Identify opportunities for code standardization")
+            
+            if 'components' in all_patterns:
+                analysis_parts.append("  - Check component APIs and prop interfaces for consistency")
+            if 'functions' in all_patterns:
+                analysis_parts.append("  - Review function signatures and error handling patterns")
         
         return "\n".join(analysis_parts)
     
+    def _format_json(self, results: List[QueryResult], query: str = "") -> FormattedContext:
+        """Format results as JSON."""
+        import json
+        
+        sources = set()
+        results_data = []
+        
+        for i, result in enumerate(results):
+            source = result.source_embedding
+            sources.add(source)
+            
+            result_data = {
+                "index": i + 1,
+                "score": result.final_score,
+                "source_embedding": source,
+                "file_path": result.metadata.get('file_path', 'unknown'),
+                "language": result.metadata.get('language', 'text'),
+                "chunk_index": result.metadata.get('chunk_index', 0),
+                "content": result.text,
+                "metadata": result.metadata
+            }
+            results_data.append(result_data)
+        
+        output_data = {
+            "query": query,
+            "total_results": len(results),
+            "sources": sorted(list(sources)),
+            "results": results_data
+        }
+        
+        content = json.dumps(output_data, indent=2, ensure_ascii=False)
+        token_count = count_tokens(content)
+        
+        return FormattedContext(
+            content=content,
+            token_count=token_count,
+            chunk_count=len(results),
+            source_count=len(sources),
+            truncated=False,
+            sources=sorted(list(sources))
+        )
+    
+    def _format_xml(self, results: List[QueryResult], query: str = "") -> FormattedContext:
+        """Format results as XML."""
+        import xml.etree.ElementTree as ET
+        from xml.dom import minidom
+        
+        sources = set()
+        
+        # Create root element
+        root = ET.Element("context_search")
+        root.set("query", query)
+        root.set("total_results", str(len(results)))
+        
+        # Add sources
+        sources_elem = ET.SubElement(root, "sources")
+        for result in results:
+            source = result.source_embedding
+            sources.add(source)
+        
+        for source in sorted(sources):
+            source_elem = ET.SubElement(sources_elem, "source")
+            source_elem.text = source
+        
+        # Add results
+        results_elem = ET.SubElement(root, "results")
+        for i, result in enumerate(results):
+            result_elem = ET.SubElement(results_elem, "result")
+            result_elem.set("index", str(i + 1))
+            result_elem.set("score", f"{result.final_score:.6f}")
+            
+            # Add metadata
+            meta_elem = ET.SubElement(result_elem, "metadata")
+            
+            source_elem = ET.SubElement(meta_elem, "source_embedding")
+            source_elem.text = result.source_embedding
+            
+            file_elem = ET.SubElement(meta_elem, "file_path")
+            file_elem.text = result.metadata.get('file_path', 'unknown')
+            
+            lang_elem = ET.SubElement(meta_elem, "language")
+            lang_elem.text = result.metadata.get('language', 'text')
+            
+            chunk_elem = ET.SubElement(meta_elem, "chunk_index")
+            chunk_elem.text = str(result.metadata.get('chunk_index', 0))
+            
+            # Add content
+            content_elem = ET.SubElement(result_elem, "content")
+            content_elem.text = result.text
+        
+        # Convert to string with pretty formatting
+        rough_string = ET.tostring(root, encoding='unicode')
+        reparsed = minidom.parseString(rough_string)
+        content = reparsed.toprettyxml(indent="  ")
+        
+        # Remove empty lines
+        content = '\n'.join([line for line in content.split('\n') if line.strip()])
+        
+        token_count = count_tokens(content)
+        
+        return FormattedContext(
+            content=content,
+            token_count=token_count,
+            chunk_count=len(results),
+            source_count=len(sources),
+            truncated=False,
+            sources=sorted(list(sources))
+        )
     
     def format_for_claude(self, results: List[QueryResult], query: str = "") -> str:
         """

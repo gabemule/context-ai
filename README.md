@@ -25,22 +25,25 @@ context-ai query "authentication patterns" --verbose
 context-ai query "modal components" --format json --max-results 5
 context-ai query "error handling" --format markdown --output results.md
 
-# Ask questions with cross-project intelligence (Coming Soon)
+# Ask questions with cross-project intelligence
 context-ai ask "Do we have existing components for file uploads?"
-context-ai ask "What's our standard approach for API error handling?"
+context-ai ask "What's our standard approach for API error handling?" --verbose
+context-ai ask "How to implement authentication?" --format markdown --output auth-guide.md
 
-# Interactive chat mode (Coming Soon)
+# Interactive chat mode
 context-ai chat
 ```
 
 ## 🎯 Key Features
 
-- **Cross-project intelligence** - Understand relationships across multiple repositories
+- **Cross-project intelligence** - Advanced correlation analysis across multiple repositories
 - **Component reusability** - Discover existing components before building new ones
-- **Pattern discovery** - Learn established patterns and conventions
+- **Pattern discovery** - Learn established patterns and conventions with cross-project comparison
 - **Architecture guidance** - Get context-aware architectural recommendations
 - **Interactive selection** - Checkbox interface for choosing active embeddings
-- **AI-powered insights** - Powered by Claude for intelligent responses
+- **AI-powered insights** - Powered by Claude with enhanced cross-project correlation prompts
+- **Smart token allocation** - Dynamic context sizing based on model capabilities
+- **Multiple output formats** - JSON, XML, Markdown, Plain text with clipboard support
 
 ## 📦 Installation
 
@@ -173,28 +176,35 @@ context-ai storage delete embedding-name
 context-ai storage reset --confirm
 ```
 
-### AI Commands (🚧 Coming Soon)
+### AI Commands (✅ Implemented)
 
-#### `ask` - AI-powered Q&A (Phase 4.3)
+#### `ask` - AI-powered Q&A with cross-project correlation
 ```bash
+# Basic AI question with context
 context-ai ask "Do we have existing components for file uploads?"
 context-ai ask "What's our standard approach for API error handling?"
+
+# With advanced options
+context-ai ask "Compare authentication patterns" --verbose --copy
+context-ai ask "Best modal implementation?" --format markdown --output modal-analysis.md
+context-ai ask "How to handle errors?" --format json --output error-patterns.json
 ```
 
-#### `chat` - Interactive AI chat (Phase 4.3)
+#### `chat` - Interactive AI chat session
 ```bash
 context-ai chat
-# Opens interactive chat session with Claude
+# Opens interactive chat session with Claude using active embeddings
 ```
 
 ### Query Output Formats
 
-| Format | Description | Use Case |
-|--------|-------------|----------|
-| `ai_friendly` (default) | Rich format with source attribution | AI consumption, debugging |
-| `json` | Structured JSON with metadata | API integration, processing |  
-| `markdown` | Clean markdown format | Documentation, reports |
-| `plain` | Simple text format | Simple scripts, pipes |
+| Format | Description | Use Case | Cross-Project Analysis |
+|--------|-------------|----------|----------------------|
+| `ai_friendly` (default) | Rich format with source attribution + cross-project correlation | AI consumption, debugging | ✅ Enhanced |
+| `json` | Structured JSON with metadata | API integration, processing | ✅ Project grouping |
+| `xml` | Well-formed XML structure | Enterprise integration | ✅ Hierarchical |
+| `markdown` | Clean markdown format | Documentation, reports | ✅ Formatted |
+| `plain` | Simple text format | Simple scripts, pipes | ✅ Basic |
 
 ### Interactive Selection Interface
 
@@ -255,15 +265,19 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ### ✅ Completed Features
 - **Embedding generation** with sentence-transformers + ChromaDB
 - **Interactive selection** with checkbox interface + direct CLI args
-- **Multi-format queries** (AI-friendly, JSON, Markdown, Plain)
+- **Multi-format queries** (AI-friendly, JSON, XML, Markdown, Plain)
 - **Cross-embedding search** with result merging & normalization  
 - **Token counting** with tiktoken integration
 - **Multi-language support** (English/Portuguese query processing)
 - **Progress tracking** with rich UI
 - **Storage management** with cleanup utilities
-
-### 🚧 In Progress  
-- **Claude integration** for AI-powered Q&A (Phase 4.3)
+- **Claude integration** with AI-powered Q&A and cross-project correlation
 - **Chat interface** for interactive conversations
+- **Dynamic token allocation** based on model capabilities (up to 200k tokens)
+- **Enhanced cross-project analysis** with pattern detection and comparison
+- **Clipboard integration** and file output support
+
+### 🚀 Production Ready
+All core features are implemented and tested. The system is ready for production use!
 
 See [Plan.md](Plan.md) for detailed development roadmap and [Future.md](Future.md) for post-MVP enhancements.

@@ -165,8 +165,13 @@ class EmbeddingService:
         Raises:
             ValidationError: If no embeddings available or selection fails
         """
-        # Get available embeddings
-        available_embeddings_info = self.vector_store.list_embeddings()
+        from rich.console import Console
+        
+        console = Console()
+        
+        # Get available embeddings with loading
+        with console.status("[bold green]Loading available embeddings...", spinner="dots"):
+            available_embeddings_info = self.vector_store.list_embeddings()
         
         if not available_embeddings_info:
             raise ValidationError("No embeddings found. Generate some first with 'context-ai generate'")
@@ -191,6 +196,10 @@ class EmbeddingService:
             info = f"{chunks} chunks, {files} files, {date_str}"
             available_embeddings.append((name, info))
         
+        # Get currently active embeddings for pre-selection
+        current_active = self.settings_manager.get_active_embeddings()
+        currently_selected = current_active.selected if current_active else []
+        
         # Use inquirer for interactive selection
         try:
             import inquirer
@@ -198,11 +207,12 @@ class EmbeddingService:
             questions = [
                 inquirer.Checkbox(
                     'selected_embeddings',
-                    message="Select embeddings to query (use space to select/deselect, enter to confirm)",
+                    message=f"Select embeddings to query (currently active: {len(currently_selected)}) - Space: select/deselect, Enter: confirm",
                     choices=[
                         (f"{name} ({info})", name) 
                         for name, info in available_embeddings
                     ],
+                    default=currently_selected,  # Pre-select currently active embeddings
                 ),
             ]
             
@@ -272,7 +282,8 @@ class QueryService:
                      question: str, 
                      format_type: str = "ai_friendly",
                      max_results: Optional[int] = None,
-                     verbose: bool = False) -> str:
+                     verbose: bool = False,
+                     max_context_tokens: Optional[int] = None) -> str:
         """
         Query embeddings for context.
         
@@ -281,6 +292,7 @@ class QueryService:
             format_type: Output format ("ai_friendly", "plain", "markdown")
             max_results: Maximum number of results (uses default if None)
             verbose: Whether to show verbose logging
+            max_context_tokens: Maximum tokens for context (uses default if None)
             
         Returns:
             Formatted context information
@@ -335,7 +347,8 @@ class QueryService:
                 normalized_results, 
                 query=processed_query.original,
                 format_type=format_type,
-                max_results=display_results
+                max_results=display_results,
+                max_tokens=max_context_tokens
             )
             
             # Add context statistics for debugging/verbose mode

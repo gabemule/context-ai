@@ -79,10 +79,15 @@ def execute_query_command(args: argparse.Namespace) -> None:
         args: Parsed command line arguments
     """
     logger = get_logger(__name__)
+    logger.info("🚀 Initializing query command...")
     
     try:
-        # Initialize query service
-        query_service = QueryService()
+        from rich.console import Console
+        console = Console()
+        
+        # Initialize query service with loading
+        with console.status("[bold blue]Loading query service...", spinner="dots"):
+            query_service = QueryService()
         
         # Set debug mode if requested
         if args.debug:
@@ -120,7 +125,8 @@ def execute_query_command(args: argparse.Namespace) -> None:
         if args.output:
             _save_to_file(context_result, args.output, logger)
         else:
-            print(context_result)
+            # Use rich formatting for better display
+            _display_query_result(context_result, args.format)
         
         if args.copy:
             _copy_to_clipboard(context_result, logger)
@@ -167,6 +173,56 @@ def _copy_to_clipboard(content: str, logger) -> None:
         logger.warning("⚠️  pyperclip not installed. Install with: pip install pyperclip")
     except Exception as e:
         logger.warning("⚠️  Failed to copy to clipboard: %s", e)
+
+
+def _display_query_result(content: str, format_type: str) -> None:
+    """Display query result with appropriate formatting."""
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.markdown import Markdown
+    from rich.syntax import Syntax
+    
+    console = Console()
+    
+    if format_type == "json":
+        # Pretty print JSON with syntax highlighting
+        syntax = Syntax(content, "json", theme="monokai", line_numbers=False)
+        panel = Panel(
+            syntax,
+            title="🔍 Query Results (JSON)",
+            border_style="cyan",
+            padding=(1, 2)
+        )
+        console.print(panel)
+    elif format_type == "xml":
+        # Pretty print XML with syntax highlighting
+        syntax = Syntax(content, "xml", theme="monokai", line_numbers=False)
+        panel = Panel(
+            syntax,
+            title="🔍 Query Results (XML)",
+            border_style="cyan",
+            padding=(1, 2)
+        )
+        console.print(panel)
+    elif format_type == "markdown":
+        # Render markdown
+        markdown_content = Markdown(content)
+        panel = Panel(
+            markdown_content,
+            title="🔍 Query Results (Markdown)",
+            border_style="cyan",
+            padding=(1, 2)
+        )
+        console.print(panel)
+    else:
+        # Plain text or ai_friendly - use simple panel
+        panel = Panel(
+            content,
+            title=f"🔍 Query Results ({format_type})",
+            border_style="cyan",
+            padding=(1, 2)
+        )
+        console.print(panel)
 
 
 # For testing and direct execution

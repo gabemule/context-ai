@@ -3,8 +3,24 @@ Configuration constants for Context-AI.
 """
 
 # Claude API Configuration
+CLAUDE_MODELS = {
+    "claude-3-sonnet": "claude-3-sonnet-20240229",
+    "claude-3-haiku": "claude-3-haiku-20240307", 
+    "claude-3-opus": "claude-3-opus-20240229",
+    "claude-3-5-sonnet": "claude-3-5-sonnet-20241022",
+    "claude-4": "claude-sonnet-4-20250514"
+}
 CLAUDE_DEFAULT_MODEL = "claude-4"
 CLAUDE_MAX_TOKENS = 200000
+CLAUDE_MAX_RETRIES = 3
+CLAUDE_RETRY_DELAY = 1.0  # seconds
+CLAUDE_TIMEOUT = 60.0     # seconds
+
+# Dynamic token allocation
+CLAUDE_CONTEXT_TOKEN_RATIO = 0.65  # Use 65% of total capacity for context
+CLAUDE_RESPONSE_TOKEN_RATIO = 0.8  # Use 80% of remaining capacity for response
+CLAUDE_MIN_RESPONSE_TOKENS = 4000  # Minimum response tokens
+CLAUDE_MAX_RESPONSE_TOKENS = 12000  # Sanity cap for response tokens
 
 # Supported file extensions by language
 LANGUAGE_EXTENSIONS = {
@@ -46,10 +62,10 @@ DEFAULT_CHUNK_OVERLAP = 200
 DEFAULT_MIN_CHUNK_SIZE = 50
 
 # Query and search defaults
-DEFAULT_QUERY_RESULTS = 20  # Raw results from vector database
-MAX_QUERY_RESULTS = 100     # Maximum allowed per query
-DEFAULT_DISPLAY_RESULTS = 8  # Results shown to user (matches Plan.md max_chunks)
-MAX_DISPLAY_RESULTS = 20    # Maximum results to display
+DEFAULT_QUERY_RESULTS = 50  # Raw results from vector database
+MAX_QUERY_RESULTS = 200     # Maximum allowed per query
+DEFAULT_DISPLAY_RESULTS = 15  # Results shown to user 
+MAX_DISPLAY_RESULTS = 50    # Maximum results to display
 
 # Language-specific text separators for chunking
 LANGUAGE_SEPARATORS = {
