@@ -310,36 +310,36 @@ Multi-project context can easily generate 8000+ token queries. Without aggressiv
 ## Phase 1: Core Infrastructure
 
 ### 1.1 Project Setup
-- [ ] **1.1.1** Create Python project with pyproject.toml
-- [ ] **1.1.2** Setup development environment (venv, dependencies)
-- [ ] **1.1.3** Configure project structure (src/)
-- [ ] **1.1.4** Setup basic package metadata and entry points
-- [ ] **1.1.5** Initialize git repository with .gitignore
-- [ ] **1.1.6** Create Makefile with development commands
-- [ ] **1.1.7** Create basic README.md with installation instructions
+- [x] **1.1.1** Create Python project with pyproject.toml
+- [x] **1.1.2** Setup development environment (venv, dependencies)
+- [x] **1.1.3** Configure project structure (src/)
+- [x] **1.1.4** Setup basic package metadata and entry points
+- [x] **1.1.5** Initialize git repository with .gitignore
+- [x] **1.1.6** Create Makefile with development commands
+- [x] **1.1.7** Create basic README.md with installation instructions
 
 ### 1.2 CLI Foundation
-- [ ] **1.2.1** Setup argparse framework and command structure
-- [ ] **1.2.2** Create main CLI entry point (cli.py)
-- [ ] **1.2.3** Implement subcommand parser structure
-- [ ] **1.2.4** Add basic --help and --version support
-- [ ] **1.2.5** Setup logging configuration (debug, info, error levels)
-- [ ] **1.2.6** Implement basic error handling and user feedback
+- [x] **1.2.1** Setup argparse framework and command structure
+- [x] **1.2.2** Create main CLI entry point (cli.py)
+- [x] **1.2.3** Implement subcommand parser structure
+- [x] **1.2.4** Add basic --help and --version support
+- [x] **1.2.5** Setup logging configuration (debug, info, error levels)
+- [x] **1.2.6** Implement basic error handling and user feedback
 
 ### 1.3 Configuration System
-- [ ] **1.3.1** Design configuration schema (JSON format)
-- [ ] **1.3.2** Implement config file location (~/.context-ai/config.json)
-- [ ] **1.3.3** Create settings management class
-- [ ] **1.3.4** Add active embedding tracking (active.json)
-- [ ] **1.3.5** Implement config validation and error handling
-- [ ] **1.3.6** Add config initialization on first run
+- [x] **1.3.1** Design configuration schema (JSON format)
+- [x] **1.3.2** Implement config file location (~/.context-ai/config.json)
+- [x] **1.3.3** Create settings management class
+- [x] **1.3.4** Add active embedding tracking (active.json)
+- [x] **1.3.5** Implement config validation and error handling
+- [x] **1.3.6** Add config initialization on first run
 
 ### 1.4 Storage Foundation
-- [ ] **1.4.1** Design storage directory structure (~/.context-ai/)
-- [ ] **1.4.2** Implement storage path management
-- [ ] **1.4.3** Create metadata schema for embeddings
-- [ ] **1.4.4** Add storage directory initialization
-- [ ] **1.4.5** Add basic reset/cleanup commands
+- [x] **1.4.1** Design storage directory structure (~/.context-ai/)
+- [x] **1.4.2** Implement storage path management
+- [x] **1.4.3** Create metadata schema for embeddings
+- [x] **1.4.4** Add storage directory initialization
+- [x] **1.4.5** Add basic reset/cleanup commands
 
 **Phase 1 Success Criteria:**
 - ✅ CLI runs without errors
@@ -536,6 +536,8 @@ For post-MVP enhancements and long-term roadmap, see [Future.md](./Future.md).
 - **Documentation**: Docstrings for all public functions and classes
 - **Linting**: Pass flake8, black, and mypy checks
 - **Testing**: Basic tests for core functionality
+- **Constants**: Use centralized constants files to eliminate code duplication
+- **Configuration**: All magic numbers and default values in constants.py
 
 
 ### Performance Goals (Realistic)
