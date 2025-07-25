@@ -248,28 +248,265 @@ context-ai chat --prompt-mode strict          # Enforced coding standards throug
 context-ai chat --prompt-mode comprehensive --verbose
 ```
 
-### 🎛️ Prompt Modes
+### 🎛️ Prompt Modes - Complete Guide
 
-Control the depth and focus of AI responses with configurable prompt modes:
+Control the depth and analysis level of AI responses. Each mode serves different development scenarios:
 
-| Mode | Description | Best For | Features |
-|------|-------------|----------|----------|
-| `minimal` | Basic context + question only | Quick queries, simple lookups | Fastest processing, no extra instructions |
-| `standard` | Cross-project awareness + coding guidelines | Daily development work | JS/TS guidelines when detected, cross-project hints |
-| `comprehensive` | Full analysis + architectural insights | Complex queries, architecture decisions | Deep cross-project comparison, best practices |
-| `strict` | Enforced standards + code review approach | Code generation, refactoring | Strict guideline enforcement, detailed code review |
+#### ⚡ `minimal` - Speed First
+**Perfect for**: Quick lookups, simple questions, when you just need facts
+- **Processing**: Basic context + question only (fastest)
+- **Instructions sent**: Simple prompt with no extra analysis
+- **Guidelines**: None applied
+- **Cross-project**: Basic mention only
+- **Response time**: ~2-3 seconds
+
+**Actual prompt sent to Claude**:
+```
+Based on the following context from the codebase, please answer the question.
+
+## Context: [your context]
+## Question: [your question]
+```
 
 ```bash
-# Examples with ask command (single questions)
-context-ai ask "How to validate forms?" --prompt-mode minimal      # Quick answer
-context-ai ask "How to validate forms?" --prompt-mode standard     # With JS/TS guidelines  
-context-ai ask "How to validate forms?" --prompt-mode comprehensive # Full architectural analysis
-context-ai ask "How to validate forms?" --prompt-mode strict       # Code review quality
-
-# Examples with chat command (applies to entire session)
-context-ai chat --prompt-mode standard        # All questions use standard mode with guidelines
-context-ai chat --prompt-mode comprehensive   # All responses include full architectural analysis
+context-ai ask "Do we have a Button component?" --prompt-mode minimal
 ```
+
+**Example Response**:
+```
+Yes, found Button component in design-system-v1/components/Button.tsx
+```
+
+---
+
+#### 🎯 `standard` - Daily Development (Default)
+**Perfect for**: Regular development work, moderate complexity questions
+- **Processing**: Cross-project awareness + auto-detected coding guidelines
+- **Instructions sent**: Conditional cross-project hints + guidelines when detected
+- **Guidelines**: JS/TS guidelines only when JS/TS files detected in context
+- **Cross-project**: Only activated when multiple projects detected in context
+- **Response time**: ~4-6 seconds
+
+**Actual prompt additions**:
+- **Cross-project detection**: If context contains `"Cross-Project Analysis"` → adds: *"Note: This context contains code from multiple projects - consider comparing approaches when relevant."*
+- **Guidelines detection**: If JS/TS files found → adds full SOLID/DRY/YAGNI guidelines + *"When providing code examples or suggestions, please follow the above guidelines."*
+
+```bash
+context-ai ask "How should I implement form validation?" --prompt-mode standard
+# Or simply: context-ai ask "How should I implement form validation?"
+```
+
+**Example Response**:
+```
+For form validation, use the ValidationSchema from utils-v2 which follows our established patterns:
+
+```typescript
+const loginSchema = ValidationSchema({
+  email: [required(), isEmail()],
+  password: [required(), minLength(8)]
+});
+```
+
+This approach maintains consistency with your existing forms in project-main-v2 
+and follows the functional programming patterns from your JS/TS guidelines.
+```
+
+---
+
+#### 🧠 `comprehensive` - Deep Analysis
+**Perfect for**: Architecture decisions, complex comparisons, learning existing patterns
+- **Processing**: Full cross-project analysis + architectural insights
+- **Instructions sent**: Detailed 7-point analysis framework + guidelines + architectural reasoning
+- **Guidelines**: Applied with architectural explanations
+- **Cross-project**: Always detailed when multiple projects detected
+- **Response time**: ~8-12 seconds
+
+**Actual prompt additions**:
+When multiple projects detected, adds **CROSS-PROJECT ANALYSIS** with these specific instructions:
+- Compare implementations across different projects
+- Highlight similarities and differences between approaches  
+- Identify reusable patterns or components
+- Suggest opportunities for standardization or consistency improvements
+- Point out which project has the most robust/complete implementation
+- Consider architectural differences and their implications
+- Recommend best practices based on the patterns observed
+
+Plus: *"Please provide a comprehensive answer with architectural insights and best practices recommendations."*
+
+```bash
+context-ai ask "How should I structure user authentication?" --prompt-mode comprehensive
+```
+
+**Example Response**:
+```
+## Cross-Project Authentication Analysis
+
+I found 3 different authentication approaches across your projects:
+
+### 🔍 **Current Implementations**
+
+**design-system-v1** (⭐ Most Robust):
+- JWT-based authentication with refresh tokens
+- Centralized auth context with React hooks
+- Proper error boundaries and loading states
+- TypeScript interfaces for all auth types
+
+**backend-v2** (Simple but Effective):
+- Session-based authentication
+- Express middleware pattern
+- Basic error handling
+
+**legacy-v1** (⚠️ Needs Migration):
+- Basic auth with hardcoded tokens
+- No proper error handling
+- Security vulnerabilities
+
+### 🏗️ **Recommended Architecture**
+
+Follow the design-system-v1 pattern because:
+1. **Security**: Implements JWT best practices with refresh tokens
+2. **TypeScript**: Full type safety for auth flows  
+3. **UX**: Proper loading states and error handling
+4. **Testability**: Pure functions and clear separation of concerns
+
+### 📋 **Implementation Plan**
+
+1. Create unified AuthContext from design-system-v1
+2. Extract reusable auth hooks
+3. Implement token refresh mechanism
+4. Add proper TypeScript interfaces
+5. Migrate legacy-v1 gradually
+
+**Code Example**: [Shows complete implementation with explanations]
+```
+
+---
+
+#### 🔍 `strict` - Code Review Mode
+**Perfect for**: Code generation, refactoring, enforcing team standards
+- **Processing**: Rigorous guideline enforcement + detailed code analysis
+- **Instructions sent**: Code review framework + forced guidelines + strict enforcement
+- **Guidelines**: **Always applied** with `force=True` - detects languages and enforces standards
+- **Cross-project**: Code quality comparison with specific review criteria
+- **Response time**: ~10-15 seconds
+
+**Actual prompt additions**:
+Base instruction: *"Based on the following context from the codebase, please answer the question **with a focus on code quality and best practices**."*
+
+When multiple projects detected, adds **CODE REVIEW APPROACH**:
+- Code quality and maintainability differences
+- Performance implications of different approaches
+- Security considerations
+- Testing strategies
+- Documentation quality
+
+**Guidelines enforcement**: Uses `force=True` to detect languages and apply guidelines even when not auto-detected, plus: *"**STRICT ENFORCEMENT**: All code suggestions must strictly adhere to the above guidelines. Review existing code for violations and suggest improvements."*
+
+Final instruction: *"Provide a detailed answer with code review insights, strict adherence to guidelines, and actionable improvement recommendations."*
+
+```bash
+context-ai ask "Review my authentication implementation" --prompt-mode strict
+```
+
+**Example Response**:
+```
+## 🔍 Code Review Analysis
+
+### ❌ **Issues Found**
+
+**Guideline Violations**:
+- Using class components instead of functional (violates modern JS/TS practices)
+- Mixing authentication logic with UI components (violates SOLID principles)
+- Hardcoded API endpoints (violates DRY principle)
+- Missing error boundaries (violates YAGNI - should implement error handling)
+
+**Cross-Project Inconsistencies**:
+- Different error handling patterns vs design-system-v1
+- Missing TypeScript interfaces that exist in other projects
+- Not using established hooks pattern from utils-v2
+
+### ✅ **Recommended Refactor**
+
+```typescript
+// ❌ Current (violates guidelines)
+class LoginForm extends React.Component {
+  handleSubmit = () => {
+    fetch('http://localhost:3000/login', {...})  // hardcoded
+    // no error handling
+  }
+}
+
+// ✅ Improved (follows all guidelines)
+const LoginForm: React.FC<LoginProps> = ({ onSubmit }) => {
+  const { login, loading, error } = useAuth(); // reuse existing hook
+  
+  const handleSubmit = useCallback(async (data: LoginData) => {
+    try {
+      await login(data); // proper error handling
+      onSubmit?.(); // optional chaining
+    } catch (err) {
+      // error boundary will handle
+    }
+  }, [login, onSubmit]);
+
+  return (
+    <Form onSubmit={handleSubmit} loading={loading}>
+      <ErrorBoundary error={error} />
+      {/* Use design system components */}
+    </Form>
+  );
+};
+```
+
+### 📋 **Action Items**
+1. Extract auth logic to custom hook (follow useAuth pattern)
+2. Add TypeScript interfaces (copy from design-system-v1)
+3. Implement error boundaries consistently
+4. Use environment variables for API endpoints
+5. Add unit tests (follow existing test patterns)
+
+**Estimated refactor time**: 2-3 hours
+**Priority**: High (security implications)
+```
+
+---
+
+### 📊 **Quick Reference**
+
+| Use Case | Recommended Mode | Why |
+|----------|------------------|-----|
+| "Do we have component X?" | `minimal` | Quick fact lookup |
+| "How to implement feature Y?" | `standard` | Needs context + guidelines |  
+| "What's our auth architecture?" | `comprehensive` | Needs full project analysis |
+| "Review my code implementation" | `strict` | Needs rigorous standards enforcement |
+| Daily coding questions | `standard` | Balanced speed + quality |
+| Architecture planning | `comprehensive` | Needs deep insights |
+| Code generation | `strict` | Needs perfect standards compliance |
+
+### ⚙️ **Usage Examples**
+
+```bash
+# Quick lookups (minimal)
+context-ai ask "Where is the API endpoint defined?" --prompt-mode minimal
+
+# Daily development (standard - default)
+context-ai ask "How to add error handling to this form?"
+context-ai ask "What's the pattern for API calls?" --prompt-mode standard
+
+# Architecture decisions (comprehensive)  
+context-ai ask "Should I use Redux or Context API?" --prompt-mode comprehensive
+context-ai ask "How to structure this new microservice?" --prompt-mode comprehensive
+
+# Code review and generation (strict)
+context-ai ask "Generate a user profile component" --prompt-mode strict
+context-ai ask "Review this authentication flow" --prompt-mode strict
+
+# Chat sessions maintain mode throughout conversation
+context-ai chat --prompt-mode comprehensive  # All responses will be comprehensive
+context-ai chat --prompt-mode strict         # All responses will enforce strict standards
+```
+
+**💡 Pro Tip**: Start with `standard` mode for daily work, use `comprehensive` for learning your codebase, and `strict` when generating new code or doing refactoring.
 
 ### 📐 Built-in Coding Guidelines
 

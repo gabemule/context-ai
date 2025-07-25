@@ -159,6 +159,10 @@ class ClaudeClient:
         return f"""Based on the following context from the codebase, please answer \
 the question.
 
+**Code Attribution**: When showing existing code examples from the codebase, always \
+prefix each code block with a comment indicating the source file path \
+(e.g., `// From: path/to/file.tsx`).
+
 ## Context:
 {context}
 
@@ -172,6 +176,14 @@ guidelines."""
             "Based on the following context from the codebase, "
             "please answer the question."
         )
+
+        # Add code attribution instruction
+        code_attribution = """
+
+**Code Attribution**: When showing existing code examples from the codebase, always \
+prefix each code block with a comment indicating the source file path \
+(e.g., `// From: path/to/file.tsx`)."""
+        base_instructions += code_attribution
 
         # Add cross-project hints for multi-project contexts
         is_cross_project = (
@@ -208,6 +220,15 @@ architectural insights."""
             "Based on the following context from the codebase, "
             "please answer the question."
         )
+
+        # Add code attribution instruction
+        code_attribution = """
+
+**Code Attribution**: When showing existing code examples from the codebase, always \
+prefix each code block with a comment indicating the source file path \
+(e.g., `// From: path/to/file.tsx`). This helps users understand the context \
+and location of the code."""
+        base_instructions += code_attribution
 
         # Check if this is cross-project context
         is_cross_project = (
@@ -260,6 +281,15 @@ code review approach."""
             "Based on the following context from the codebase, please answer the "
             "question with a focus on code quality and best practices."
         )
+
+        # Add code attribution instruction (most important in strict mode)
+        code_attribution = """
+
+**Code Attribution**: When showing existing code examples from the codebase, always \
+prefix each code block with a comment indicating the source file path \
+(e.g., `// From: path/to/file.tsx`). This is essential for code review and \
+understanding implementation context."""
+        base_instructions += code_attribution
 
         # Always include cross-project analysis when applicable
         is_cross_project = (
