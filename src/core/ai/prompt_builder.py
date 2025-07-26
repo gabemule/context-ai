@@ -1,7 +1,7 @@
 """
 Prompt building logic for Context-AI.
 
-Handles construction of prompts based on different modes (minimal, standard, 
+Handles construction of prompts based on different modes (minimal, standard,
 comprehensive, strict) independent of the AI provider being used.
 """
 
@@ -19,7 +19,7 @@ prefix each code block with a comment indicating the source file path \
 class PromptBuilder:
     """
     Builds prompts based on configured mode - from minimal to comprehensive.
-    
+
     This class is AI provider agnostic and focuses purely on prompt construction
     logic based on the configured mode and available context.
     """
@@ -106,7 +106,10 @@ architectural insights."""
         )
 
         # Add global code attribution instruction with enhanced description
-        base_instructions += GLOBAL_CODE_ATTRIBUTION + " This helps users understand the context and location of the code."
+        base_instructions += (
+            GLOBAL_CODE_ATTRIBUTION
+            + " This helps users understand the context and location of the code."
+        )
 
         # Check if this is cross-project context
         is_cross_project = (
@@ -161,7 +164,10 @@ code review approach."""
         )
 
         # Add global code attribution instruction with strict mode emphasis
-        base_instructions += GLOBAL_CODE_ATTRIBUTION + " This is essential for code review and understanding implementation context."
+        base_instructions += (
+            GLOBAL_CODE_ATTRIBUTION
+            + " This is essential for code review and understanding implementation context."
+        )
 
         # Always include cross-project analysis when applicable
         is_cross_project = (

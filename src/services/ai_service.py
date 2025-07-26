@@ -373,13 +373,15 @@ class AIService:
         from rich.text import Text
 
         self.logger.info("💬 Starting chat session with Claude...")
-        
+
         # Check and display active embeddings
         active = self.settings_manager.get_active_embeddings()
         if not active.selected:
-            self.logger.error("❌ No active embeddings selected. Use 'context-ai select' first")
+            self.logger.error(
+                "❌ No active embeddings selected. Use 'context-ai select' first"
+            )
             return
-        
+
         # Show active embeddings before welcome panel
         embeddings_list = ", ".join(active.selected)
         self.logger.info("📊 Active embeddings: %s", embeddings_list)
@@ -401,7 +403,9 @@ class AIService:
             "    exit        - Quit chat session",
             style="dim",
         )
-        title = f"🤖 Context-AI Chat Session with History{' (Verbose)' if verbose else ''}"
+        title = (
+            f"🤖 Context-AI Chat Session with History{' (Verbose)' if verbose else ''}"
+        )
         welcome_panel = Panel(
             welcome_text,
             title=title,
@@ -439,7 +443,9 @@ class AIService:
                         # Show current active embeddings
                         active = self.settings_manager.get_active_embeddings()
                         if active.selected:
-                            self.logger.info("📊 Active embeddings: %s", ", ".join(active.selected))
+                            self.logger.info(
+                                "📊 Active embeddings: %s", ", ".join(active.selected)
+                            )
                         else:
                             self.logger.info("❌ No active embeddings selected")
                         continue
@@ -472,30 +478,43 @@ class AIService:
                         if len(parts) == 1:
                             # Show current mode and available options
                             import config.constants
+
                             current_mode = config.constants.PROMPT_MODE
                             self.logger.info("🎯 Current prompt mode: %s", current_mode)
-                            self.logger.info("📋 Available modes: minimal, standard, comprehensive, strict")
+                            self.logger.info(
+                                "📋 Available modes: minimal, standard, comprehensive, strict"
+                            )
                             self.logger.info("💡 Usage: /mode <mode_name>")
                             continue
-                        elif len(parts) == 2 and parts[1] in ["minimal", "standard", "comprehensive", "strict"]:
+                        elif len(parts) == 2 and parts[1] in [
+                            "minimal",
+                            "standard",
+                            "comprehensive",
+                            "strict",
+                        ]:
                             # Change mode
                             new_mode = parts[1]
                             import config.constants
+
                             old_mode = config.constants.PROMPT_MODE
                             config.constants.PROMPT_MODE = new_mode
-                            self.logger.info("🎯 Prompt mode changed: %s → %s", old_mode, new_mode)
-                            
+                            self.logger.info(
+                                "🎯 Prompt mode changed: %s → %s", old_mode, new_mode
+                            )
+
                             # Show helpful description of new mode
                             mode_descriptions = {
                                 "minimal": "Basic context + question only (fastest)",
                                 "standard": "Context + guidelines when detected (balanced)",
                                 "comprehensive": "Full cross-project analysis + insights (detailed)",
-                                "strict": "Enforced coding standards + code review approach (thorough)"
+                                "strict": "Enforced coding standards + code review approach (thorough)",
                             }
                             self.logger.info("📝 %s", mode_descriptions[new_mode])
                             continue
                         else:
-                            self.logger.error("❌ Invalid mode. Available: minimal, standard, comprehensive, strict")
+                            self.logger.error(
+                                "❌ Invalid mode. Available: minimal, standard, comprehensive, strict"
+                            )
                             self.logger.info("💡 Usage: /mode <mode_name>")
                             continue
 

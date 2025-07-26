@@ -54,6 +54,7 @@ def execute_chat_command(args: argparse.Namespace) -> int:
     # Load heavy imports with loading indicator
     with console.status("[bold green]Loading chat service...", spinner="dots"):
         from services.ai_service import get_ai_service
+
         service = get_ai_service()
 
     try:

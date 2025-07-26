@@ -17,7 +17,7 @@ from config.constants import (
     CLAUDE_RETRY_DELAY,
     CLAUDE_TIMEOUT,
 )
-from core.ai.ai_client_interface import AIClientInterface, AIResponse, AIClientFactory
+from core.ai.ai_client_interface import AIClientFactory, AIClientInterface, AIResponse
 from utils.exceptions import APIError, ConfigurationError
 from utils.logging import get_logger
 
@@ -25,6 +25,7 @@ from utils.logging import get_logger
 @dataclass
 class ClaudeResponse:
     """Internal Claude API response (before conversion to AIResponse)."""
+
     content: str
     model: str
     usage: Dict[str, int]
@@ -97,7 +98,7 @@ class ClaudeClient(AIClientInterface):
         context: Optional[str] = None,
         model: Optional[str] = None,
         max_tokens: Optional[int] = None,
-        **provider_kwargs
+        **provider_kwargs,
     ) -> AIResponse:
         """
         Ask Claude a question with optional context.
@@ -118,6 +119,7 @@ class ClaudeClient(AIClientInterface):
 
         # Build prompt using the dedicated PromptBuilder
         from core.ai.prompt_builder import get_prompt_builder
+
         prompt_builder = get_prompt_builder()
         prompt = prompt_builder.build_prompt(question, context)
 
@@ -145,7 +147,7 @@ class ClaudeClient(AIClientInterface):
             model=claude_response.model,
             usage=claude_response.usage,
             finish_reason=claude_response.finish_reason,
-            provider="claude"
+            provider="claude",
         )
 
     def get_available_models(self) -> list[str]:

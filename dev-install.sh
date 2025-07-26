@@ -105,11 +105,11 @@ fi
 
 print_status "Installing current project in development mode..."
 
-# Install current project
-if pip install -e .; then
-    print_success "Project installed successfully!"
+# Install current project with dev dependencies
+if pip install -e ".[dev]"; then
+    print_success "Project installed successfully with dev dependencies!"
 else
-    print_error "Failed to install current project"
+    print_error "Failed to install current project with dev dependencies"
     exit 1
 fi
 

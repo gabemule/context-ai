@@ -236,15 +236,17 @@ class StorageManager:
         try:
             # Delete from ChromaDB
             from core.embeddings.vector_store import get_vector_store
-            
+
             vector_store = get_vector_store()
             success = vector_store.delete_embedding(embedding_name)
-            
+
             if success:
                 self.logger.info("Deleted embedding '%s' from ChromaDB", embedding_name)
                 return True
             else:
-                self.logger.warning("Embedding '%s' not found in ChromaDB", embedding_name)
+                self.logger.warning(
+                    "Embedding '%s' not found in ChromaDB", embedding_name
+                )
                 return False
 
         except Exception as e:

@@ -39,13 +39,14 @@ def execute_select_command(args: argparse.Namespace) -> int:
     logger.info("🚀 Initializing select command...")
 
     from rich.console import Console
-    
+
     console = Console()
 
     # Load heavy imports with loading indicator
     with console.status("[bold green]Loading embedding service...", spinner="dots"):
         from config.settings import get_settings_manager
         from services.embedding_service import EmbeddingService
+
         service = EmbeddingService()
 
     if args.embeddings:

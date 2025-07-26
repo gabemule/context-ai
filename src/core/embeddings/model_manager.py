@@ -185,9 +185,12 @@ class EmbeddingModelManager:
 
             # Load model with visual loading indicator
             from rich.console import Console
+
             console = Console()
-            
-            with console.status(f"[bold green]Loading model {model_name}...", spinner="dots"):
+
+            with console.status(
+                f"[bold green]Loading model {model_name}...", spinner="dots"
+            ):
                 model = SentenceTransformer(
                     model_name, cache_folder=str(self._model_cache_dir)
                 )

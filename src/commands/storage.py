@@ -86,11 +86,12 @@ def execute_storage_command(args: argparse.Namespace) -> int:
 
     # Import storage manager (fast operation)
     from utils.storage import get_storage_manager
+
     storage_manager = get_storage_manager()
 
     if args.storage_action == "info":
         logger.info("📊 Storage Information:")
-        
+
         # Load storage info with loading indicator (this accesses ChromaDB and is slow)
         with console.status("[bold green]Loading storage info...", spinner="dots"):
             storage_info = storage_manager.get_storage_info()
@@ -113,16 +114,16 @@ def execute_storage_command(args: argparse.Namespace) -> int:
         # Show directory sizes
         logger.info("Directory breakdown:")
         dir_sizes = storage_info["directory_sizes"]
-        
+
         # Combine embeddings and chroma sizes for clearer display
         chroma_size = dir_sizes.get("chroma", 0)
-        embeddings_size = dir_sizes.get("embeddings", 0) 
+        embeddings_size = dir_sizes.get("embeddings", 0)
         combined_size = chroma_size + embeddings_size
-        
+
         if combined_size > 0:
             combined_mb = round(combined_size / (1024 * 1024), 2)
             logger.info("  embeddings (chroma): %s MB", combined_mb)
-        
+
         # Show other directories (excluding embeddings and chroma since they're combined)
         for dir_name, size_bytes in dir_sizes.items():
             if dir_name not in ["embeddings", "chroma"]:

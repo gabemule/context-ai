@@ -54,6 +54,7 @@ def execute_generate_command(args: argparse.Namespace) -> int:
     # Load heavy imports with loading indicator
     with console.status("[bold green]Loading embedding service...", spinner="dots"):
         from services.embedding_service import EmbeddingService
+
         service = EmbeddingService()
 
     show_progress = not args.no_progress
