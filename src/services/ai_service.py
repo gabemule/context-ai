@@ -373,16 +373,31 @@ class AIService:
         from rich.text import Text
 
         self.logger.info("💬 Starting chat session with Claude...")
+        
+        # Check and display active embeddings
+        active = self.settings_manager.get_active_embeddings()
+        if not active.selected:
+            self.logger.error("❌ No active embeddings selected. Use 'context-ai select' first")
+            return
+        
+        # Show active embeddings before welcome panel
+        embeddings_list = ", ".join(active.selected)
+        self.logger.info("📊 Active embeddings: %s", embeddings_list)
         self.logger.info("Type 'exit', 'quit', or press Ctrl+C to end the session")
 
         console = Console()
 
-        # Welcome panel
+        # Enhanced welcome panel with embedding info
         welcome_text = Text(
+            f"Using embeddings: {embeddings_list}\n\n"
             "Ask questions about your codebase. Chat history will be maintained "
             "for context.\n\n"
-            "Special commands: /history (stats), /clear (reset), "
-            "/verbose (toggle), 'exit' (quit)",
+            "Special commands:\n"
+            "    /embeddings - Show active embeddings\n"
+            "    /history    - Show chat statistics\n"
+            "    /clear      - Reset conversation history\n"
+            "    /verbose    - Toggle detailed logging\n"
+            "    exit        - Quit chat session",
             style="dim",
         )
         title = f"🤖 Context-AI Chat Session with History{' (Verbose)' if verbose else ''}"
@@ -419,7 +434,15 @@ class AIService:
                         continue
 
                     # Handle special commands
-                    if question.lower() == "/history":
+                    if question.lower() == "/embeddings":
+                        # Show current active embeddings
+                        active = self.settings_manager.get_active_embeddings()
+                        if active.selected:
+                            self.logger.info("📊 Active embeddings: %s", ", ".join(active.selected))
+                        else:
+                            self.logger.info("❌ No active embeddings selected")
+                        continue
+                    elif question.lower() == "/history":
                         stats = self.chat_history.get_stats()
                         if stats["turns"] > 0:
                             self.logger.info(
