@@ -397,6 +397,7 @@ class AIService:
             "    /history    - Show chat statistics\n"
             "    /clear      - Reset conversation history\n"
             "    /verbose    - Toggle detailed logging\n"
+            "    /mode       - Change prompt mode (minimal|standard|comprehensive|strict)\n"
             "    exit        - Quit chat session",
             style="dim",
         )
@@ -465,6 +466,38 @@ class AIService:
                             "🔧 Verbose mode %s", "enabled" if verbose else "disabled"
                         )
                         continue
+                    elif question.lower().startswith("/mode"):
+                        # Parse and handle mode change
+                        parts = question.split()
+                        if len(parts) == 1:
+                            # Show current mode and available options
+                            import config.constants
+                            current_mode = config.constants.PROMPT_MODE
+                            self.logger.info("🎯 Current prompt mode: %s", current_mode)
+                            self.logger.info("📋 Available modes: minimal, standard, comprehensive, strict")
+                            self.logger.info("💡 Usage: /mode <mode_name>")
+                            continue
+                        elif len(parts) == 2 and parts[1] in ["minimal", "standard", "comprehensive", "strict"]:
+                            # Change mode
+                            new_mode = parts[1]
+                            import config.constants
+                            old_mode = config.constants.PROMPT_MODE
+                            config.constants.PROMPT_MODE = new_mode
+                            self.logger.info("🎯 Prompt mode changed: %s → %s", old_mode, new_mode)
+                            
+                            # Show helpful description of new mode
+                            mode_descriptions = {
+                                "minimal": "Basic context + question only (fastest)",
+                                "standard": "Context + guidelines when detected (balanced)",
+                                "comprehensive": "Full cross-project analysis + insights (detailed)",
+                                "strict": "Enforced coding standards + code review approach (thorough)"
+                            }
+                            self.logger.info("📝 %s", mode_descriptions[new_mode])
+                            continue
+                        else:
+                            self.logger.error("❌ Invalid mode. Available: minimal, standard, comprehensive, strict")
+                            self.logger.info("💡 Usage: /mode <mode_name>")
+                            continue
 
                     # Use the same display method but with history enabled
                     self.ask_question(question, verbose=verbose, include_history=True)
