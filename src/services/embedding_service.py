@@ -149,7 +149,6 @@ class EmbeddingService:
                     "errors_count": 0,
                 }
 
-        # TODO: Save embedding metadata and actual embeddings to storage
         self.logger.info(
             "✅ Embedding generation completed: %d chunks from %d files",
             final_stats.get("chunks_created", 0),

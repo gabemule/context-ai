@@ -82,16 +82,18 @@ def execute_storage_command(args: argparse.Namespace) -> int:
 
     from rich.console import Console
 
-    from utils.storage import get_storage_manager
-
     console = Console()
 
-    with console.status("[bold yellow]Loading storage info...", spinner="dots"):
-        storage_manager = get_storage_manager()
+    # Import storage manager (fast operation)
+    from utils.storage import get_storage_manager
+    storage_manager = get_storage_manager()
 
     if args.storage_action == "info":
         logger.info("📊 Storage Information:")
-        storage_info = storage_manager.get_storage_info()
+        
+        # Load storage info with loading indicator (this accesses ChromaDB and is slow)
+        with console.status("[bold green]Loading storage info...", spinner="dots"):
+            storage_info = storage_manager.get_storage_info()
 
         if "error" in storage_info:
             logger.error("❌ Error getting storage info: %s", storage_info["error"])
@@ -110,9 +112,22 @@ def execute_storage_command(args: argparse.Namespace) -> int:
 
         # Show directory sizes
         logger.info("Directory breakdown:")
-        for dir_name, size_bytes in storage_info["directory_sizes"].items():
-            size_mb = round(size_bytes / (1024 * 1024), 2)
-            logger.info("  %s: %s MB", dir_name, size_mb)
+        dir_sizes = storage_info["directory_sizes"]
+        
+        # Combine embeddings and chroma sizes for clearer display
+        chroma_size = dir_sizes.get("chroma", 0)
+        embeddings_size = dir_sizes.get("embeddings", 0) 
+        combined_size = chroma_size + embeddings_size
+        
+        if combined_size > 0:
+            combined_mb = round(combined_size / (1024 * 1024), 2)
+            logger.info("  embeddings (chroma): %s MB", combined_mb)
+        
+        # Show other directories (excluding embeddings and chroma since they're combined)
+        for dir_name, size_bytes in dir_sizes.items():
+            if dir_name not in ["embeddings", "chroma"]:
+                size_mb = round(size_bytes / (1024 * 1024), 2)
+                logger.info("  %s: %s MB", dir_name, size_mb)
 
     elif args.storage_action == "cleanup":
         logger.info("🧹 Cleaning up temporary files older than %d hours...", args.hours)

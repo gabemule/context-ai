@@ -52,7 +52,7 @@ class VectorStoreManager:
         self._collection: Optional[chromadb.Collection] = None
 
         # Setup ChromaDB storage path
-        self._db_path = self.storage_manager.embeddings_dir / "chromadb"
+        self._db_path = self.storage_manager.chroma_dir / "chromadb"
         self._db_path.mkdir(parents=True, exist_ok=True)
 
     def _get_client(self) -> chromadb.ClientAPI:

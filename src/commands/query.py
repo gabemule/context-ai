@@ -90,7 +90,7 @@ def execute_query_command(args: argparse.Namespace) -> None:
         console = Console()
 
         # Initialize query service with loading
-        with console.status("[bold blue]Loading query service...", spinner="dots"):
+        with console.status("[bold green]Loading query service...", spinner="dots"):
             from services.embedding_service import QueryService
 
             query_service = QueryService()

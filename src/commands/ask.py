@@ -68,8 +68,6 @@ def execute_ask_command(args: argparse.Namespace) -> int:
 
     from rich.console import Console
 
-    from services.ai_service import get_ai_service
-
     console = Console()
 
     # Set prompt mode if specified
@@ -81,7 +79,9 @@ def execute_ask_command(args: argparse.Namespace) -> int:
         if args.verbose:
             logger.info("🎯 Using prompt mode: %s", args.prompt_mode)
 
-    with console.status("[bold blue]Initializing AI service...", spinner="dots"):
+    # Load heavy imports with loading indicator
+    with console.status("[bold green]Loading AI service...", spinner="dots"):
+        from services.ai_service import get_ai_service
         service = get_ai_service()
 
     try:

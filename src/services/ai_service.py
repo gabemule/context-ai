@@ -385,7 +385,7 @@ class AIService:
             "/verbose (toggle), 'exit' (quit)",
             style="dim",
         )
-        title = f"🤖 Claude Chat Session with History{' (Verbose)' if verbose else ''}"
+        title = f"🤖 Context-AI Chat Session with History{' (Verbose)' if verbose else ''}"
         welcome_panel = Panel(
             welcome_text,
             title=title,
@@ -502,7 +502,7 @@ class AIService:
         # Display in a styled panel
         panel = Panel(
             markdown_content,
-            title="🤖 Claude's Answer",
+            title="🤖 Context-AI's Answer",
             title_align="center",
             border_style="green",
             padding=(1, 2),

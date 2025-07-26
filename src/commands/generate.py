@@ -49,11 +49,11 @@ def execute_generate_command(args: argparse.Namespace) -> int:
 
     from rich.console import Console
 
-    from services.embedding_service import EmbeddingService
-
     console = Console()
 
+    # Load heavy imports with loading indicator
     with console.status("[bold green]Loading embedding service...", spinner="dots"):
+        from services.embedding_service import EmbeddingService
         service = EmbeddingService()
 
     show_progress = not args.no_progress

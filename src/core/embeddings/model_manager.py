@@ -183,10 +183,14 @@ class EmbeddingModelManager:
                     "📥 Downloading model (this may take a few minutes)..."
                 )
 
-            # Load model (will download if not cached)
-            model = SentenceTransformer(
-                model_name, cache_folder=str(self._model_cache_dir)
-            )
+            # Load model with visual loading indicator
+            from rich.console import Console
+            console = Console()
+            
+            with console.status(f"[bold green]Loading model {model_name}...", spinner="dots"):
+                model = SentenceTransformer(
+                    model_name, cache_folder=str(self._model_cache_dir)
+                )
 
             # Cache the loaded model
             self._loaded_models[model_name] = model

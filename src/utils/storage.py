@@ -63,10 +63,6 @@ class StorageManager:
         """Get path for embedding data."""
         return self.chroma_dir / f"{embedding_name}.db"
 
-    def get_embedding_metadata_path(self, embedding_name: str) -> Path:
-        """Get path for embedding metadata."""
-        return self.embeddings_dir / f"{embedding_name}.json"
-
     def get_model_cache_path(self, model_name: str) -> Path:
         """Get path for cached model."""
         safe_name = model_name.replace("/", "_").replace(":", "_")
@@ -93,22 +89,7 @@ class StorageManager:
 
         except Exception as e:
             self.logger.warning("Error listing embeddings from vector store: %s", e)
-            # Fallback to JSON files if vector store fails
-            try:
-                if not self.embeddings_dir.exists():
-                    return []
-
-                embeddings = []
-                for metadata_file in self.embeddings_dir.glob("*.json"):
-                    embedding_name = metadata_file.stem
-                    embeddings.append(embedding_name)
-
-                return sorted(embeddings)
-            except Exception as fallback_e:
-                self.logger.warning(
-                    "Fallback to JSON files also failed: %s", fallback_e
-                )
-                return []
+            return []
 
     def embedding_exists(self, embedding_name: str) -> bool:
         """Check if embedding exists in ChromaDB."""
@@ -121,8 +102,7 @@ class StorageManager:
 
         except Exception as e:
             self.logger.warning("Error checking embedding existence: %s", e)
-            # Fallback to JSON file check
-            return self.get_embedding_metadata_path(embedding_name).exists()
+            return False
 
     def get_storage_size(self) -> int:
         """Get total storage size in bytes."""
@@ -245,7 +225,7 @@ class StorageManager:
 
     def delete_embedding(self, embedding_name: str) -> bool:
         """
-        Delete a specific embedding and its metadata.
+        Delete a specific embedding from ChromaDB.
 
         Args:
             embedding_name: Name of embedding to delete
@@ -254,32 +234,17 @@ class StorageManager:
             True if deletion was successful
         """
         try:
-            deleted_files = 0
-
-            # Delete metadata file
-            metadata_path = self.get_embedding_metadata_path(embedding_name)
-            if metadata_path.exists():
-                metadata_path.unlink()
-                deleted_files += 1
-                self.logger.debug("Deleted metadata: %s", metadata_path)
-
-            # Delete embedding data
-            embedding_path = self.get_embedding_path(embedding_name)
-            if embedding_path.exists():
-                if embedding_path.is_dir():
-                    shutil.rmtree(embedding_path)
-                else:
-                    embedding_path.unlink()
-                deleted_files += 1
-                self.logger.debug("Deleted embedding data: %s", embedding_path)
-
-            if deleted_files > 0:
-                self.logger.info(
-                    "Deleted embedding '%s' (%d files)", embedding_name, deleted_files
-                )
+            # Delete from ChromaDB
+            from core.embeddings.vector_store import get_vector_store
+            
+            vector_store = get_vector_store()
+            success = vector_store.delete_embedding(embedding_name)
+            
+            if success:
+                self.logger.info("Deleted embedding '%s' from ChromaDB", embedding_name)
                 return True
             else:
-                self.logger.warning("Embedding '%s' not found", embedding_name)
+                self.logger.warning("Embedding '%s' not found in ChromaDB", embedding_name)
                 return False
 
         except Exception as e:
