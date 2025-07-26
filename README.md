@@ -78,6 +78,21 @@ make dev                # Full development cycle
 
 
 ### Manual Setup (Full Control)
+
+#### Option A: pipx editable (Recommended for local development) 🏆
+```bash  
+git clone https://github.com/gabemule/context-ai
+cd context-ai
+pipx install -e .  # Global command + live code changes
+```
+
+**What this gives you:**
+- 🌍 **Global command**: `context-ai` works from anywhere
+- 🔧 **Live editing**: Code changes reflect immediately
+- 🧹 **Clean environment**: Dependencies isolated in pipx venv
+- 💨 **No activation needed**: Just use the command!
+
+#### Option B: Traditional venv
 ```bash
 git clone https://github.com/gabemule/context-ai
 cd context-ai
@@ -108,6 +123,55 @@ context-ai --version
 context-ai --help
 ```
 
+## 🔧 Managing Your Installation
+
+### Check what's installed
+```bash
+pipx list  # Shows all pipx applications
+pip show context-ai  # For venv installations
+```
+
+### Update after code changes
+```bash
+# pipx automatically detects changes in editable installs
+# But if something seems wrong:
+pipx reinstall context-ai
+
+# For venv installations:
+pip install -e . --force-reinstall
+```
+
+### Uninstall
+```bash
+# Remove context-ai from pipx
+pipx uninstall context-ai
+
+# Remove from venv
+pip uninstall context-ai
+```
+
+### Switch installation methods
+```bash
+# From pipx to venv
+pipx uninstall context-ai
+python -m venv venv && source venv/bin/activate
+pip install -e ".[dev]"
+
+# From venv to pipx  
+deactivate && rm -rf venv
+pipx install -e .
+```
+
+### Troubleshooting
+```bash
+# Context-AI command not found after pipx install
+pipx ensurepath
+source ~/.bashrc  # or ~/.zshrc
+
+# Development tools not working with pipx
+source dev-install.sh  # Use venv for development
+```
+
 ## ⚡ Quick Start
 
 ```bash
@@ -132,13 +196,13 @@ context-ai chat
 
 | Command | Purpose | Quick Example |
 |---------|---------|---------------|
-| `generate` | Create embeddings from projects | `context-ai generate ./my-project --name "v1"` |
-| `select` | Choose active embeddings | `context-ai select` (interactive) |
-| `query` | Search for context | `context-ai query "auth patterns" --format json` |
-| `ask` | AI Q&A with context | `context-ai ask "How to implement login?"` |
-| `chat` | Interactive AI session | `context-ai chat --prompt-mode comprehensive` |
-| `config` | Manage settings | `context-ai config set --claude-key sk-ant-xxx` |
-| `storage` | Manage data | `context-ai storage info` |
+| **[`generate`](docs/commands/generate.md)** | Create embeddings from projects | `context-ai generate ./my-project --name "v1"` |
+| **[`select`](docs/commands/select.md)** | Choose active embeddings | `context-ai select` (interactive) |
+| **[`query`](docs/commands/query.md)** | Search for context | `context-ai query "auth patterns" --format json` |
+| **[`ask`](docs/commands/ask.md)** | AI Q&A with context | `context-ai ask "How to implement login?"` |
+| **[`chat`](docs/commands/chat.md)** | Interactive AI session | `context-ai chat --prompt-mode comprehensive` |
+| **[`config`](docs/commands/config.md)** | Manage settings | `context-ai config set --claude-key sk-ant-xxx` |
+| **[`storage`](docs/commands/storage.md)** | Manage data | `context-ai storage info` |
 
 ## 🎛️ Prompt Modes
 
@@ -193,19 +257,19 @@ For detailed information, see our comprehensive documentation:
 ### **🚀 Getting Started Guide**
 New to Context-AI? Check the [complete documentation index](docs/README.md) for guided learning paths.
 
+### **📖 Command References** 
+- **[Generate Command](docs/commands/generate.md)** - Embedding creation, ignore patterns, processing
+- **[Select Command](docs/commands/select.md)** - Interactive selection, CLI usage, state management
+- **[Query Command](docs/commands/query.md)** - Search syntax, formats, performance tuning
+- **[Ask Command](docs/commands/ask.md)** - AI questions with prompt modes and output options
+- **[Chat Command](docs/commands/chat.md)** - Interactive sessions, special commands, history management
+- **[Config Command](docs/commands/config.md)** - API setup, validation, troubleshooting
+- **[Storage Command](docs/commands/storage.md)** - Data management, cleanup, operations
+
 ### **🏗️ Architecture**
 - **[Context Window Management](docs/architecture/context-window-management.md)** - How Context-AI manages Claude's 200K token context
 - **[Prompt Modes Architecture](docs/architecture/prompt-modes.md)** - Deep dive into the four prompt modes
 - **[Similarity Scoring System](docs/architecture/similarity-scoring.md)** - Multi-embedding ranking algorithms
-
-### **📖 Command References** 
-- **[Chat Command](docs/commands/chat.md)** - Interactive sessions, special commands, history management
-- **[Ask Command](docs/commands/ask.md)** - AI questions with prompt modes and output options
-- **[Query Command](docs/commands/query.md)** - Search syntax, formats, performance tuning
-- **[Generate Command](docs/commands/generate.md)** - Embedding creation, ignore patterns, processing
-- **[Select Command](docs/commands/select.md)** - Interactive selection, CLI usage, state management
-- **[Config Command](docs/commands/config.md)** - API setup, validation, troubleshooting
-- **[Storage Command](docs/commands/storage.md)** - Data management, cleanup, operations
 
 ## 🏗️ Built With
 
