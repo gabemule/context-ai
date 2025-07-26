@@ -41,24 +41,65 @@ print_status "Checking Python environment..."
 PYTHON_VERSION=$(python --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
 print_status "Using Python $PYTHON_VERSION"
 
-# Get current project name
+# Check if we're in a virtual environment, create one if not
+print_status "Checking virtual environment..."
+if [[ -z "$VIRTUAL_ENV" ]]; then
+    print_warning "Not in a virtual environment - creating one for you..."
+    
+    if [ -d "venv" ]; then
+        print_status "Found existing venv directory, activating it..."
+    else
+        print_status "Creating new virtual environment..."
+        python -m venv venv
+        print_success "✅ Virtual environment created!"
+    fi
+    
+    # Activate the virtual environment
+    print_status "Activating virtual environment..."
+    source venv/bin/activate
+    
+    # Verify activation
+    if [[ -n "$VIRTUAL_ENV" ]]; then
+        print_success "✅ Virtual environment activated: $(basename "$VIRTUAL_ENV")"
+    else
+        print_error "Failed to activate virtual environment"
+        exit 1
+    fi
+else
+    print_success "✅ Already in virtual environment: $(basename "$VIRTUAL_ENV")"
+fi
+
+# Get current project name - try multiple methods
 CURRENT_PROJECT=""
-if [ -f "pyproject.toml" ]; then
+
+# Method 1: Parse pyproject.toml directly (no dependencies needed)
+if [ -f "pyproject.toml" ] && [ -z "$CURRENT_PROJECT" ]; then
+    CURRENT_PROJECT=$(grep -E '^name\s*=' pyproject.toml | head -1 | sed -E 's/.*=\s*["\047]([^"\047]+)["\047].*/\1/' 2>/dev/null || echo "")
+fi
+
+# Method 2: Try using Python's built-in configparser for setup.py projects
+if [ -f "setup.py" ] && [ -z "$CURRENT_PROJECT" ]; then
     CURRENT_PROJECT=$(python -c "
-import toml
+import re
 try:
-    data = toml.load('pyproject.toml')
-    print(data.get('project', {}).get('name', ''))
+    with open('setup.py', 'r') as f:
+        content = f.read()
+    match = re.search(r'name\s*=\s*['\''\"']([^'\''\"\'']+)['\''\"']', content)
+    if match:
+        print(match.group(1))
+    else:
+        print('')
 except:
     print('')
 " 2>/dev/null || echo "")
 fi
 
+# Method 3: Use directory name as fallback
 if [ -z "$CURRENT_PROJECT" ]; then
-    print_warning "Could not detect current project name from pyproject.toml"
-    CURRENT_PROJECT="unknown"
+    CURRENT_PROJECT=$(basename "$(pwd)" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g')
+    print_warning "Could not detect project name from config files, using directory name: $CURRENT_PROJECT"
 else
-    print_status "Current project: $CURRENT_PROJECT"
+    print_status "Detected project: $CURRENT_PROJECT"
 fi
 
 print_status "Detecting locally installed editable packages..."
@@ -146,8 +187,17 @@ echo ""
 echo "📋 Summary:"
 echo "  📦 Project: $CURRENT_PROJECT"
 echo "  🐍 Python: $PYTHON_VERSION"
+echo "  🏠 Virtual env: $(basename "$VIRTUAL_ENV" 2>/dev/null || echo "none")"
 echo "  🔗 Mode: Editable install (pip install -e .)"
 echo ""
-echo "🔧 To uninstall: pip uninstall $CURRENT_PROJECT"
-echo "🔄 To reinstall: ./dev-install.sh"
-echo "📝 To see all packages: pip list"
+echo "💡 Next steps:"
+echo "  🚀 Start using: $CLI_COMMAND --help"
+echo "  🔧 To uninstall: pip uninstall $CURRENT_PROJECT"
+echo "  🔄 To reinstall: source dev-install.sh"
+echo "  📝 To see all packages: pip list"
+echo ""
+if [[ -n "$VIRTUAL_ENV" ]]; then
+    print_success "✅ Virtual environment is active and ready to use!"
+else
+    print_warning "⚠️  Remember to activate your virtual environment before using the project"
+fi
