@@ -479,7 +479,7 @@ class QueryService:
                     {
                         "text": result.text,
                         "score": result.final_score,
-                        "similarity": 1.0 - result.original_distance,
+                        "similarity": result.normalized_score,
                         "source_embedding": result.source_embedding,
                         "metadata": result.metadata,
                     }

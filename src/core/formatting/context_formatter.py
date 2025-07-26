@@ -202,9 +202,7 @@ class ContextFormatter:
             sources.add(source)
 
             # Create result section
-            similarity = (
-                1.0 - result.original_distance
-            )  # Convert distance back to similarity
+            similarity = result.normalized_score  # Use properly normalized score (0-1 range)
             file_path = result.metadata.get("file_path", "unknown")
             language = result.metadata.get("language", "text")
 

@@ -7,6 +7,7 @@
 ### **Architecture & Design**
 - **[Context Window Management](architecture/context-window-management.md)** - How Context-AI manages Claude's 200K token context window
 - **[Prompt Modes Architecture](architecture/prompt-modes.md)** - Design and implementation of the four prompt modes
+- **[Similarity Scoring System](architecture/similarity-scoring.md)** - Multi-embedding score normalization and cross-project ranking algorithms
 
 ### **Command References**
 - **[Chat Command](commands/chat.md)** - Start interactive chat sessions with AI
