@@ -340,7 +340,7 @@ class FileFilter:
                 if file_size > MAX_FILE_SIZE_BYTES:
                     return (
                         False,
-                        f"file too large (>{MAX_FILE_SIZE_BYTES // (1024*1024)}MB)",
+                        f"file too large (>{MAX_FILE_SIZE_BYTES // (1024 * 1024)}MB)",
                     )
 
                 if file_size == 0:

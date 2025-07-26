@@ -105,8 +105,8 @@ class ChatHistoryManager:
 
         conversation_text = ""
         for i, turn in enumerate(old_turns):
-            conversation_text += f"Q{i+1}: {turn.question}\n"
-            conversation_text += f"A{i+1}: {turn.response}\n\n"
+            conversation_text += f"Q{i + 1}: {turn.question}\n"
+            conversation_text += f"A{i + 1}: {turn.response}\n\n"
 
         return f"""Please summarize this conversation history in 2-3 sentences, \
 focusing on:
@@ -486,7 +486,7 @@ class AIService:
                             )
                             self.logger.info("💡 Usage: /mode <mode_name>")
                             continue
-                        elif len(parts) == 2 and parts[1] in [
+                        elif len(parts) == 2 and parts[1] in [  # noqa: E501
                             "minimal",
                             "standard",
                             "comprehensive",

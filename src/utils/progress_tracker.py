@@ -320,7 +320,7 @@ class FileProcessingTracker:
 
         for category, count in stats.items():
             if category != "total" and count > 0:
-                percentage = f"{(count/total)*100:.1f}%" if total > 0 else "0%"
+                percentage = f"{(count / total) * 100:.1f}%" if total > 0 else "0%"
 
                 # Color coding
                 if category == "accepted":

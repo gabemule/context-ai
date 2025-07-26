@@ -155,13 +155,13 @@ class AIClientFactory:
             client_class: Class implementing AIClientInterface
         """
         if not issubclass(client_class, AIClientInterface):
-            raise TypeError(f"Client class must implement AIClientInterface")
+            raise TypeError("Client class must implement AIClientInterface")
 
         cls._registry[name.lower()] = client_class
 
     @classmethod
     def create_client(
-        self, provider: str, api_key: str, default_model: str = None, **kwargs
+        cls, provider: str, api_key: str, default_model: str = None, **kwargs
     ) -> AIClientInterface:
         """
         Create an AI client for the specified provider.
@@ -183,7 +183,7 @@ class AIClientFactory:
         if provider_lower not in cls._registry:
             available = ", ".join(cls._registry.keys())
             raise ValueError(
-                f"Unknown AI provider: {provider}. " f"Available providers: {available}"
+                f"Unknown AI provider: {provider}. Available providers: {available}"
             )
 
         client_class = cls._registry[provider_lower]

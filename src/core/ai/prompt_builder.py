@@ -233,7 +233,7 @@ guidelines, and actionable improvement recommendations."""
 
         except Exception as e:
             # Don't let guidelines errors break the main functionality
-            self.logger.debug("Failed to load guidelines: %s", e)
+            self.logger.debug("Failed to load guidelines: %s", e)  # noqa: E501
             return None
 
 

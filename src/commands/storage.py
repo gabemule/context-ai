@@ -124,7 +124,8 @@ def execute_storage_command(args: argparse.Namespace) -> int:
             combined_mb = round(combined_size / (1024 * 1024), 2)
             logger.info("  embeddings (chroma): %s MB", combined_mb)
 
-        # Show other directories (excluding embeddings and chroma since they're combined)
+        # Show other directories (excluding embeddings and chroma since they're
+        # combined)
         for dir_name, size_bytes in dir_sizes.items():
             if dir_name not in ["embeddings", "chroma"]:
                 size_mb = round(size_bytes / (1024 * 1024), 2)
@@ -144,7 +145,9 @@ def execute_storage_command(args: argparse.Namespace) -> int:
             logger.error("Usage: context-ai storage reset --confirm")
             return 1
 
-        logger.warning("🚨 RESETTING ALL STORAGE - This will delete everything!")
+        logger.warning(
+            "🚨 RESETTING ALL STORAGE - This will delete everything!"
+        )  # noqa: E501
         success = storage_manager.reset_storage(confirm=True)
         if success:
             logger.info("✅ Storage reset complete")

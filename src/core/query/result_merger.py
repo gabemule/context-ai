@@ -194,7 +194,7 @@ class MultiEmbeddingResultMerger:
 
             context_parts.append(
                 f"""
-## Result {i+1} (score: {result.final_score:.3f}, source: {result.source_embedding})
+## Result {i + 1} (score: {result.final_score:.3f}, source: {result.source_embedding})
 **File:** {file_path} ({language})
 
 ```{language}
