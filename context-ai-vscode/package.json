@@ -4,26 +4,16 @@
   "description": "Chat interface for Context-AI - AI-powered codebase question answering",
   "version": "0.1.0",
   "publisher": "context-ai",
-  "engines": {
-    "vscode": "^1.60.0"
-  },
-  "categories": [
-    "Other",
-    "Machine Learning",
-    "Snippets"
-  ],
-  "keywords": [
-    "ai",
-    "chat",
-    "context",
-    "claude",
-    "assistant"
-  ],
-  "activationEvents": [
-    "onCommand:context-ai.openChat",
-    "onCommand:context-ai.askSelection"
-  ],
   "main": "./out/extension.js",
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package --out dist/",
+    "install-local": "npm run package && code --install-extension dist/*.vsix",
+    "build": "npm run compile && npm run package",
+    "clean": "rm -rf out dist"
+  },
   "contributes": {
     "commands": [
       {
@@ -31,22 +21,9 @@
         "title": "Open Context-AI Chat",
         "category": "Context-AI",
         "icon": "$(comment-discussion)"
-      },
-      {
-        "command": "context-ai.askSelection",
-        "title": "Ask Context-AI about Selection",
-        "category": "Context-AI",
-        "icon": "$(question)"
       }
     ],
     "menus": {
-      "editor/context": [
-        {
-          "command": "context-ai.askSelection",
-          "when": "editorHasSelection",
-          "group": "context-ai"
-        }
-      ],
       "editor/title": [
         {
           "command": "context-ai.openChat",
@@ -60,33 +37,24 @@
         "command": "context-ai.openChat",
         "key": "ctrl+shift+c",
         "mac": "cmd+shift+c"
-      },
-      {
-        "command": "context-ai.askSelection",
-        "key": "ctrl+shift+a",
-        "mac": "cmd+shift+a",
-        "when": "editorHasSelection"
       }
     ]
   },
-  "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
-    "package": "vsce package --out dist/",
-    "install-local": "npm run package && code --install-extension dist/*.vsix",
-    "build": "npm run compile && npm run package",
-    "clean": "rm -rf out dist"
-  },
   "devDependencies": {
-    "@types/vscode": "^1.60.0",
+    "@types/vscode": "^1.75.0",
     "@types/node": "16.x",
     "typescript": "^4.9.4",
     "@vscode/vsce": "^2.22.0"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/gabemule/context-ai.git"
+  "engines": {
+    "vscode": "^1.75.0"
   },
+  "keywords": [
+    "ai",
+    "chat",
+    "context",
+    "claude",
+    "assistant"
+  ],
   "license": "MIT"
 }
