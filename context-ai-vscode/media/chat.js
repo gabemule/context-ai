@@ -211,16 +211,30 @@
     function setLoading(loading) {
         isLoading = loading;
         
-        if (loading) {
+        if (loading && !isInitializing) { // ✅ SÓ mostrar se não estiver inicializando
             sendBtn.disabled = true;
             sendText.style.display = 'none';
             loadingText.style.display = 'inline';
-            currentLoadingMessage = addLoadingMessage();
-        } else {
+            showHeaderLoading(); // ✅ USAR header loading
+        } else if (!loading) {
             sendBtn.disabled = false;
             sendText.style.display = 'inline';
             loadingText.style.display = 'none';
-            removeLoadingMessage();
+            hideHeaderLoading(); // ✅ ESCONDER header loading
+        }
+    }
+
+    function showHeaderLoading() {
+        const header = document.querySelector('.header');
+        if (header) {
+            header.classList.add('loading');
+        }
+    }
+
+    function hideHeaderLoading() {
+        const header = document.querySelector('.header');
+        if (header) {
+            header.classList.remove('loading');
         }
     }
 
@@ -268,21 +282,8 @@
                 break;
                 
             case 'streamStart':
-                // Start streaming - replace loading with streaming message
-                console.log('🎯 streamStart - forcing loading removal');
-                
-                setLoading(false);
-                removeLoadingMessage();
-                
-                // ✅ FORÇAR remoção de TODOS os loadings (força bruta)
-                const loadingMessages = document.querySelectorAll('.loading-message');
-                console.log('🧹 Found loading messages:', loadingMessages.length);
-                loadingMessages.forEach(el => {
-                    console.log('🧹 Removing loading element:', el);
-                    el.remove();
-                });
-                currentLoadingMessage = null;
-                
+                // Start streaming - MANTER loading ativo
+                console.log('🎯 streamStart - starting streaming (keeping header loading)');
                 startStreaming();
                 break;
                 
@@ -292,7 +293,9 @@
                 break;
                 
             case 'streamComplete':
-                // Complete streaming
+                // Complete streaming and remove loading
+                console.log('🎯 streamComplete - removing header loading');
+                setLoading(false);
                 completeStreaming();
                 break;
                 
@@ -338,7 +341,7 @@ Special commands:
         
         // Create streaming message container
         const messageDiv = document.createElement('div');
-        messageDiv.className = 'message assistant streaming';
+        messageDiv.className = 'message assistant'; // ✅ SEM classe streaming
         
         const headerDiv = document.createElement('div');
         headerDiv.className = 'message-header';
@@ -383,8 +386,20 @@ Special commands:
     }
 
     function formatMarkdownPreservingBreaks(text) {
+        // ✅ NORMALIZAR quebras de linha antes da formatação
+        let normalized = text
+            // Remove quebras triplas ou mais, mantém máximo 2
+            .replace(/\n{3,}/g, '\n\n')
+            // Remove quebras extras entre bullets
+            .replace(/([•\-\*].*?)\n{2,}(?=[•\-\*])/g, '$1\n')
+            // Remove quebras extras entre listas numeradas
+            .replace(/(\d+\..*?)\n{2,}(?=\d+\.)/g, '$1\n')
+            // Remove quebra extra antes de emojis de seção
+            .replace(/\n{2,}(?=[🎯🔧🔑🛡️🔄])/g, '\n')
+            .trim();
+
         // Apply markdown formatting while preserving line breaks
-        let formatted = text
+        let formatted = normalized
             // Headers (preserve line breaks)
             .replace(/^### (.*?)$/gm, '<h3>$1</h3>')
             .replace(/^## (.*?)$/gm, '<h2>$1</h2>')

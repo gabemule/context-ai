@@ -27,6 +27,23 @@ body {
     margin-bottom: 16px;
     padding-bottom: 12px;
     border-bottom: 1px solid var(--vscode-panel-border);
+    position: relative;
+}
+
+/* ✅ Progress bar animada no header (mesmo estilo do streaming) */
+.header.loading::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, 
+        transparent, 
+        var(--vscode-progressBar-background), 
+        transparent
+    );
+    animation: streaming-progress 2s ease-in-out infinite;
 }
 
 .header h1 {
@@ -378,27 +395,6 @@ body {
     border: 1px solid var(--vscode-panel-border);
     border-radius: 8px;
     margin: 16px 0;
-}
-
-/* Streaming message */
-.message.streaming {
-    position: relative;
-    overflow: hidden;
-}
-
-.message.streaming::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, 
-        transparent, 
-        var(--vscode-progressBar-background), 
-        transparent
-    );
-    animation: streaming-progress 2s ease-in-out infinite;
 }
 
 @keyframes streaming-progress {
