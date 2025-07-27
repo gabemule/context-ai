@@ -386,47 +386,53 @@ Special commands:
     }
 
     function formatMarkdownPreservingBreaks(text) {
-        // ✅ NORMALIZAR quebras de linha antes da formatação
-        let normalized = text
-            // Remove quebras triplas ou mais, mantém máximo 2
-            .replace(/\n{3,}/g, '\n\n')
-            // Remove quebras extras entre bullets
-            .replace(/([•\-\*].*?)\n{2,}(?=[•\-\*])/g, '$1\n')
-            // Remove quebras extras entre listas numeradas
-            .replace(/(\d+\..*?)\n{2,}(?=\d+\.)/g, '$1\n')
-            // Remove quebra extra antes de emojis de seção
-            .replace(/\n{2,}(?=[🎯🔧🔑🛡️🔄])/g, '\n')
-            .trim();
+        // ✅ USAR marked.js para formatação perfeita
+        if (typeof marked !== 'undefined') {
+            console.log('✅ Using marked.js for markdown formatting');
+            
+            // ✅ CONFIGURAÇÃO SIMPLES do marked.js
+            marked.setOptions({
+                breaks: false,      // Não quebrar em toda linha simples
+                gfm: true,          // GitHub Flavored Markdown
+                headerIds: false,   // Sem IDs nos headers
+                mangle: false,      // Não alterar texto
+                sanitize: false     // Permitir HTML (seguro no VSCode)
+            });
+            
+            // ✅ LIMPEZA BÁSICA do texto
+            let cleaned = text
+                .replace(/\n{2,}/g, '\n')  // Max 1 quebras
+                .trim();
+            
+            return marked.parse(cleaned);
+        } else {
+            // ✅ FALLBACK com regex manual se marked.js não carregar
+            console.warn('⚠️ marked.js not available, using fallback formatting');
+            
+            let normalized = text
+                .replace(/\n{3,}/g, '\n\n')
+                .replace(/([•\-\*].*?)\n{2,}(?=[•\-\*])/g, '$1\n')
+                .replace(/(\d+\..*?)\n{2,}(?=\d+\.)/g, '$1\n')
+                .replace(/\n{2,}(?=[🎯🔧🔑🛡️🔄])/g, '\n')
+                .trim();
 
-        // Apply markdown formatting while preserving line breaks
-        let formatted = normalized
-            // Headers (preserve line breaks)
-            .replace(/^### (.*?)$/gm, '<h3>$1</h3>')
-            .replace(/^## (.*?)$/gm, '<h2>$1</h2>')
-            .replace(/^# (.*?)$/gm, '<h1>$1</h1>')
-            
-            // Code blocks (preserve content inside)
-            .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
-            
-            // Bold/Italic
-            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-            .replace(/\*(.*?)\*/g, '<em>$1</em>')
-            
-            // Inline code
-            .replace(/`([^`]+)`/g, '<code>$1</code>')
-            
-            // Lists (preserve line structure)
-            .replace(/^\* (.*$)/gm, '<li>$1</li>')
-            .replace(/^- (.*$)/gm, '<li>$1</li>');
+            let formatted = normalized
+                .replace(/^### (.*?)$/gm, '<h3>$1</h3>')
+                .replace(/^## (.*?)$/gm, '<h2>$1</h2>')
+                .replace(/^# (.*?)$/gm, '<h1>$1</h1>')
+                .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/`([^`]+)`/g, '<code>$1</code>')
+                .replace(/^\* (.*$)/gm, '<li>$1</li>')
+                .replace(/^- (.*$)/gm, '<li>$1</li>');
 
-        // Wrap consecutive list items in ul tags
-        formatted = formatted.replace(/(<li>.*<\/li>\n?)+/g, (match) => {
-            return '<ul>' + match + '</ul>';
-        });
+            formatted = formatted.replace(/(<li>.*<\/li>\n?)+/g, (match) => {
+                return '<ul>' + match + '</ul>';
+            });
 
-        // Since we're using CSS white-space: pre-wrap, we keep \n as \n
-        // The CSS will handle rendering line breaks properly
-        return formatted;
+            return formatted;
+        }
     }
 
     function completeStreaming() {
