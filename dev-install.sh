@@ -120,22 +120,32 @@ except:
 " 2>/dev/null || echo "")
 
 if [ -z "$EDITABLE_PACKAGES" ]; then
-    print_status "No conflicting editable packages found"
+    print_status "No other editable packages found"
 else
-    print_warning "Found editable packages to remove:"
+    print_warning "Found other editable packages:"
     echo "$EDITABLE_PACKAGES" | while read -r package; do
         if [ -n "$package" ]; then
             echo "  - $package"
         fi
     done
+    echo ""
+    print_warning "⚠️  Removing these packages may affect other projects you're working on."
+    echo -n "Remove these editable packages? (y/N): "
+    read -r response
     
-    print_status "Uninstalling conflicting editable packages..."
-    echo "$EDITABLE_PACKAGES" | while read -r package; do
-        if [ -n "$package" ]; then
-            print_status "Uninstalling $package..."
-            pip uninstall "$package" -y || print_warning "Failed to uninstall $package"
-        fi
-    done
+    if [[ "$response" =~ ^[Yy]$ ]]; then
+        print_status "Uninstalling other editable packages..."
+        echo "$EDITABLE_PACKAGES" | while read -r package; do
+            if [ -n "$package" ]; then
+                print_status "Uninstalling $package..."
+                pip uninstall "$package" -y || print_warning "Failed to uninstall $package"
+            fi
+        done
+        print_success "✅ Other editable packages removed"
+    else
+        print_status "Keeping existing editable packages"
+        print_warning "⚠️  Note: This may cause import conflicts if packages have overlapping dependencies"
+    fi
 fi
 
 # Also check for the current project itself (in case it's already installed)
