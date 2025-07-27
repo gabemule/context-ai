@@ -108,7 +108,6 @@ body {
 
 .message-content {
     line-height: 1.5;
-    white-space: pre-wrap; /* Preserva quebras de linha automaticamente */
     word-wrap: break-word;
     overflow-wrap: break-word;
 }
@@ -141,12 +140,21 @@ body {
 .message-content h3 { font-size: 1.1em; }
 
 .message-content ul, .message-content ol {
-    margin: 8px 0;
+    margin: 4px 0;
     padding-left: 20px;
 }
 
 .message-content li {
-    margin: 4px 0;
+    margin: 1px 0;
+}
+
+.message-content li ul,
+.message-content li ol {
+    margin: 0;
+}
+
+.message-content li p {
+    margin: 0;
 }
 
 .loading-message {

@@ -404,7 +404,17 @@ Special commands:
                 .replace(/\n{2,}/g, '\n')  // Max 1 quebras
                 .trim();
             
-            return marked.parse(cleaned);
+            console.log('📄 Input text sample:', cleaned.substring(0, 200) + '...');
+            
+            const result = marked.parse(cleaned);
+            
+            // ✅ DEBUG: Ver HTML gerado pelo marked.js
+            console.log('🎯 HTML gerado pelo marked.js:', result);
+            console.log('🔍 Contains <li><p>:', result.includes('<li><p>'));
+            console.log('🔍 Contains <ul>:', result.includes('<ul>'));
+            console.log('🔍 Contains <li> only:', result.match(/<li>/g)?.length || 0);
+            
+            return result;
         } else {
             // ✅ FALLBACK com regex manual se marked.js não carregar
             console.warn('⚠️ marked.js not available, using fallback formatting');
