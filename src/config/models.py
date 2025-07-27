@@ -8,7 +8,6 @@ from typing import Dict, List
 from pydantic import BaseModel, Field
 
 from .constants import (
-    CLAUDE_MAX_TOKENS,
     DEFAULT_CHUNK_OVERLAP,
     DEFAULT_CHUNK_SIZE,
     DEFAULT_CLEANUP_AFTER_DAYS,
@@ -21,6 +20,7 @@ from .constants import (
     DEFAULT_SYSTEM_PROMPT_STRATEGY,
     SUPPORTED_EXTENSIONS,
 )
+from .providers import get_max_tokens
 
 
 class AIProviderConfig(BaseModel):
@@ -28,7 +28,7 @@ class AIProviderConfig(BaseModel):
 
     api_key: str = Field(..., description="API key for the provider")
     default_model: str = Field(..., description="Default model to use")
-    max_tokens: int = Field(CLAUDE_MAX_TOKENS, description="Maximum tokens per request")
+    max_tokens: int = Field(get_max_tokens(), description="Maximum tokens per request")
 
 
 class ChunkingConfig(BaseModel):

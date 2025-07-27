@@ -10,12 +10,14 @@ from dataclasses import dataclass
 from typing import Dict, Optional
 
 from config.constants import (
-    CLAUDE_DEFAULT_MODEL,
-    CLAUDE_MAX_RETRIES,
-    CLAUDE_MAX_TOKENS,
+    DEFAULT_MAX_RETRIES,
+    DEFAULT_RETRY_DELAY,
+    DEFAULT_TIMEOUT,
+)
+from config.providers import (
+    DEFAULT_MODEL,
+    get_max_tokens,
     CLAUDE_MODELS,
-    CLAUDE_RETRY_DELAY,
-    CLAUDE_TIMEOUT,
 )
 from core.ai.ai_client_interface import AIClientFactory, AIClientInterface, AIResponse
 from utils.exceptions import APIError, ConfigurationError
@@ -35,7 +37,7 @@ class ClaudeResponse:
 class ClaudeClient(AIClientInterface):
     """Basic Claude API client with retry logic and Claude-3/4 model support."""
 
-    def __init__(self, api_key: str, default_model: str = CLAUDE_DEFAULT_MODEL):
+    def __init__(self, api_key: str, default_model: str = DEFAULT_MODEL):
         """
         Initialize Claude client.
 
@@ -60,9 +62,9 @@ class ClaudeClient(AIClientInterface):
         self.base_url = "https://api.anthropic.com/v1"
 
         # Configuration from constants
-        self.max_retries = CLAUDE_MAX_RETRIES
-        self.retry_delay = CLAUDE_RETRY_DELAY
-        self.timeout = CLAUDE_TIMEOUT
+        self.max_retries = DEFAULT_MAX_RETRIES
+        self.retry_delay = DEFAULT_RETRY_DELAY
+        self.timeout = DEFAULT_TIMEOUT
 
         self.logger.debug(
             "Claude client initialized with model: %s (%s)",
@@ -108,17 +110,22 @@ class ClaudeClient(AIClientInterface):
             context: Optional context to include
             model: Override default model
             max_tokens: Maximum tokens to generate
-            **provider_kwargs: Claude-specific parameters (verbose, etc.)
+            **provider_kwargs: Claude-specific parameters (verbose, text_callback, etc.)
 
         Returns:
             Standardized AIResponse
         """
         model = model or self.default_model
-        max_tokens = max_tokens or CLAUDE_MAX_TOKENS
-        model_name = CLAUDE_MODELS[model]
+        max_tokens = max_tokens or get_max_tokens()
         
-        # Extract verbose flag from provider_kwargs
+        # Get API name dynamically from model config
+        from config.providers import get_model_config
+        model_config = get_model_config(model)
+        model_name = model_config.get("api_name", model) if model_config else model
+        
+        # Extract parameters from provider_kwargs
         verbose = provider_kwargs.get("verbose", False)
+        text_callback = provider_kwargs.get("text_callback", None)
 
         # Build prompt using the dedicated PromptBuilder
         from core.ai.prompt_builder import get_prompt_builder
@@ -132,7 +139,7 @@ class ClaudeClient(AIClientInterface):
 
         # Make API call with retry
         claude_response = self._make_request_with_retry(
-            prompt=prompt, model=model_name, max_tokens=max_tokens
+            prompt=prompt, model=model_name, max_tokens=max_tokens, text_callback=text_callback
         )
 
         # Only log response in verbose mode
@@ -160,14 +167,14 @@ class ClaudeClient(AIClientInterface):
         return "claude"
 
     def _make_request_with_retry(
-        self, prompt: str, model: str, max_tokens: int
+        self, prompt: str, model: str, max_tokens: int, text_callback=None
     ) -> ClaudeResponse:
         """Make API request with retry logic."""
         last_error = None
 
         for attempt in range(self.max_retries + 1):
             try:
-                return self._make_request(prompt, model, max_tokens)
+                return self._make_request(prompt, model, max_tokens, text_callback)
 
             except APIError as e:
                 last_error = e
@@ -196,8 +203,46 @@ class ClaudeClient(AIClientInterface):
             f"API request failed after {self.max_retries + 1} attempts: {last_error}"
         )
 
-    def _make_request(self, prompt: str, model: str, max_tokens: int) -> ClaudeResponse:
-        """Make single API request."""
+    def _should_use_streaming(self, prompt: str) -> bool:
+        """Determine if streaming should be used based on input size."""
+        from core.formatting.context_formatter import count_tokens
+        from config.constants import STREAMING_THRESHOLD_TOKENS
+        
+        # Use streaming for large contexts to avoid timeouts
+        input_tokens = count_tokens(prompt)
+        
+        should_stream = input_tokens > STREAMING_THRESHOLD_TOKENS
+        if should_stream:
+            self.logger.debug(
+                "🌊 Using streaming for large context (%dK tokens > %dK threshold)", 
+                input_tokens // 1000, 
+                STREAMING_THRESHOLD_TOKENS // 1000
+            )
+        
+        return should_stream
+
+    def _make_request(self, prompt: str, model: str, max_tokens: int, text_callback=None) -> ClaudeResponse:
+        """Make API request with automatic streaming detection."""
+        use_streaming = self._should_use_streaming(prompt)
+        
+        try:
+            if use_streaming:
+                return self._make_streaming_request(prompt, model, max_tokens, text_callback)
+            else:
+                return self._make_standard_request(prompt, model, max_tokens)
+        except Exception as e:
+            # Fallback: if streaming fails, try standard (if we were streaming)
+            if use_streaming:
+                self.logger.warning("🌊 Streaming failed, falling back to standard API: %s", e)
+                try:
+                    return self._make_standard_request(prompt, model, max_tokens)
+                except Exception as fallback_error:
+                    raise APIError(f"Both streaming and standard API failed. Last error: {fallback_error}")
+            else:
+                raise
+
+    def _make_standard_request(self, prompt: str, model: str, max_tokens: int) -> ClaudeResponse:
+        """Make standard (non-streaming) API request."""
         try:
             import anthropic
         except ImportError:
@@ -208,7 +253,7 @@ class ClaudeClient(AIClientInterface):
         try:
             client = anthropic.Anthropic(api_key=self.api_key)
 
-            self.logger.debug("Making API request to Claude")
+            self.logger.debug("Making standard API request to Claude")
 
             response = client.messages.create(
                 model=model,
@@ -240,10 +285,86 @@ class ClaudeClient(AIClientInterface):
         except Exception as e:
             raise APIError(f"Unexpected error calling Claude API: {e}")
 
+    def _make_streaming_request(self, prompt: str, model: str, max_tokens: int, text_callback=None) -> ClaudeResponse:
+        """Make streaming API request with real-time progress and optional text callback."""
+        try:
+            import anthropic
+        except ImportError:
+            raise ConfigurationError(
+                "Anthropic library not installed. Install with: pip install anthropic"
+            )
+
+        try:
+            client = anthropic.Anthropic(api_key=self.api_key)
+
+            self.logger.debug("🌊 Making streaming API request to Claude")
+
+            # Collect streaming response
+            content_parts = []
+            input_tokens = 0
+            output_tokens = 0
+            model_used = model
+            finish_reason = None
+
+            # Create streaming request
+            with client.messages.stream(
+                model=model,
+                max_tokens=max_tokens,
+                messages=[{"role": "user", "content": prompt}],
+            ) as stream:
+                
+                for event in stream:
+                    if hasattr(event, 'type'):
+                        # Handle different event types
+                        if event.type == "message_start":
+                            if hasattr(event.message, 'usage'):
+                                input_tokens = event.message.usage.input_tokens
+                            if hasattr(event.message, 'model'):
+                                model_used = event.message.model
+                                
+                        elif event.type == "content_block_delta":
+                            if hasattr(event.delta, 'text'):
+                                text_chunk = event.delta.text
+                                content_parts.append(text_chunk)
+                                
+                                # Call text callback for real-time display
+                                if text_callback:
+                                    text_callback(text_chunk)
+                                
+                        elif event.type == "message_delta":
+                            if hasattr(event.delta, 'stop_reason'):
+                                finish_reason = event.delta.stop_reason
+                            if hasattr(event.usage, 'output_tokens'):
+                                output_tokens = event.usage.output_tokens
+
+            # Combine all content parts
+            content = "".join(content_parts)
+
+            self.logger.debug("🌊 Streaming completed successfully (%d tokens)", output_tokens)
+
+            return ClaudeResponse(
+                content=content,
+                model=model_used,
+                usage={
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
+                },
+                finish_reason=finish_reason,
+            )
+
+        except anthropic.AuthenticationError as e:
+            raise APIError(f"Authentication failed: {e}")
+        except anthropic.RateLimitError as e:
+            raise APIError(f"Rate limit exceeded: {e}")
+        except anthropic.APIError as e:
+            raise APIError(f"Claude API error: {e}")
+        except Exception as e:
+            raise APIError(f"Unexpected error in streaming request: {e}")
+
 
 def get_claude_client(api_key: str, model: Optional[str] = None) -> ClaudeClient:
     """Get Claude client instance."""
-    return ClaudeClient(api_key=api_key, default_model=model or CLAUDE_DEFAULT_MODEL)
+    return ClaudeClient(api_key=api_key, default_model=model or DEFAULT_MODEL)
 
 
 # Register Claude client in the factory

@@ -21,6 +21,8 @@ def add_config_parser(subparsers) -> argparse.ArgumentParser:
     # Config set
     config_set = config_subparsers.add_parser("set", help="Set configuration value")
     config_set.add_argument("--claude-key", help="Set Claude API key")
+    config_set.add_argument("--provider", help="Set active AI provider (e.g., claude)")
+    config_set.add_argument("--model", help="Set model for active provider (e.g., claude-3-5-haiku, claude-3-5-sonnet, claude-opus-4)")
     config_set.add_argument(
         "--verbose",
         "-v",
@@ -59,6 +61,20 @@ def add_config_parser(subparsers) -> argparse.ArgumentParser:
         help="Show detailed processing information",
     )
 
+    # Config models
+    config_models = config_subparsers.add_parser(
+        "models", help="List available models for providers"
+    )
+    config_models.add_argument(
+        "--provider", help="Show models for specific provider (default: all)"
+    )
+    config_models.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        help="Show detailed model information",
+    )
+
     parser.set_defaults(func=execute_config_command)
     return parser
 
@@ -78,11 +94,55 @@ def execute_config_command(args: argparse.Namespace) -> int:
     settings_manager = get_settings_manager()
 
     if args.config_action == "set":
+        any_option_set = False
+        
         if args.claude_key:
             logger.info("🔑 Setting Claude API key...")
             settings_manager.set_claude_api_key(args.claude_key)
             logger.info("✅ Claude API key configured successfully")
-        else:
+            any_option_set = True
+            
+        if args.provider:
+            logger.info("🔄 Setting active provider...")
+            from config.providers import get_available_providers, get_available_models
+            available_providers = get_available_providers()
+            
+            if args.provider not in available_providers:
+                logger.error("❌ Invalid provider: %s", args.provider)
+                logger.info("Available providers: %s", ", ".join(available_providers))
+                return 1
+                
+            settings_manager.set_active_provider(args.provider)
+            logger.info("✅ Active provider set to: %s", args.provider)
+            
+            # Se não especificou modelo, define o padrão do provider
+            if not args.model:
+                available_models = get_available_models(args.provider)
+                if available_models:
+                    default_model = available_models[0]  # Primeiro modelo = padrão
+                    settings_manager.set_model(default_model)
+                    logger.info("✅ Default model set to: %s", default_model)
+            
+            any_option_set = True
+            
+        if args.model:
+            logger.info("🎯 Setting model...")
+            config = settings_manager.get_config()
+            active_provider = config.active_provider
+            
+            from config.providers import get_available_models
+            available_models = get_available_models(active_provider)
+            
+            if args.model not in available_models:
+                logger.error("❌ Invalid model for provider %s: %s", active_provider, args.model)
+                logger.info("Available models: %s", ", ".join(available_models))
+                return 1
+                
+            settings_manager.set_model(args.model)
+            logger.info("✅ Model set to: %s", args.model)
+            any_option_set = True
+            
+        if not any_option_set:
             logger.error("❌ No configuration option provided")
             return 1
 
@@ -141,6 +201,49 @@ def execute_config_command(args: argparse.Namespace) -> int:
         except Exception as e:
             logger.error("❌ Error testing connection: %s", e)
             return 1
+
+    elif args.config_action == "models":
+        logger.info("🤖 Available AI models:")
+        
+        from config.providers import get_available_providers, get_available_models, CLAUDE_MODELS
+        
+        if args.provider:
+            # Show models for specific provider
+            if args.provider not in get_available_providers():
+                logger.error("❌ Invalid provider: %s", args.provider)
+                logger.info("Available providers: %s", ", ".join(get_available_providers()))
+                return 1
+                
+            models = get_available_models(args.provider)
+            logger.info("📋 %s models:", args.provider.title())
+            
+            for i, model in enumerate(models):
+                prefix = "🔸" if i == 0 else "  "  # First model = default
+                default_suffix = " (default)" if i == 0 else ""
+                
+                if args.verbose and args.provider == "claude":
+                    # Show detailed info for Claude models
+                    model_info = CLAUDE_MODELS.get(model, {})
+                    speed = model_info.get("speed", "unknown")
+                    description = model_info.get("description", "")
+                    max_output = model_info.get("max_output_tokens", "unknown")
+                    
+                    logger.info("%s %s%s - %s (%s speed, %s max tokens)", 
+                              prefix, model, default_suffix, description, speed, max_output)
+                else:
+                    logger.info("%s %s%s", prefix, model, default_suffix)
+        else:
+            # Show all providers and their models
+            for provider in get_available_providers():
+                models = get_available_models(provider)
+                logger.info("📋 %s models:", provider.title())
+                
+                for i, model in enumerate(models):
+                    prefix = "🔸" if i == 0 else "  "  # First model = default
+                    default_suffix = " (default)" if i == 0 else ""
+                    logger.info("%s %s%s", prefix, model, default_suffix)
+                
+                logger.info("")  # Empty line between providers
 
     elif args.config_action == "validate":
         logger.info("🔧 Validating configuration...")

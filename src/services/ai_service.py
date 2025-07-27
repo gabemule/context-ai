@@ -237,16 +237,15 @@ class AIService:
             # Calculate dynamic context limit first
             from config.constants import (
                 CHAT_HISTORY_TOKEN_RATIO,
-                CLAUDE_CONTEXT_TOKEN_RATIO,
-                CLAUDE_MAX_RESPONSE_TOKENS,
-                CLAUDE_MAX_TOKENS,
-                CLAUDE_MIN_RESPONSE_TOKENS,
-                CLAUDE_RESPONSE_TOKEN_RATIO,
+                CONTEXT_TOKEN_RATIO,
+                MIN_RESPONSE_TOKENS,
+                RESPONSE_TOKEN_RATIO,
             )
+            from config.providers import get_max_tokens, get_max_output_tokens
 
             # Reserve space for question and response, use rest for context
             question_tokens = count_tokens(question)
-            total_context_tokens = int(CLAUDE_MAX_TOKENS * CLAUDE_CONTEXT_TOKEN_RATIO)
+            total_context_tokens = int(get_max_tokens() * CONTEXT_TOKEN_RATIO)
 
             # Allocate tokens between code context and chat history
             if include_history:
@@ -306,12 +305,17 @@ class AIService:
             input_tokens = context_tokens + question_tokens
 
             # Calculate available tokens and allocate response space
-            available_tokens = CLAUDE_MAX_TOKENS - input_tokens
+            from config.providers import get_max_tokens, get_max_output_tokens
+            
+            model_max_tokens = get_max_tokens()
+            model_max_output = get_max_output_tokens()
+            
+            available_tokens = model_max_tokens - input_tokens
             max_response_tokens = min(
-                available_tokens * CLAUDE_RESPONSE_TOKEN_RATIO,
-                max(CLAUDE_MIN_RESPONSE_TOKENS, context_tokens // 2),
+                available_tokens * RESPONSE_TOKEN_RATIO,
+                max(MIN_RESPONSE_TOKENS, context_tokens // 2),
             )
-            max_tokens = int(min(max_response_tokens, CLAUDE_MAX_RESPONSE_TOKENS))
+            max_tokens = int(min(max_response_tokens, model_max_output))
 
             # Calculate actual used window context (always show)
             window_context_used = code_context_tokens + chat_context_tokens
@@ -391,7 +395,7 @@ class AIService:
             # Use simple progress for all queries
             import time
             start_time = time.time()
-            response = self._ask_claude_with_progress(
+            response, was_streamed = self._ask_claude_with_progress(
                 question, context, max_tokens, verbose, include_history
             )
             duration = time.time() - start_time
@@ -435,7 +439,9 @@ class AIService:
             if output_file:
                 self._save_to_file(response.content, output_file)
             else:
-                self._display_response(response.content)
+                # Only display response if it wasn't streamed (streaming already shows formatted result)
+                if not was_streamed:
+                    self._display_response(response.content)
 
             if copy_to_clipboard:
                 self._copy_to_clipboard(response.content)
@@ -688,7 +694,7 @@ class AIService:
         chat_context_tokens: int = 0,
     ) -> None:
         """Display token usage statistics using logging."""
-        from config.constants import CLAUDE_MAX_TOKENS
+        from config.providers import get_max_tokens
 
         # Get actual usage from response
         actual_input = response.usage.get("input_tokens", input_tokens)
@@ -696,14 +702,14 @@ class AIService:
         total_used = actual_input + actual_output
 
         # Calculate percentages
-        total_pct = (total_used / CLAUDE_MAX_TOKENS) * 100
+        total_pct = (total_used / get_max_tokens()) * 100
 
         if verbose:
             # Detailed breakdown for verbose mode
-            context_pct = (context_tokens / CLAUDE_MAX_TOKENS) * 100
-            question_pct = (question_tokens / CLAUDE_MAX_TOKENS) * 100
-            input_pct = (actual_input / CLAUDE_MAX_TOKENS) * 100
-            output_pct = (actual_output / CLAUDE_MAX_TOKENS) * 100
+            context_pct = (context_tokens / get_max_tokens()) * 100
+            question_pct = (question_tokens / get_max_tokens()) * 100
+            input_pct = (actual_input / get_max_tokens()) * 100
+            output_pct = (actual_output / get_max_tokens()) * 100
 
             self.logger.info("📊 Token Usage Details:")
             self.logger.info(
@@ -723,7 +729,7 @@ class AIService:
             )
             self.logger.info(
                 "  Remaining: %s tokens (%.1f%%)",
-                f"{CLAUDE_MAX_TOKENS - total_used:,}",
+                f"{get_max_tokens() - total_used:,}",
                 100 - total_pct,
             )
         else:
@@ -737,7 +743,7 @@ class AIService:
                     f"{actual_output:,}",
                     f"{total_used:,}",
                     total_pct,
-                    f"{CLAUDE_MAX_TOKENS:,}",
+                    f"{get_max_tokens():,}",
                 )
             else:
                 self.logger.info(
@@ -746,7 +752,7 @@ class AIService:
                     f"{actual_output:,}",
                     f"{total_used:,}",
                     total_pct,
-                    f"{CLAUDE_MAX_TOKENS:,}",
+                    f"{get_max_tokens():,}",
                 )
 
     def _ask_claude_with_progress(
@@ -757,70 +763,141 @@ class AIService:
         verbose: bool = False,
         include_history: bool = False,
     ):
-        """Ask Claude with progress spinner and timer."""
+        """Ask Claude with progress spinner and timer, with streaming text display."""
         import time
         from rich.console import Console
         from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
+        from core.formatting.context_formatter import count_tokens
 
         console = Console()
 
         # Log the question BEFORE starting timer
         self.logger.info("Asking Claude: %s", question)
 
-        # Clean progress messages without time estimates
-        if include_history and hasattr(self, "chat_history") and self.chat_history.history:
-            progress_msg = "🧠 Asking Claude..."
-        else:
-            progress_msg = "🧠 Thinking..."
-
-        # Start progress indication with timer
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            TimeElapsedColumn(),
-            console=console,
-            transient=False,
-        ) as progress:
-            task = progress.add_task(progress_msg, total=None)
+        # Build full prompt to check if streaming will be used
+        from core.ai.prompt_builder import get_prompt_builder
+        prompt_builder = get_prompt_builder()
+        full_prompt = prompt_builder.build_prompt(question, context)
+        
+        # Always use streaming for better UX (with fallback to standard if needed)
+        will_use_streaming = True
+        
+        # Variables for streaming display
+        accumulated_text = ""
+        
+        if will_use_streaming:
+            # For streaming: print() direct for guaranteed scroll + final formatted panel
             start_time = time.time()
-
+            
             try:
-                # Make the actual API call
+                from rich.markdown import Markdown
+                from rich.panel import Panel
+                
+                # Print header with Rich styling
+                console.print("🌊 Context-AI Streaming Response...\n", style="bold green")
+                
+                def live_streaming_callback(text_chunk: str):
+                    """Live callback with direct print for guaranteed scroll."""
+                    nonlocal accumulated_text
+                    accumulated_text += text_chunk
+                    # Print directly to terminal for natural scroll
+                    print(text_chunk, end="", flush=True)
+                
+                # Make streaming API call with direct print callback
                 response = self.claude_client.ask(
-                    question=question, context=context, max_tokens=max_tokens, verbose=verbose
+                    question=question, 
+                    context=context, 
+                    max_tokens=max_tokens, 
+                    verbose=verbose,
+                    text_callback=live_streaming_callback
                 )
-
+                
                 elapsed = time.time() - start_time
-
+                response_tokens = response.usage.get("output_tokens", 0)
+                
+                # After streaming, add final formatted panel to terminal history
+                print("\n")  # Add some spacing
+                
+                try:
+                    final_content = Markdown(accumulated_text.strip()) if accumulated_text.strip() else "No response received"
+                except:
+                    final_content = accumulated_text.strip() if accumulated_text.strip() else "No response received"
+                
+                final_panel = Panel(
+                    final_content,
+                    title="🤖 Context-AI's Answer",
+                    title_align="center",
+                    border_style="green",
+                    padding=(1, 2)
+                )
+                console.print(final_panel)
+                
             except Exception:
                 elapsed = time.time() - start_time
-                progress.update(task, description=f"❌ Request failed after {elapsed:.1f}s")
-                raise
-
-            # Create completion message with response info
-            response_tokens = response.usage.get("output_tokens", 0)
-            if response_tokens > 0:
-                completion_msg = (
-                    f"✅ Response received in {elapsed:.1f}s "
-                    f"({response_tokens:,} tokens)"
+                error_panel = Panel(
+                    f"❌ Streaming failed after {elapsed:.1f}s",
+                    title="Error",
+                    title_align="center",
+                    border_style="red"
                 )
-            else:
-                completion_msg = f"✅ Response received in {elapsed:.1f}s"
+                console.print(error_panel)
+                raise
+                
+        else:
+            # For non-streaming: use normal progress spinner
+            progress_msg = "🧠 Asking Claude..." if include_history and hasattr(self, "chat_history") and self.chat_history.history else "🧠 Thinking..."
+            
+            # Start progress indication with timer
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                TimeElapsedColumn(),
+                console=console,
+                transient=False,
+            ) as progress:
+                task = progress.add_task(progress_msg, total=None)
+                start_time = time.time()
 
-            progress.update(task, description=completion_msg)
+                try:
+                    # Make the actual API call (no streaming)
+                    response = self.claude_client.ask(
+                        question=question, context=context, max_tokens=max_tokens, verbose=verbose
+                    )
 
-        # Log timing if verbose
+                    elapsed = time.time() - start_time
+
+                except Exception:
+                    elapsed = time.time() - start_time
+                    progress.update(task, description=f"❌ Request failed after {elapsed:.1f}s")
+                    raise
+
+                # Create completion message with response info
+                response_tokens = response.usage.get("output_tokens", 0)
+                
+                if response_tokens > 0:
+                    completion_msg = (
+                        f"✅ Received response in {elapsed:.1f}s "
+                        f"({response_tokens:,} tokens)"
+                    )
+                else:
+                    completion_msg = f"✅ Received response in {elapsed:.1f}s"
+
+                progress.update(task, description=completion_msg)
+
+        # Log timing if verbose with streaming info
         if verbose:
             input_tokens = response.usage.get("input_tokens", 0)
             output_tokens = response.usage.get("output_tokens", 0)
+            method = "streaming" if will_use_streaming else "standard"
             self.logger.info(
-                "⏱️ Claude API: %.1f seconds (%s in, %s out)",
+                "⏱️ Claude API (%s): %.1f seconds (%s in, %s out)",
+                method,
                 elapsed,
                 f"{input_tokens:,}",
                 f"{output_tokens:,}",
             )
 
-        return response
+        return response, will_use_streaming
 
     def _get_cached_context(
         self, question: str, max_tokens: int, verbose: bool, include_history: bool

@@ -9,7 +9,8 @@ import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-from config.constants import CLAUDE_MAX_TOKENS, CONTEXT_DEFAULT_CHUNKS
+from config.constants import CONTEXT_DEFAULT_CHUNKS
+from config.providers import get_max_tokens
 from core.query.result_merger import QueryResult
 from utils.logging import get_logger
 
@@ -122,7 +123,7 @@ class ContextFormatter:
 
         Args:
             max_tokens: Maximum tokens for context. If None, calculated dynamically
-                       from Claude limits (CLAUDE_MAX_TOKENS * CLAUDE_CONTEXT_TOKEN_RATIO)
+                       from Claude limits (get_max_tokens() * CONTEXT_TOKEN_RATIO)
         """
         self.logger = get_logger(__name__)
         self.max_tokens = self._validate_token_limit(max_tokens)
@@ -137,28 +138,28 @@ class ContextFormatter:
         Returns:
             Validated token limit within safe bounds
         """
-        from config.constants import CLAUDE_CONTEXT_TOKEN_RATIO
+        from config.constants import CONTEXT_TOKEN_RATIO
         
         # If not provided, calculate dynamically from Claude limits
         if max_tokens is None:
-            dynamic_limit = int(CLAUDE_MAX_TOKENS * CLAUDE_CONTEXT_TOKEN_RATIO)
+            dynamic_limit = int(get_max_tokens() * CONTEXT_TOKEN_RATIO)
             self.logger.debug(
                 "🔧 Dynamic token limit: %dK (%d%% of %dK Claude max)",
                 dynamic_limit // 1000,
-                int(CLAUDE_CONTEXT_TOKEN_RATIO * 100),
-                CLAUDE_MAX_TOKENS // 1000,
+                int(CONTEXT_TOKEN_RATIO * 100),
+                get_max_tokens() // 1000,
             )
             return dynamic_limit
         
         # If exceeds Claude limit, cap with warning
-        if max_tokens > CLAUDE_MAX_TOKENS:
+        if max_tokens > get_max_tokens():
             self.logger.warning(
                 "⚠️  Token limit %dK exceeds Claude max %dK, capping at %dK",
                 max_tokens // 1000,
-                CLAUDE_MAX_TOKENS // 1000,
-                CLAUDE_MAX_TOKENS // 1000,
+                get_max_tokens() // 1000,
+                get_max_tokens() // 1000,
             )
-            return CLAUDE_MAX_TOKENS
+            return get_max_tokens()
         
         # If too small, use sensible minimum
         min_tokens = 1000
@@ -737,7 +738,7 @@ correlation."""
         # Use Claude's token limit from constants
         original_max = self.max_tokens
         self.max_tokens = min(
-            self.max_tokens, CLAUDE_MAX_TOKENS // 4
+            self.max_tokens, get_max_tokens() // 4
         )  # Leave room for query + response
 
         try:

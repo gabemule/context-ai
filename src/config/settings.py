@@ -10,7 +10,7 @@ from typing import List, Optional
 from utils.exceptions import ConfigurationError
 from utils.logging import get_logger
 
-from .constants import CLAUDE_DEFAULT_MODEL, CLAUDE_MAX_TOKENS
+from .providers import DEFAULT_MODEL, get_max_tokens
 from .models import ActiveEmbeddings, AIProviderConfig, ContextAIConfig, EmbeddingInfo
 
 
@@ -94,8 +94,8 @@ class SettingsManager:
         # Create or update Claude provider config
         config.ai["claude"] = AIProviderConfig(
             api_key=api_key,
-            default_model=CLAUDE_DEFAULT_MODEL,
-            max_tokens=CLAUDE_MAX_TOKENS,
+            default_model=DEFAULT_MODEL,
+            max_tokens=get_max_tokens(),
         )
 
         # Set as active provider
@@ -109,6 +109,39 @@ class SettingsManager:
         config = self.get_config()
         claude_config = config.ai.get("claude")
         return claude_config.api_key if claude_config else None
+
+    def set_active_provider(self, provider: str) -> None:
+        """Set active AI provider."""
+        config = self.get_config()
+        config.active_provider = provider
+        self.save_config(config)
+        self.logger.info("Active provider set to: %s", provider)
+
+    def set_model(self, model: str) -> None:
+        """Set model for the active provider."""
+        config = self.get_config()
+        active_provider = config.active_provider
+        
+        if active_provider == "claude":
+            # Update Claude config with new model
+            if "claude" not in config.ai:
+                # Create default Claude config if doesn't exist
+                from .providers import get_max_tokens
+                config.ai["claude"] = AIProviderConfig(
+                    api_key="",  # Will need to be set separately
+                    default_model=model,
+                    max_tokens=get_max_tokens(),
+                )
+            else:
+                # Update existing config
+                config.ai["claude"].default_model = model
+                
+        # Future: add support for other providers
+        # elif active_provider == "openai":
+        #     config.ai["openai"].default_model = model
+        
+        self.save_config(config)
+        self.logger.info("Model for %s set to: %s", active_provider, model)
 
     def set_active_embeddings(self, embedding_names: List[str]) -> None:
         """Set active embeddings."""

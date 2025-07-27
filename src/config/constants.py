@@ -2,25 +2,13 @@
 Configuration constants for Context-AI.
 """
 
-# Claude API Configuration
-CLAUDE_MODELS = {
-    "claude-3-sonnet": "claude-3-sonnet-20240229",
-    "claude-3-haiku": "claude-3-haiku-20240307",
-    "claude-3-opus": "claude-3-opus-20240229",
-    "claude-3-5-sonnet": "claude-3-5-sonnet-20241022",
-    "claude-4": "claude-sonnet-4-20250514",
-}
-CLAUDE_DEFAULT_MODEL = "claude-4"
-CLAUDE_MAX_TOKENS = 200000
-CLAUDE_MAX_RETRIES = 3
-CLAUDE_RETRY_DELAY = 1.0  # seconds
-CLAUDE_TIMEOUT = 60.0  # seconds
-
-# Dynamic token allocation
-CLAUDE_CONTEXT_TOKEN_RATIO = 0.65  # Use 65% of total capacity for context
-CLAUDE_RESPONSE_TOKEN_RATIO = 0.8  # Use 80% of remaining capacity for response
-CLAUDE_MIN_RESPONSE_TOKENS = 4000  # Minimum response tokens
-CLAUDE_MAX_RESPONSE_TOKENS = 12000  # Sanity cap for response tokens
+# Static AI constants (provider-agnostic)
+DEFAULT_MAX_RETRIES = 3
+DEFAULT_RETRY_DELAY = 1.0  # seconds  
+DEFAULT_TIMEOUT = 60.0  # seconds
+CONTEXT_TOKEN_RATIO = 0.65  # Use 65% of total capacity for context
+RESPONSE_TOKEN_RATIO = 0.8  # Use 80% of remaining capacity for response
+MIN_RESPONSE_TOKENS = 4000  # Minimum response tokens
 
 # Chat history management
 CHAT_HISTORY_TOKEN_RATIO = 0.3  # Use 30% of context for chat history
@@ -77,6 +65,9 @@ ENABLE_TOKEN_CACHE = True  # Cache token calculations to avoid re-processing
 TOKEN_CACHE_SIZE = 200  # Cache recent token calculations
 ENABLE_CONTEXT_CACHE = True  # Cache context between chat turns
 CONTEXT_CACHE_TTL = 300  # Context cache TTL in seconds
+
+# Streaming configuration
+STREAMING_THRESHOLD_TOKENS = 50000  # Use streaming for contexts larger than this
 
 # Prompt configuration
 PROMPT_MODE = "standard"  # Modes: "minimal", "standard", "comprehensive", "strict"
