@@ -23,17 +23,31 @@
 - **Results**: CLI help command now starts in ~0.4s instead of 6+ seconds
 - **Next Optimizations**: Command-specific operations (storage, query) still take 5+ seconds due to ChromaDB initialization
 
-### Phase 5: Simple Multi-Provider Support (Month 2)
+### Phase 5: Smart Query Intelligence (Month 2)
+- [ ] **Smart Query Balancing**: Intelligent embedding prioritization based on query content
+  - [ ] **5.1.1** Implement keyword detection in queries ("sdk", "hub", "auth", etc.)
+  - [ ] **5.1.2** Dynamic embedding weight adjustment based on detected keywords
+  - [ ] **5.1.3** Smart result distribution (e.g., "sdk" queries get 70% sdk results, 30% hub)
+  - [ ] **5.1.4** Query preprocessing to identify project-specific intent
+  - [ ] **5.1.5** Configuration options for weight adjustment per embedding
+  - **Example Impact**: `"what modules does sdk have?"` → 150+ sdk-v1 results + 100- hub-v1 results (instead of 50 sdk + 200 hub)
+- [ ] **Context Relevance Scoring**: Improve result ranking
+  - [ ] **5.2.1** Implement query-specific similarity boost factors
+  - [ ] **5.2.2** Penalize off-topic results from wrong embeddings
+  - [ ] **5.2.3** Boost results that match detected programming languages
+  - [ ] **5.2.4** Smart deduplication across similar files
+
+### Phase 6: Simple Multi-Provider Support (Month 3)
 - [ ] **OpenAI Integration**: Add GPT-4, GPT-4o as second provider option
-  - [ ] **5.1.1** Implement OpenAI API client with basic retry logic
-  - [ ] **5.1.2** Add support for key OpenAI models (GPT-4, GPT-4o)
-  - [ ] **5.1.3** Simple model selection between Claude and OpenAI
-  - [ ] **5.1.4** Basic token counting for OpenAI
+  - [ ] **6.1.1** Implement OpenAI API client with basic retry logic
+  - [ ] **6.1.2** Add support for key OpenAI models (GPT-4, GPT-4o)
+  - [ ] **6.1.3** Simple model selection between Claude and OpenAI
+  - [ ] **6.1.4** Basic token counting for OpenAI
 - [ ] **Simple Fallback System**: Basic provider fallback
-  - [ ] **5.2.1** Implement simple fallback: Claude → OpenAI
-  - [ ] **5.2.2** Add basic provider health checking
-  - [ ] **5.2.3** Manual provider switching commands
-  - [ ] **5.2.4** Basic error handling between providers
+  - [ ] **6.2.1** Implement simple fallback: Claude → OpenAI
+  - [ ] **6.2.2** Add basic provider health checking
+  - [ ] **6.2.3** Manual provider switching commands
+  - [ ] **6.2.4** Basic error handling between providers
 
 ### Phase 6: Essential Format Support (Month 3)
 - [ ] **Multi-modal Documentation**: Support for common doc formats
