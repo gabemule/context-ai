@@ -394,9 +394,9 @@ Special commands:
         if (typeof marked !== 'undefined') {
             console.log('✅ Using marked.js for markdown formatting');
             
-            // ✅ CONFIGURAÇÃO SIMPLES do marked.js
+            // ✅ CONFIGURAÇÃO do marked.js com breaks: true
             marked.setOptions({
-                breaks: false,      // Não quebrar em toda linha simples
+                breaks: true,       // ✅ ATIVAR breaks para detectar melhor separações
                 gfm: true,          // GitHub Flavored Markdown
                 headerIds: false,   // Sem IDs nos headers
                 mangle: false,      // Não alterar texto
