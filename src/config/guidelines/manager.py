@@ -4,7 +4,8 @@ Guidelines manager for Context-AI.
 Handles loading and applying language-specific coding guidelines to prompts.
 """
 
-from typing import List, Optional
+from pathlib import Path
+from typing import Dict, List, Optional
 
 from utils.logging import get_logger
 
@@ -15,24 +16,114 @@ class GuidelinesManager:
     def __init__(self):
         self.logger = get_logger(__name__)
         self._guidelines_cache = {}
+        self._guidelines_dir = None
         self._load_guidelines()
 
-    def _load_guidelines(self) -> None:
-        """Load all available guidelines."""
+    def _get_guidelines_directory(self) -> Path:
+        """Get or create the guidelines directory in ~/.context-ai/"""
+        if self._guidelines_dir is None:
+            from config.constants import DEFAULT_CONFIG_DIR
+            
+            config_dir = Path(DEFAULT_CONFIG_DIR).expanduser()
+            self._guidelines_dir = config_dir / "guidelines"
+            
+            # Create directory if it doesn't exist
+            self._guidelines_dir.mkdir(parents=True, exist_ok=True)
+        
+        return self._guidelines_dir
+
+    def _ensure_default_guidelines_exist(self) -> None:
+        """Ensure default guideline files exist, create them if missing."""
+        guidelines_dir = self._get_guidelines_directory()
+        
+        # Default guidelines content
+        defaults = self._get_default_guidelines()
+        
+        for language, content in defaults.items():
+            guideline_file = guidelines_dir / f"{language}.md"
+            
+            if not guideline_file.exists():
+                self.logger.debug(f"Creating default guidelines: {guideline_file}")
+                try:
+                    with open(guideline_file, 'w', encoding='utf-8') as f:
+                        f.write(content)
+                except Exception as e:
+                    self.logger.warning(f"Failed to create {guideline_file}: {e}")
+
+    def _get_default_guidelines(self) -> Dict[str, str]:
+        """Get default guidelines content from code modules."""
+        defaults = {}
+        
         try:
             from .javascript import JAVASCRIPT_GUIDELINES, TYPESCRIPT_EXTENSIONS
             from .python import PYTHON_GUIDELINES
+            
+            defaults["python"] = PYTHON_GUIDELINES
+            defaults["javascript"] = JAVASCRIPT_GUIDELINES
+            defaults["typescript"] = JAVASCRIPT_GUIDELINES + TYPESCRIPT_EXTENSIONS
+            
+        except Exception as e:
+            self.logger.error("Failed to load default guidelines from code: %s", e)
+        
+        return defaults
 
-            self._guidelines_cache = {
-                "python": PYTHON_GUIDELINES,
-                "py": PYTHON_GUIDELINES,
-                "javascript": JAVASCRIPT_GUIDELINES,
-                "typescript": JAVASCRIPT_GUIDELINES + TYPESCRIPT_EXTENSIONS,
-                "js": JAVASCRIPT_GUIDELINES,
-                "ts": JAVASCRIPT_GUIDELINES + TYPESCRIPT_EXTENSIONS,
-                "jsx": JAVASCRIPT_GUIDELINES,
-                "tsx": JAVASCRIPT_GUIDELINES + TYPESCRIPT_EXTENSIONS,
-            }
+    def _load_guidelines_from_files(self) -> Dict[str, str]:
+        """Load guidelines from .md files in ~/.context-ai/guidelines/"""
+        guidelines = {}
+        guidelines_dir = self._get_guidelines_directory()
+        
+        # Supported languages
+        language_files = {
+            "python": ["python.md", "py.md"],
+            "javascript": ["javascript.md", "js.md"],
+            "typescript": ["typescript.md", "ts.md"],
+        }
+        
+        for language, possible_files in language_files.items():
+            content = None
+            
+            # Try each possible filename
+            for filename in possible_files:
+                file_path = guidelines_dir / filename
+                if file_path.exists():
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            content = f.read().strip()
+                        self.logger.debug(f"Loaded guidelines from: {file_path}")
+                        break
+                    except Exception as e:
+                        self.logger.warning(f"Failed to read {file_path}: {e}")
+            
+            if content:
+                guidelines[language] = content
+        
+        return guidelines
+
+    def _load_guidelines(self) -> None:
+        """Load all available guidelines from files or create defaults."""
+        try:
+            # Ensure default files exist
+            self._ensure_default_guidelines_exist()
+            
+            # Load from files
+            file_guidelines = self._load_guidelines_from_files()
+            
+            # Build cache with all language mappings
+            self._guidelines_cache = {}
+            
+            for language, content in file_guidelines.items():
+                # Primary language key
+                self._guidelines_cache[language] = content
+                
+                # Add common aliases
+                if language == "python":
+                    self._guidelines_cache["py"] = content
+                elif language == "javascript":
+                    self._guidelines_cache["js"] = content
+                    self._guidelines_cache["jsx"] = content
+                elif language == "typescript":
+                    self._guidelines_cache["ts"] = content
+                    self._guidelines_cache["tsx"] = content
 
             self.logger.debug(
                 "Loaded guidelines for languages: %s",
@@ -205,6 +296,66 @@ class GuidelinesManager:
             )
 
         return guidelines
+
+    def list_available_guidelines(self) -> List[str]:
+        """List all available guideline languages."""
+        guidelines_dir = self._get_guidelines_directory()
+        
+        # Find all .md files in guidelines directory
+        available = []
+        for file_path in guidelines_dir.glob("*.md"):
+            language = file_path.stem
+            available.append(language)
+        
+        return sorted(available)
+
+    def get_guideline_content(self, language: str) -> Optional[str]:
+        """Get the content of a specific guideline."""
+        guidelines_dir = self._get_guidelines_directory()
+        guideline_file = guidelines_dir / f"{language}.md"
+        
+        if not guideline_file.exists():
+            return None
+        
+        try:
+            with open(guideline_file, 'r', encoding='utf-8') as f:
+                return f.read()
+        except Exception as e:
+            self.logger.error(f"Failed to read {guideline_file}: {e}")
+            return None
+
+    def save_guideline(self, language: str, content: str) -> bool:
+        """Save content to a guideline file."""
+        guidelines_dir = self._get_guidelines_directory()
+        guideline_file = guidelines_dir / f"{language}.md"
+        
+        try:
+            with open(guideline_file, 'w', encoding='utf-8') as f:
+                f.write(content)
+            
+            # Reload guidelines cache
+            self._load_guidelines()
+            
+            self.logger.info(f"Updated guidelines for {language}")
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to save {guideline_file}: {e}")
+            return False
+
+    def reset_guideline_to_default(self, language: str) -> bool:
+        """Reset a guideline to its default content."""
+        defaults = self._get_default_guidelines()
+        
+        if language not in defaults:
+            self.logger.error(f"No default guidelines available for {language}")
+            return False
+        
+        return self.save_guideline(language, defaults[language])
+
+    def get_guideline_file_path(self, language: str) -> Path:
+        """Get the file path for a specific guideline."""
+        guidelines_dir = self._get_guidelines_directory()
+        return guidelines_dir / f"{language}.md"
 
 
 # Global instance

@@ -75,6 +75,42 @@ def add_config_parser(subparsers) -> argparse.ArgumentParser:
         help="Show detailed model information",
     )
 
+    # Config guidelines
+    config_guidelines = config_subparsers.add_parser(
+        "guidelines", help="Manage coding guidelines"
+    )
+    guidelines_subparsers = config_guidelines.add_subparsers(
+        dest="guidelines_action", help="Guidelines actions"
+    )
+
+    # Guidelines list
+    guidelines_list = guidelines_subparsers.add_parser(
+        "list", help="List available guidelines"
+    )
+
+    # Guidelines show
+    guidelines_show = guidelines_subparsers.add_parser(
+        "show", help="Show content of a specific guideline"
+    )
+    guidelines_show.add_argument("language", help="Language to show (e.g., python, javascript)")
+
+    # Guidelines edit
+    guidelines_edit = guidelines_subparsers.add_parser(
+        "edit", help="Edit a specific guideline in your default editor"
+    )
+    guidelines_edit.add_argument("language", help="Language to edit (e.g., python, javascript)")
+
+    # Guidelines reset
+    guidelines_reset = guidelines_subparsers.add_parser(
+        "reset", help="Reset a guideline to default content"
+    )
+    guidelines_reset.add_argument("language", help="Language to reset (e.g., python, javascript)")
+
+    # Guidelines path
+    guidelines_path = guidelines_subparsers.add_parser(
+        "path", help="Show file path for guidelines directory"
+    )
+
     parser.set_defaults(func=execute_config_command)
     return parser
 
@@ -290,6 +326,106 @@ def execute_config_command(args: argparse.Namespace) -> int:
         else:
             logger.info("✅ Configuration is valid and ready to use!")
             return 0
+
+    elif args.config_action == "guidelines":
+        from config.guidelines.manager import get_guidelines_manager
+        
+        guidelines_manager = get_guidelines_manager()
+        
+        if args.guidelines_action == "list":
+            logger.info("📋 Available coding guidelines:")
+            available = guidelines_manager.list_available_guidelines()
+            
+            if available:
+                for language in available:
+                    logger.info("  🔸 %s", language)
+                logger.info("")
+                logger.info("💡 Usage:")
+                logger.info("  context-ai config guidelines show <language>")
+                logger.info("  context-ai config guidelines edit <language>")
+            else:
+                logger.warning("⚠️  No guidelines found. They will be created on first use.")
+            
+        elif args.guidelines_action == "show":
+            language = args.language.lower()
+            content = guidelines_manager.get_guideline_content(language)
+            
+            if content:
+                logger.info("📋 Guidelines for %s:", language)
+                logger.info("=" * 50)
+                print(content)  # Print directly for clean formatting
+                logger.info("=" * 50)
+            else:
+                logger.error("❌ No guidelines found for language: %s", language)
+                available = guidelines_manager.list_available_guidelines()
+                if available:
+                    logger.info("Available languages: %s", ", ".join(available))
+                return 1
+                
+        elif args.guidelines_action == "edit":
+            language = args.language.lower()
+            file_path = guidelines_manager.get_guideline_file_path(language)
+            
+            # Create file with default content if it doesn't exist
+            if not file_path.exists():
+                logger.info("📝 Creating default guidelines for %s...", language)
+                if not guidelines_manager.reset_guideline_to_default(language):
+                    logger.error("❌ Failed to create default guidelines for %s", language)
+                    return 1
+            
+            # Open in default editor
+            import os
+            import subprocess
+            import platform
+            
+            try:
+                logger.info("📝 Opening %s for editing...", file_path)
+                
+                # Use platform-appropriate editor
+                if platform.system() == "Darwin":  # macOS
+                    subprocess.run(["open", str(file_path)])
+                elif platform.system() == "Windows":
+                    os.startfile(str(file_path))
+                else:  # Linux
+                    editor = os.environ.get("EDITOR", "nano")
+                    subprocess.run([editor, str(file_path)])
+                
+                logger.info("✅ Guidelines will be reloaded automatically when you ask questions")
+                
+            except Exception as e:
+                logger.error("❌ Failed to open editor: %s", e)
+                logger.info("📁 You can manually edit: %s", file_path)
+                return 1
+                
+        elif args.guidelines_action == "reset":
+            language = args.language.lower()
+            
+            logger.info("🔄 Resetting %s guidelines to default...", language)
+            if guidelines_manager.reset_guideline_to_default(language):
+                logger.info("✅ Guidelines for %s reset successfully", language)
+            else:
+                logger.error("❌ Failed to reset guidelines for %s", language)
+                return 1
+                
+        elif args.guidelines_action == "path":
+            guidelines_dir = guidelines_manager._get_guidelines_directory()
+            logger.info("📁 Guidelines directory: %s", guidelines_dir)
+            
+            # Show file listing
+            if guidelines_dir.exists():
+                files = list(guidelines_dir.glob("*.md"))
+                if files:
+                    logger.info("📋 Available files:")
+                    for file_path in sorted(files):
+                        logger.info("  📄 %s", file_path.name)
+                else:
+                    logger.info("📁 Directory exists but no guideline files found")
+            else:
+                logger.info("📁 Directory will be created on first use")
+                
+        else:
+            logger.error("❌ Unknown guidelines action: %s", args.guidelines_action)
+            return 1
 
     else:
         logger.error("❌ Unknown config action")
