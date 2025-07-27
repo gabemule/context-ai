@@ -7,7 +7,7 @@ generation, selection, and management.
 
 from typing import Any, Dict, List, Optional
 
-from config.constants import MAX_RESULTS, DEFAULT_RESULTS
+from config.constants import QUERY_POOL_SIZE, CONTEXT_DEFAULT_CHUNKS, CONTEXT_PERFORMANCE_LIMIT
 from config.settings import get_settings_manager
 from core.chunking import get_chunker
 from core.embeddings.model_manager import get_model_manager
@@ -344,6 +344,7 @@ class QueryService:
                     "📝 Expanded terms: %s", ", ".join(processed_query.expanded_terms)
                 )
             self.logger.info("📊 Active embeddings: %s", ", ".join(active.selected))
+            self.logger.info("🎯 Query strategy: Wide search (%d candidates) → Best selection", QUERY_POOL_SIZE)
 
         # Query vector database with preprocessed terms
         try:
@@ -354,10 +355,11 @@ class QueryService:
             # (we could also try multiple terms but that's more complex)
             query_text = search_terms[0] if search_terms else processed_query.cleaned
 
+            # Query with wide search pool for better score normalization
             raw_results = self.vector_store.query_embeddings(
                 query_texts=[query_text],
                 embedding_names=active.selected,
-                n_results=DEFAULT_RESULTS,
+                n_results=QUERY_POOL_SIZE,  # Get 1000 candidates for selection
             )
 
             # Use result merger for cross-embedding normalization
@@ -370,8 +372,17 @@ class QueryService:
 
             # Format results using the new context formatter
             display_results = (
-                max_results if max_results is not None else MAX_RESULTS
+                max_results if max_results is not None else CONTEXT_DEFAULT_CHUNKS
             )
+            
+            # Apply performance protection limit
+            if display_results > CONTEXT_PERFORMANCE_LIMIT:
+                display_results = CONTEXT_PERFORMANCE_LIMIT
+                self.logger.warning(
+                    "⚠️  Limited to %d chunks for performance (requested: %d)",
+                    CONTEXT_PERFORMANCE_LIMIT,
+                    max_results if max_results is not None else CONTEXT_DEFAULT_CHUNKS
+                )
             formatted_context = self.context_formatter.format_context(
                 normalized_results,
                 query=processed_query.original,
@@ -441,10 +452,11 @@ class QueryService:
             search_terms = self.query_preprocessor.get_search_terms(processed_query)
             query_text = search_terms[0] if search_terms else processed_query.cleaned
 
+            # Query with wide search pool for better score normalization
             raw_results = self.vector_store.query_embeddings(
                 query_texts=[query_text],
                 embedding_names=active.selected,
-                n_results=DEFAULT_RESULTS,
+                n_results=QUERY_POOL_SIZE,  # Get 1000 candidates for selection
             )
 
             # Use result merger for cross-embedding normalization
@@ -468,8 +480,12 @@ class QueryService:
 
             # Limit results
             display_results = (
-                max_results if max_results is not None else MAX_RESULTS
+                max_results if max_results is not None else CONTEXT_DEFAULT_CHUNKS
             )
+            
+            # Apply performance protection limit
+            if display_results > CONTEXT_PERFORMANCE_LIMIT:
+                display_results = CONTEXT_PERFORMANCE_LIMIT
             limited_results = normalized_results[:display_results]
 
             # Convert to JSON-serializable format

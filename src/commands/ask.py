@@ -67,6 +67,18 @@ def execute_ask_command(args: argparse.Namespace) -> int:
     logger.info("🚀 Initializing ask command...")
 
     from rich.console import Console
+    from utils.session_logger import start_command_session, end_command_session
+
+    # Start session logging
+    session_args = {
+        "question": args.question,
+        "format": args.format,
+        "verbose": args.verbose,
+        "copy": args.copy,
+        "output": args.output,
+        "prompt_mode": getattr(args, 'prompt_mode', None)
+    }
+    start_command_session("ask", session_args)
 
     console = Console()
 
@@ -97,6 +109,9 @@ def execute_ask_command(args: argparse.Namespace) -> int:
         # Restore original mode
         if args.prompt_mode:
             config.constants.PROMPT_MODE = original_mode
+        
+        # End session logging
+        end_command_session()
 
     from config.constants import EXIT_SUCCESS
 

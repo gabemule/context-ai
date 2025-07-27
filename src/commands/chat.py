@@ -39,6 +39,14 @@ def execute_chat_command(args: argparse.Namespace) -> int:
     logger.info("🚀 Initializing chat command...")
 
     from rich.console import Console
+    from utils.session_logger import start_command_session, end_command_session
+
+    # Start session logging
+    session_args = {
+        "verbose": args.verbose,
+        "prompt_mode": getattr(args, 'prompt_mode', None)
+    }
+    start_command_session("chat", session_args)
 
     console = Console()
 
@@ -63,6 +71,9 @@ def execute_chat_command(args: argparse.Namespace) -> int:
         # Restore original mode
         if args.prompt_mode:
             config.constants.PROMPT_MODE = original_mode
+        
+        # End session logging
+        end_command_session()
 
     from config.constants import EXIT_SUCCESS
 

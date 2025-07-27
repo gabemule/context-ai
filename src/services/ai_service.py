@@ -374,10 +374,36 @@ class AIService:
                 )
                 self.logger.info("📊 Dynamic response tokens: %d", max_tokens)
 
+            # Save context to session logger if available
+            from utils.session_logger import get_current_session
+            from config.constants import CONTEXT_DEFAULT_CHUNKS
+            session = get_current_session()
+            if session:
+                active = self.settings_manager.get_active_embeddings()
+                context_metadata = {
+                    "token_count": context_tokens,
+                    "embeddings_used": active.selected,
+                    "results_count": CONTEXT_DEFAULT_CHUNKS,  # We can make this more accurate later
+                    "truncated": False  # We can determine this from context formatter
+                }
+                session.save_context(context, question, context_metadata)
+
             # Ask Claude with context with progress indication
+            import time
+            start_time = time.time()
             response = self._ask_claude_with_progress(
                 question, context, max_tokens, verbose, include_history
             )
+            duration = time.time() - start_time
+
+            # Save response to session logger if available
+            if session:
+                response_metadata = {
+                    "tokens_in": response.usage.get("input_tokens", input_tokens),
+                    "tokens_out": response.usage.get("output_tokens", 0),
+                    "duration_seconds": duration
+                }
+                session.save_response(response.content, response_metadata)
 
             # Handle output
             if output_file:

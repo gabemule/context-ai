@@ -67,9 +67,10 @@ DEFAULT_CHUNK_SIZE = 2000
 DEFAULT_CHUNK_OVERLAP = 200
 DEFAULT_MIN_CHUNK_SIZE = 50
 
-# Query and search defaults - unified for consistency
-DEFAULT_RESULTS = 250  # Default results for both query and display (2.5x increase for massive context)
-MAX_RESULTS = 500      # Maximum results allowed for both query and display (massive context testing)
+# Query and search defaults - clarified for specific purposes
+QUERY_POOL_SIZE = 1000              # Wide search pool for vector queries (internal)
+CONTEXT_DEFAULT_CHUNKS = 250        # Default chunks when user doesn't specify max_results
+CONTEXT_PERFORMANCE_LIMIT = 500     # Performance protection limit to avoid excessive processing
 
 # Performance optimization constants
 ENABLE_TOKEN_CACHE = True  # Cache token calculations to avoid re-processing

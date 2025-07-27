@@ -9,7 +9,7 @@ import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-from config.constants import CLAUDE_MAX_TOKENS, DEFAULT_RESULTS
+from config.constants import CLAUDE_MAX_TOKENS, CONTEXT_DEFAULT_CHUNKS
 from core.query.result_merger import QueryResult
 from utils.logging import get_logger
 
@@ -177,7 +177,7 @@ class ContextFormatter:
         results: List[QueryResult],
         query: str = "",
         format_type: str = "ai_friendly",
-        max_results: int = DEFAULT_RESULTS,
+        max_results: int = CONTEXT_DEFAULT_CHUNKS,
         max_tokens: Optional[int] = None,
     ) -> FormattedContext:
         """
@@ -237,8 +237,8 @@ class ContextFormatter:
         results_sent = 0
         source_stats = {}  # Track tokens per source
 
-        # Add project structure overview first
-        project_structure = self._generate_project_structure(results)
+        # Add project structure overview first (unlimited depth for complete debugging info)
+        project_structure = self._generate_project_structure(results, max_depth=None)
         if project_structure:
             content_parts.append(project_structure)
             token_count += count_tokens(project_structure)
@@ -420,7 +420,7 @@ class ContextFormatter:
             sources=sorted(list(sources)),
         )
 
-    def _generate_project_structure(self, results: List[QueryResult]) -> str:
+    def _generate_project_structure(self, results: List[QueryResult], max_depth: int = 4) -> str:
         """Generate project structure overview from query results."""
         if not results:
             return ""
@@ -449,7 +449,7 @@ class ContextFormatter:
             header = f"\n📁 {source}:"
             
             structure_parts.append(header)
-            structure_parts.extend(self._format_tree(tree))
+            structure_parts.extend(self._format_tree(tree, max_depth=max_depth))
         
         structure_parts.append("")  # Empty line after structure
         return "\n".join(structure_parts)
@@ -474,7 +474,7 @@ class ContextFormatter:
     
     def _format_tree(self, tree, prefix="", is_last=True, max_depth=4, current_depth=0):
         """Format directory tree with proper indentation."""
-        if current_depth >= max_depth:
+        if max_depth is not None and current_depth >= max_depth:
             return ["  └── ... (more files)"] if tree else []
         
         items = []
