@@ -82,12 +82,15 @@ comparing approaches when relevant."""
         # Always include coding guidelines when applicable
         guidelines = self._get_applicable_guidelines(context, question)
         if guidelines:
+            self.logger.debug("📋 Guidelines applied in standard mode")
             guidelines_section = f"""
 
 {guidelines}
 
 **When providing code examples or suggestions, please follow the above guidelines.**"""
             base_instructions += guidelines_section
+        else:
+            self.logger.debug("📋 No guidelines applied in standard mode")
 
         return f"""{base_instructions}
 

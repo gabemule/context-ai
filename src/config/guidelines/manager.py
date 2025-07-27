@@ -21,8 +21,11 @@ class GuidelinesManager:
         """Load all available guidelines."""
         try:
             from .javascript import JAVASCRIPT_GUIDELINES, TYPESCRIPT_EXTENSIONS
+            from .python import PYTHON_GUIDELINES
 
             self._guidelines_cache = {
+                "python": PYTHON_GUIDELINES,
+                "py": PYTHON_GUIDELINES,
                 "javascript": JAVASCRIPT_GUIDELINES,
                 "typescript": JAVASCRIPT_GUIDELINES + TYPESCRIPT_EXTENSIONS,
                 "js": JAVASCRIPT_GUIDELINES,
@@ -90,10 +93,18 @@ class GuidelinesManager:
         languages = []
         context_lower = context.lower()
 
+        # Python detection
+        python_keywords = ["python", "py", "pip", "poetry", "django", "flask", "fastapi", "pytest", "pandas", "numpy"]
+        
         # JavaScript/TypeScript detection
         js_keywords = ["javascript", "js", "jsx", "react", "node.js", "npm", "yarn"]
         ts_keywords = ["typescript", "ts", "tsx", "interface", "type"]
 
+        # Check for Python keywords
+        if any(keyword in context_lower for keyword in python_keywords):
+            languages.append("python")
+        
+        # Check for JS/TS keywords
         if any(keyword in context_lower for keyword in ts_keywords):
             languages.append("typescript")
         elif any(keyword in context_lower for keyword in js_keywords):
@@ -114,7 +125,10 @@ class GuidelinesManager:
         file_ext_pattern = r"\.(\w+)(?:\s|$|,|;|\))"
         ext_matches = re.findall(file_ext_pattern, context_lower)
         for ext in ext_matches:
-            if ext in ["js", "jsx", "ts", "tsx"]:
+            if ext == "py":
+                if "python" not in languages:
+                    languages.append("python")
+            elif ext in ["js", "jsx", "ts", "tsx"]:
                 lang = "typescript" if ext in ["ts", "tsx"] else "javascript"
                 if lang not in languages:
                     languages.append(lang)

@@ -76,14 +76,14 @@ ENABLE_CODING_GUIDELINES = (
     True  # Include coding guidelines in prompts (always when applicable)
 )
 GUIDELINES_AUTO_DETECT = True  # Automatically detect when to apply guidelines
-GUIDELINES_LANGUAGES = ["javascript", "typescript"]  # Supported guideline languages
+GUIDELINES_LANGUAGES = ["python", "javascript", "typescript"]  # Supported guideline languages
 
 # Prompt mode descriptions - each mode builds upon the previous
 PROMPT_MODES = {
     "minimal": "Basic context + question only. No additional instructions "
     "or analysis prompts. Fastest processing.",
     "standard": "Context + question + cross-project awareness when multiple "
-    "projects detected. Includes coding guidelines when JS/TS detected.",
+    "projects detected. Includes coding guidelines when Python/JS/TS detected.",
     "comprehensive": "Full cross-project comparison analysis + coding "
     "guidelines + architectural insights. Best for complex queries.",
     "strict": "All features + enforced coding standards + detailed code "
