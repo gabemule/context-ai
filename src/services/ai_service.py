@@ -388,7 +388,7 @@ class AIService:
                 }
                 session.save_context(context, question, context_metadata)
 
-            # Ask Claude with context with progress indication
+            # Use simple progress for all queries
             import time
             start_time = time.time()
             response = self._ask_claude_with_progress(
@@ -404,21 +404,6 @@ class AIService:
                     "duration_seconds": duration
                 }
                 session.save_response(response.content, response_metadata)
-
-            # Handle output
-            if output_file:
-                self._save_to_file(response.content, output_file)
-            else:
-                self._display_response(response.content)
-
-            if copy_to_clipboard:
-                self._copy_to_clipboard(response.content)
-
-            # Show token usage stats (always, but elegantly)
-            self._display_token_stats(
-                response, input_tokens, context_tokens, question_tokens, verbose,
-                include_history, code_context_tokens, chat_context_tokens
-            )
 
             # Add to chat history if this is part of a conversation
             if include_history:
@@ -445,6 +430,21 @@ class AIService:
                         "✅ History updated: now have %d turns total",
                         len(self.chat_history.history),
                     )
+
+            # Handle output
+            if output_file:
+                self._save_to_file(response.content, output_file)
+            else:
+                self._display_response(response.content)
+
+            if copy_to_clipboard:
+                self._copy_to_clipboard(response.content)
+
+            # Show token usage stats (always, but elegantly)
+            self._display_token_stats(
+                response, input_tokens, context_tokens, question_tokens, verbose,
+                include_history, code_context_tokens, chat_context_tokens
+            )
 
             return response.content
 
@@ -757,62 +757,44 @@ class AIService:
         verbose: bool = False,
         include_history: bool = False,
     ):
-        """Ask Claude with a progress spinner."""
+        """Ask Claude with progress spinner and timer."""
         import time
-
         from rich.console import Console
+        from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 
         console = Console()
 
-        # Create a descriptive progress message
-        if verbose:
-            context_info = f"{len(context):,} chars"
-            if (
-                include_history
-                and hasattr(self, "chat_history")
-                and self.chat_history.history
-            ):
-                context_info += f" + {len(self.chat_history.history)} turns history"
-            progress_msg = (
-                f"🧠 Asking Claude ({context_info}, max {max_tokens:,} tokens)..."
-            )
-        else:
-            if (
-                include_history
-                and hasattr(self, "chat_history")
-                and self.chat_history.history
-            ):
-                progress_msg = (
-                    f"🧠 Thinking... (with {len(self.chat_history.history)} "
-                    f"turn context)"
-                )
-            else:
-                progress_msg = "🧠 Thinking..."
+        # Log the question BEFORE starting timer
+        self.logger.info("Asking Claude: %s", question)
 
-        # For longer contexts, show estimated time and choose appropriate spinner
-        estimated_seconds = max(3, min(15, len(context) // 10000))  # Rough estimate
-        if len(context) > 50000:
-            progress_msg += f" (~{estimated_seconds}s)"
-            spinner_type = "moon"  # Slower spinner for longer requests
+        # Clean progress messages without time estimates
+        if include_history and hasattr(self, "chat_history") and self.chat_history.history:
+            progress_msg = "🧠 Asking Claude..."
         else:
-            spinner_type = "dots"  # Fast spinner for quick requests
+            progress_msg = "🧠 Thinking..."
 
-        # Start progress indication
-        with console.status(progress_msg, spinner=spinner_type) as status:
+        # Start progress indication with timer
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            TimeElapsedColumn(),
+            console=console,
+            transient=False,
+        ) as progress:
+            task = progress.add_task(progress_msg, total=None)
             start_time = time.time()
 
             try:
                 # Make the actual API call
                 response = self.claude_client.ask(
-                    question=question, context=context, max_tokens=max_tokens
+                    question=question, context=context, max_tokens=max_tokens, verbose=verbose
                 )
 
                 elapsed = time.time() - start_time
 
             except Exception:
                 elapsed = time.time() - start_time
-                status.update(f"❌ Request failed after {elapsed:.1f}s")
-                time.sleep(0.5)
+                progress.update(task, description=f"❌ Request failed after {elapsed:.1f}s")
                 raise
 
             # Create completion message with response info
@@ -825,8 +807,7 @@ class AIService:
             else:
                 completion_msg = f"✅ Response received in {elapsed:.1f}s"
 
-            status.update(completion_msg)
-            time.sleep(0.8)  # Brief pause to show completion
+            progress.update(task, description=completion_msg)
 
         # Log timing if verbose
         if verbose:
@@ -943,29 +924,6 @@ class AIService:
             if files:  # Only include if we found files
                 file_list = ', '.join(sorted(files))
                 summary_parts.append(f"{source}: {file_list}")
-        
-        return ' | '.join(summary_parts)
-
-    def _extract_context_summary(self, query_results) -> str:
-        """Extract file summary from results actually sent to Claude."""
-        if not query_results:
-            return ""
-        
-        files_by_source = {}
-        
-        for result in query_results:
-            source = result.source_embedding
-            file_path = result.metadata.get('file_path', 'unknown')
-            
-            if source not in files_by_source:
-                files_by_source[source] = set()
-            files_by_source[source].add(file_path)
-        
-        # Format compactly: source1: file1, file2 | source2: file3, file4
-        summary_parts = []
-        for source, files in files_by_source.items():
-            file_list = ', '.join(sorted(files))
-            summary_parts.append(f"{source}: {file_list}")
         
         return ' | '.join(summary_parts)
 

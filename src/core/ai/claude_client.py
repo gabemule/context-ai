@@ -108,7 +108,7 @@ class ClaudeClient(AIClientInterface):
             context: Optional context to include
             model: Override default model
             max_tokens: Maximum tokens to generate
-            **provider_kwargs: Claude-specific parameters (ignored for now)
+            **provider_kwargs: Claude-specific parameters (verbose, etc.)
 
         Returns:
             Standardized AIResponse
@@ -116,6 +116,9 @@ class ClaudeClient(AIClientInterface):
         model = model or self.default_model
         max_tokens = max_tokens or CLAUDE_MAX_TOKENS
         model_name = CLAUDE_MODELS[model]
+        
+        # Extract verbose flag from provider_kwargs
+        verbose = provider_kwargs.get("verbose", False)
 
         # Build prompt using the dedicated PromptBuilder
         from core.ai.prompt_builder import get_prompt_builder
@@ -123,10 +126,6 @@ class ClaudeClient(AIClientInterface):
         prompt_builder = get_prompt_builder()
         prompt = prompt_builder.build_prompt(question, context)
 
-        self.logger.info(
-            "Asking Claude: %s",
-            question[:100] + "..." if len(question) > 100 else question,
-        )
         self.logger.debug(
             "Using model: %s (%s), max_tokens: %d", model, model_name, max_tokens
         )
@@ -136,10 +135,12 @@ class ClaudeClient(AIClientInterface):
             prompt=prompt, model=model_name, max_tokens=max_tokens
         )
 
-        self.logger.info(
-            "Claude response received (%d tokens)",
-            claude_response.usage.get("output_tokens", 0),
-        )
+        # Only log response in verbose mode
+        if verbose:
+            self.logger.info(
+                "Claude response received (%d tokens)",
+                claude_response.usage.get("output_tokens", 0),
+            )
 
         # Convert to standardized AIResponse
         return AIResponse(
