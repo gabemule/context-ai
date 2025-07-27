@@ -24,6 +24,7 @@ class ChatTurn:
     response: str
     timestamp: datetime
     context_used: str = ""
+    context_summary: str = ""  # Summary of files actually sent to Claude
     tokens_used: int = 0
 
 
@@ -35,7 +36,7 @@ class ChatHistoryManager:
         self.history: List[ChatTurn] = []
 
     def add_turn(
-        self, question: str, response: str, context: str = "", tokens: int = 0
+        self, question: str, response: str, context: str = "", tokens: int = 0, context_summary: str = ""
     ) -> None:
         """Add a new turn to the conversation history."""
         turn = ChatTurn(
@@ -43,6 +44,7 @@ class ChatHistoryManager:
             response=response,
             timestamp=datetime.now(),
             context_used=context,
+            context_summary=context_summary,
             tokens_used=tokens,
         )
         self.history.append(turn)
@@ -251,16 +253,35 @@ class AIService:
                 history_tokens = int(total_context_tokens * CHAT_HISTORY_TOKEN_RATIO)
                 code_context_tokens = total_context_tokens - history_tokens
 
+                # Debug: Check history state before retrieval
+                history_count = len(self.chat_history.history)
+                if verbose:
+                    self.logger.info(
+                        "🔍 History Debug: %d turns available, %dK token budget",
+                        history_count,
+                        history_tokens // 1000,
+                    )
+
                 # Get chat history within token budget
                 chat_context = self.chat_history.get_history_context(history_tokens)
                 chat_context_tokens = count_tokens(chat_context) if chat_context else 0
 
-                if verbose and chat_context:
-                    self.logger.info(
-                        "💬 Chat history: %d tokens (%d turns)",
-                        chat_context_tokens,
-                        len(self.chat_history.history),
-                    )
+                # Enhanced history logging
+                if verbose:
+                    if chat_context:
+                        self.logger.info(
+                            "💬 Chat history retrieved: %dK tokens (%d turns)",
+                            chat_context_tokens // 1000,
+                            history_count,
+                        )
+                        # Show a preview of the history content
+                        preview = chat_context[:200].replace('\n', ' ')
+                        self.logger.info("📝 History preview: %s...", preview)
+                    else:
+                        self.logger.info(
+                            "💬 No chat history retrieved (%d turns available)",
+                            history_count,
+                        )
             else:
                 code_context_tokens = total_context_tokens
                 chat_context = ""
@@ -275,12 +296,13 @@ class AIService:
             # Combine code context with chat history
             if chat_context:
                 context = chat_context + "\n\n" + context
+                # Calculate tokens accurately: individual counts + separator
+                separator_tokens = count_tokens("\n\n")
+                context_tokens = chat_context_tokens + separator_tokens + code_context_tokens
+            else:
+                context_tokens = code_context_tokens
 
-            if verbose:
-                self.logger.info("📄 Context retrieved (%d characters)", len(context))
-
-            # Calculate final token allocation
-            context_tokens = count_tokens(context)
+            # Note: context_tokens now calculated above, not recounted
             input_tokens = context_tokens + question_tokens
 
             # Calculate available tokens and allocate response space
@@ -291,43 +313,66 @@ class AIService:
             )
             max_tokens = int(min(max_response_tokens, CLAUDE_MAX_RESPONSE_TOKENS))
 
-            if verbose:
+            # Calculate actual used window context (always show)
+            window_context_used = code_context_tokens + chat_context_tokens
+            window_usage_pct = (window_context_used / total_context_tokens) * 100 if total_context_tokens > 0 else 0
+            
+            # Always show main stats
+            self.logger.info(
+                "📊 Context Window: %dK used (%.1f%% of %dK limit)",
+                window_context_used // 1000,
+                window_usage_pct,
+                total_context_tokens // 1000,
+            )
+            
+            if include_history and chat_context_tokens > 0:
                 self.logger.info(
-                    "📊 Context limit: %d tokens (65%% of %d)",
-                    total_context_tokens,
-                    CLAUDE_MAX_TOKENS,
+                    "📊 Breakdown: %dK code + %dK history (%d turns) = %dK total",
+                    code_context_tokens // 1000,
+                    chat_context_tokens // 1000,
+                    len(self.chat_history.history),
+                    context_tokens // 1000,
                 )
-                if include_history:
-                    self.logger.info(
-                        "📊 Allocation: %d code + %d history = %d total context",
-                        code_context_tokens,
-                        chat_context_tokens,
-                        context_tokens,
-                    )
+            else:
                 self.logger.info(
-                    "📊 Input tokens: %d (context: %d, question: %d)",
-                    input_tokens,
+                    "📊 Code context: %dK tokens → %dK final",
+                    code_context_tokens // 1000,
+                    context_tokens // 1000,
+                )
+
+            # Always show input total and performance expectation
+            self.logger.info("📊 Input: %sK tokens → Claude", input_tokens // 1000)
+            
+            # Performance diagnostic (always useful)
+            if input_tokens > 100000:
+                self.logger.warning(
+                    "⚠️  Large context (%s tokens) - Claude may be slow",
+                    f"{input_tokens:,}",
+                )
+            elif input_tokens > 50000:
+                self.logger.info(
+                    "ℹ️  Medium context (%s tokens) - expect 10-20s response",
+                    f"{input_tokens:,}",
+                )
+            else:
+                self.logger.info(
+                    "✅ Small context (%s tokens) - should be fast",
+                    f"{input_tokens:,}",
+                )
+
+            if verbose:
+                self.logger.info("📄 Context retrieved (%d characters)", len(context))
+                self.logger.info("📊 Token calculation: %dK chat + %dK code + separator = %dK total", 
+                                chat_context_tokens // 1000, 
+                                code_context_tokens // 1000, 
+                                context_tokens // 1000)
+                self.logger.info(
+                    "📊 Input breakdown: %d context + %d question = %d total",
                     context_tokens,
                     question_tokens,
+                    input_tokens,
                 )
                 self.logger.info("📊 Dynamic response tokens: %d", max_tokens)
-
-                # Performance diagnostic
-                if input_tokens > 100000:
-                    self.logger.warning(
-                        "⚠️  Large context detected (%s tokens) - Claude may be slow",
-                        f"{input_tokens:,}",
-                    )
-                elif input_tokens > 50000:
-                    self.logger.info(
-                        "ℹ️  Medium context (%s tokens) - expect 10-20s response",
-                        f"{input_tokens:,}",
-                    )
-                else:
-                    self.logger.info(
-                        "✅ Small context (%s tokens) - should be fast",
-                        f"{input_tokens:,}",
-                    )
 
             # Ask Claude with context with progress indication
             response = self._ask_claude_with_progress(
@@ -345,7 +390,8 @@ class AIService:
 
             # Show token usage stats (always, but elegantly)
             self._display_token_stats(
-                response, input_tokens, context_tokens, question_tokens, verbose
+                response, input_tokens, context_tokens, question_tokens, verbose,
+                include_history, code_context_tokens, chat_context_tokens
             )
 
             # Add to chat history if this is part of a conversation
@@ -353,9 +399,26 @@ class AIService:
                 total_tokens_used = response.usage.get(
                     "input_tokens", input_tokens
                 ) + response.usage.get("output_tokens", 0)
+                
+                if verbose:
+                    self.logger.info(
+                        "💾 Saving to history: %dK tokens (turn #%d)",
+                        total_tokens_used // 1000,
+                        len(self.chat_history.history) + 1,
+                    )
+                
+                # Extract context summary from formatted context
+                context_summary = self._extract_context_summary_from_formatted(context)
+                
                 self.chat_history.add_turn(
-                    question, response.content, context, total_tokens_used
+                    question, response.content, context, total_tokens_used, context_summary
                 )
+                
+                if verbose:
+                    self.logger.info(
+                        "✅ History updated: now have %d turns total",
+                        len(self.chat_history.history),
+                    )
 
             return response.content
 
@@ -594,6 +657,9 @@ class AIService:
         context_tokens: int,
         question_tokens: int,
         verbose: bool = False,
+        include_history: bool = False,
+        code_context_tokens: int = 0,
+        chat_context_tokens: int = 0,
     ) -> None:
         """Display token usage statistics using logging."""
         from config.constants import CLAUDE_MAX_TOKENS
@@ -635,15 +701,27 @@ class AIService:
                 100 - total_pct,
             )
         else:
-            # Compact one-liner for normal mode
-            self.logger.info(
-                "📊 Tokens: %s in + %s out = %s total (%.1f%% of %s)",
-                f"{actual_input:,}",
-                f"{actual_output:,}",
-                f"{total_used:,}",
-                total_pct,
-                f"{CLAUDE_MAX_TOKENS:,}",
-            )
+            # Compact one-liner with history breakdown when available
+            if include_history and chat_context_tokens > 0:
+                self.logger.info(
+                    "📊 Tokens: %s in (%dK code + %dK history) + %s out = %s total (%.1f%% of %s)",
+                    f"{actual_input:,}",
+                    code_context_tokens // 1000,
+                    chat_context_tokens // 1000,
+                    f"{actual_output:,}",
+                    f"{total_used:,}",
+                    total_pct,
+                    f"{CLAUDE_MAX_TOKENS:,}",
+                )
+            else:
+                self.logger.info(
+                    "📊 Tokens: %s in + %s out = %s total (%.1f%% of %s)",
+                    f"{actual_input:,}",
+                    f"{actual_output:,}",
+                    f"{total_used:,}",
+                    total_pct,
+                    f"{CLAUDE_MAX_TOKENS:,}",
+                )
 
     def _ask_claude_with_progress(
         self,
@@ -754,9 +832,9 @@ class AIService:
                 max_context_tokens=max_tokens,
             )
 
-        # Create cache key based on question, active embeddings, and token limit
+        # Create cache key based on question, active embeddings, token limit, and history inclusion
         active = self.settings_manager.get_active_embeddings()
-        cache_key_data = f"{question}:{','.join(sorted(active.selected))}:{max_tokens}"
+        cache_key_data = f"{question}:{','.join(sorted(active.selected))}:{max_tokens}:{include_history}"
         cache_key = hashlib.md5(cache_key_data.encode()).hexdigest()
 
         # Check cache validity
@@ -800,6 +878,70 @@ class AIService:
                 del self._context_cache[old_key]
 
         return context
+
+    def _extract_context_summary_from_formatted(self, formatted_context: str) -> str:
+        """Extract file summary from already formatted context sent to Claude."""
+        import re
+        
+        if not formatted_context:
+            return ""
+        
+        files_by_source = {}
+        
+        # Look for patterns like "## From sdk-v1 (similarity: 0.85):" followed by "**File:** path/to/file.py"
+        source_pattern = r'## From ([^(]+) \(similarity: [^)]+\):'
+        file_pattern = r'\*\*File:\*\* ([^(]+) \([^)]+\)'
+        
+        lines = formatted_context.split('\n')
+        current_source = None
+        
+        for line in lines:
+            # Check for source header
+            source_match = re.search(source_pattern, line)
+            if source_match:
+                current_source = source_match.group(1).strip()
+                if current_source not in files_by_source:
+                    files_by_source[current_source] = set()
+                continue
+            
+            # Check for file info
+            if current_source:
+                file_match = re.search(file_pattern, line)
+                if file_match:
+                    file_path = file_match.group(1).strip()
+                    files_by_source[current_source].add(file_path)
+        
+        # Format compactly: source1: file1, file2 | source2: file3, file4  
+        summary_parts = []
+        for source, files in files_by_source.items():
+            if files:  # Only include if we found files
+                file_list = ', '.join(sorted(files))
+                summary_parts.append(f"{source}: {file_list}")
+        
+        return ' | '.join(summary_parts)
+
+    def _extract_context_summary(self, query_results) -> str:
+        """Extract file summary from results actually sent to Claude."""
+        if not query_results:
+            return ""
+        
+        files_by_source = {}
+        
+        for result in query_results:
+            source = result.source_embedding
+            file_path = result.metadata.get('file_path', 'unknown')
+            
+            if source not in files_by_source:
+                files_by_source[source] = set()
+            files_by_source[source].add(file_path)
+        
+        # Format compactly: source1: file1, file2 | source2: file3, file4
+        summary_parts = []
+        for source, files in files_by_source.items():
+            file_list = ', '.join(sorted(files))
+            summary_parts.append(f"{source}: {file_list}")
+        
+        return ' | '.join(summary_parts)
 
 
 def get_ai_service() -> AIService:

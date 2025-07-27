@@ -9,12 +9,10 @@ import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-from config.constants import CLAUDE_MAX_TOKENS, DEFAULT_DISPLAY_RESULTS
+from config.constants import CLAUDE_MAX_TOKENS, DEFAULT_RESULTS
 from core.query.result_merger import QueryResult
 from utils.logging import get_logger
 
-# Context formatting constants
-DEFAULT_MAX_TOKENS = 4000
 CONTEXT_HEADER_TEMPLATE = "=== CONTEXT FROM MULTIPLE SOURCES ==="
 RESULT_HEADER_TEMPLATE = "## Result {index} (score: {score:.3f}, source: {source})"
 SOURCE_HEADER_TEMPLATE = "## From {source} (similarity: {similarity:.2f}):"
@@ -118,22 +116,68 @@ class ContextFormatter:
     - Cross-reference analysis
     """
 
-    def __init__(self, max_tokens: int = DEFAULT_MAX_TOKENS):
+    def __init__(self, max_tokens: Optional[int] = None):
         """
         Initialize context formatter.
 
         Args:
-            max_tokens: Maximum tokens for context (default: 4000 from Plan.md)
+            max_tokens: Maximum tokens for context. If None, calculated dynamically
+                       from Claude limits (CLAUDE_MAX_TOKENS * CLAUDE_CONTEXT_TOKEN_RATIO)
         """
         self.logger = get_logger(__name__)
-        self.max_tokens = max_tokens
+        self.max_tokens = self._validate_token_limit(max_tokens)
+
+    def _validate_token_limit(self, max_tokens: Optional[int]) -> int:
+        """
+        Validate and sanitize token limit with intelligent fallbacks.
+        
+        Args:
+            max_tokens: Requested token limit or None for auto-calculation
+            
+        Returns:
+            Validated token limit within safe bounds
+        """
+        from config.constants import CLAUDE_CONTEXT_TOKEN_RATIO
+        
+        # If not provided, calculate dynamically from Claude limits
+        if max_tokens is None:
+            dynamic_limit = int(CLAUDE_MAX_TOKENS * CLAUDE_CONTEXT_TOKEN_RATIO)
+            self.logger.debug(
+                "🔧 Dynamic token limit: %dK (%d%% of %dK Claude max)",
+                dynamic_limit // 1000,
+                int(CLAUDE_CONTEXT_TOKEN_RATIO * 100),
+                CLAUDE_MAX_TOKENS // 1000,
+            )
+            return dynamic_limit
+        
+        # If exceeds Claude limit, cap with warning
+        if max_tokens > CLAUDE_MAX_TOKENS:
+            self.logger.warning(
+                "⚠️  Token limit %dK exceeds Claude max %dK, capping at %dK",
+                max_tokens // 1000,
+                CLAUDE_MAX_TOKENS // 1000,
+                CLAUDE_MAX_TOKENS // 1000,
+            )
+            return CLAUDE_MAX_TOKENS
+        
+        # If too small, use sensible minimum
+        min_tokens = 1000
+        if max_tokens < min_tokens:
+            self.logger.warning(
+                "⚠️  Token limit %d too small, using minimum %d",
+                max_tokens,
+                min_tokens,
+            )
+            return min_tokens
+            
+        return max_tokens
 
     def format_context(
         self,
         results: List[QueryResult],
         query: str = "",
         format_type: str = "ai_friendly",
-        max_results: int = DEFAULT_DISPLAY_RESULTS,
+        max_results: int = DEFAULT_RESULTS,
         max_tokens: Optional[int] = None,
     ) -> FormattedContext:
         """
@@ -190,6 +234,14 @@ class ContextFormatter:
         sources = set()
         token_count = 0
         truncated = False
+        results_sent = 0
+        source_stats = {}  # Track tokens per source
+
+        # Add project structure overview first
+        project_structure = self._generate_project_structure(results)
+        if project_structure:
+            content_parts.append(project_structure)
+            token_count += count_tokens(project_structure)
 
         # Add header
         header = CONTEXT_HEADER_TEMPLATE
@@ -226,15 +278,53 @@ class ContextFormatter:
             # Check if adding this section would exceed token limit
             if token_count + section_tokens > token_limit:
                 truncated = True
+                # Log detailed truncation info
+                truncated_count = len(results) - results_sent
                 self.logger.info(
-                    "Context truncated at %d tokens (limit: %d)",
-                    token_count,
-                    token_limit,
+                    "📊 Context Results: %d/%d sent to AI (%d truncated by %dK token limit)",
+                    results_sent,
+                    len(results),
+                    truncated_count,
+                    token_limit // 1000,
                 )
+                
+                # Log per-source breakdown
+                for source_name, stats in source_stats.items():
+                    self.logger.info(
+                        "  • %s: %d results (%dK tokens)",
+                        source_name,
+                        stats["count"],
+                        stats["tokens"] // 1000,
+                    )
                 break
 
             content_parts.append(section)
             token_count += section_tokens
+            results_sent += 1
+            
+            # Track tokens per source for detailed logging
+            if source not in source_stats:
+                source_stats[source] = {"count": 0, "tokens": 0}
+            source_stats[source]["count"] += 1
+            source_stats[source]["tokens"] += section_tokens
+
+        # Log successful formatting (no truncation)
+        if not truncated and results_sent > 0:
+            self.logger.info(
+                "📊 Context Results: %d/%d sent to AI (no truncation, %dK token limit)",
+                results_sent,
+                len(results),
+                token_limit // 1000,
+            )
+            
+            # Log per-source breakdown
+            for source_name, stats in source_stats.items():
+                self.logger.info(
+                    "  • %s: %d results (%dK tokens)",
+                    source_name,
+                    stats["count"],
+                    stats["tokens"] // 1000,
+                )
 
         # Add cross-reference analysis if space permits
         if not truncated and len(sources) > 1:
@@ -330,6 +420,93 @@ class ContextFormatter:
             sources=sorted(list(sources)),
         )
 
+    def _generate_project_structure(self, results: List[QueryResult]) -> str:
+        """Generate project structure overview from query results."""
+        if not results:
+            return ""
+        
+        # Group files by source embedding
+        projects = {}
+        for result in results:
+            source = result.source_embedding
+            file_path = result.metadata.get("file_path", "unknown")
+            
+            if source not in projects:
+                projects[source] = set()
+            projects[source].add(file_path)
+        
+        if not projects:
+            return ""
+        
+        structure_parts = ["=== PROJECT STRUCTURES ==="]
+        
+        for source, files in projects.items():
+            # Build directory tree
+            tree = self._build_directory_tree(files)
+            
+            # Simple header with just the project name
+            # Claude will infer project type from file extensions
+            header = f"\n📁 {source}:"
+            
+            structure_parts.append(header)
+            structure_parts.extend(self._format_tree(tree))
+        
+        structure_parts.append("")  # Empty line after structure
+        return "\n".join(structure_parts)
+    
+    def _build_directory_tree(self, file_paths):
+        """Build a nested directory tree from file paths."""
+        tree = {}
+        
+        for file_path in file_paths:
+            if file_path == "unknown":
+                continue
+                
+            parts = file_path.split("/")
+            current = tree
+            
+            for part in parts:
+                if part not in current:
+                    current[part] = {}
+                current = current[part]
+        
+        return tree
+    
+    def _format_tree(self, tree, prefix="", is_last=True, max_depth=4, current_depth=0):
+        """Format directory tree with proper indentation."""
+        if current_depth >= max_depth:
+            return ["  └── ... (more files)"] if tree else []
+        
+        items = []
+        sorted_items = sorted(tree.items())
+        
+        for i, (name, subtree) in enumerate(sorted_items):
+            is_last_item = i == len(sorted_items) - 1
+            
+            # Choose connector
+            if current_depth == 0:
+                connector = "├── " if not is_last_item else "└── "
+            else:
+                connector = "├── " if not is_last_item else "└── "
+            
+            # Add current item
+            items.append(f"{prefix}{connector}{name}")
+            
+            # Add children if it's a directory
+            if subtree:
+                # Determine prefix for children
+                if current_depth == 0:
+                    child_prefix = prefix + ("│   " if not is_last_item else "    ")
+                else:
+                    child_prefix = prefix + ("│   " if not is_last_item else "    ")
+                
+                child_items = self._format_tree(
+                    subtree, child_prefix, is_last_item, max_depth, current_depth + 1
+                )
+                items.extend(child_items)
+        
+        return items
+    
     def _generate_cross_reference_analysis(self, results: List[QueryResult]) -> str:
         """Generate enhanced cross-reference analysis section with project \
 correlation."""
@@ -589,8 +766,8 @@ correlation."""
 _context_formatter: Optional[ContextFormatter] = None
 
 
-def get_context_formatter(max_tokens: int = DEFAULT_MAX_TOKENS) -> ContextFormatter:
-    """Get global context formatter instance."""
+def get_context_formatter(max_tokens: Optional[int] = None) -> ContextFormatter:
+    """Get global context formatter instance with dynamic token limit."""
     global _context_formatter
     if _context_formatter is None:
         _context_formatter = ContextFormatter(max_tokens)
@@ -598,7 +775,7 @@ def get_context_formatter(max_tokens: int = DEFAULT_MAX_TOKENS) -> ContextFormat
 
 
 def format_results_for_ai(
-    results: List[QueryResult], query: str = "", max_tokens: int = DEFAULT_MAX_TOKENS
+    results: List[QueryResult], query: str = "", max_tokens: Optional[int] = None
 ) -> str:
     """Convenience function to format results for AI consumption."""
     formatter = get_context_formatter(max_tokens)

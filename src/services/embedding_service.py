@@ -7,7 +7,7 @@ generation, selection, and management.
 
 from typing import Any, Dict, List, Optional
 
-from config.constants import DEFAULT_DISPLAY_RESULTS, DEFAULT_QUERY_RESULTS
+from config.constants import MAX_RESULTS, DEFAULT_RESULTS
 from config.settings import get_settings_manager
 from core.chunking import get_chunker
 from core.embeddings.model_manager import get_model_manager
@@ -357,7 +357,7 @@ class QueryService:
             raw_results = self.vector_store.query_embeddings(
                 query_texts=[query_text],
                 embedding_names=active.selected,
-                n_results=DEFAULT_QUERY_RESULTS,
+                n_results=DEFAULT_RESULTS,
             )
 
             # Use result merger for cross-embedding normalization
@@ -370,7 +370,7 @@ class QueryService:
 
             # Format results using the new context formatter
             display_results = (
-                max_results if max_results is not None else DEFAULT_DISPLAY_RESULTS
+                max_results if max_results is not None else MAX_RESULTS
             )
             formatted_context = self.context_formatter.format_context(
                 normalized_results,
@@ -444,7 +444,7 @@ class QueryService:
             raw_results = self.vector_store.query_embeddings(
                 query_texts=[query_text],
                 embedding_names=active.selected,
-                n_results=DEFAULT_QUERY_RESULTS,
+                n_results=DEFAULT_RESULTS,
             )
 
             # Use result merger for cross-embedding normalization
@@ -468,7 +468,7 @@ class QueryService:
 
             # Limit results
             display_results = (
-                max_results if max_results is not None else DEFAULT_DISPLAY_RESULTS
+                max_results if max_results is not None else MAX_RESULTS
             )
             limited_results = normalized_results[:display_results]
 

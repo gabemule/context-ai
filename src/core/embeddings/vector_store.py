@@ -13,8 +13,8 @@ import chromadb
 from chromadb.config import Settings
 
 from config.constants import (
-    DEFAULT_QUERY_RESULTS,
-    MAX_QUERY_RESULTS,
+    DEFAULT_RESULTS,
+    MAX_RESULTS,
 )
 from utils.exceptions import ConfigurationError
 from utils.logging import get_logger
@@ -176,7 +176,7 @@ class VectorStoreManager:
         self,
         query_texts: List[str],
         embedding_names: Optional[List[str]] = None,
-        n_results: int = DEFAULT_QUERY_RESULTS,
+        n_results: int = DEFAULT_RESULTS,
     ) -> Dict[str, Any]:
         """
         Query embeddings with optional filtering by embedding names.
@@ -196,7 +196,7 @@ class VectorStoreManager:
             raise ConfigurationError("Query texts cannot be empty")
 
         # Limit results to maximum
-        n_results = min(n_results, MAX_QUERY_RESULTS)
+        n_results = min(n_results, MAX_RESULTS)
 
         try:
             collection = self._get_collection()

@@ -160,11 +160,26 @@ class MultiEmbeddingResultMerger:
         # Sort by final score (highest first)
         normalized_results.sort(key=lambda x: x.final_score, reverse=True)
 
+        # Enhanced logging with per-embedding breakdown
+        total_results = len(normalized_results)
+        embedding_count = len(grouped)
+        
+        # Create detailed breakdown
+        embedding_breakdown = []
+        for embedding_name, embedding_results in grouped.items():
+            result_count = len(embedding_results)
+            embedding_breakdown.append(f"{embedding_name}: {result_count} results")
+        
         self.logger.info(
-            "Merged and normalized %d results from %d embeddings",
-            len(normalized_results),
-            len(grouped),
+            "📊 Query Results: %d/%d results merged from %d embeddings",
+            total_results,
+            sum(len(embedding_results) for embedding_results in grouped.values()),
+            embedding_count,
         )
+        
+        # Log per-embedding details
+        for breakdown in embedding_breakdown:
+            self.logger.info("  • %s", breakdown)
 
         return normalized_results
 

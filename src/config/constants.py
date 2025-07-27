@@ -25,7 +25,7 @@ CLAUDE_MAX_RESPONSE_TOKENS = 12000  # Sanity cap for response tokens
 # Chat history management
 CHAT_HISTORY_TOKEN_RATIO = 0.3  # Use 30% of context for chat history
 CHAT_MAX_HISTORY_TURNS = 10  # Maximum conversation turns to keep
-CHAT_MIN_HISTORY_TURNS = 3  # Minimum turns to preserve when truncating
+CHAT_MIN_HISTORY_TURNS = 1  # Minimum turns to preserve when truncating (include from 1st turn)
 CHAT_SUMMARY_THRESHOLD = 5  # After N turns, start summarizing old history
 
 # Supported file extensions by language
@@ -67,15 +67,9 @@ DEFAULT_CHUNK_SIZE = 2000
 DEFAULT_CHUNK_OVERLAP = 200
 DEFAULT_MIN_CHUNK_SIZE = 50
 
-# Query and search defaults
-DEFAULT_QUERY_RESULTS = (
-    100  # Raw results from vector database (doubled for better quality)
-)
-MAX_QUERY_RESULTS = 200  # Maximum allowed per query
-DEFAULT_DISPLAY_RESULTS = (
-    20  # Results shown to user (increased - only affects terminal display)
-)
-MAX_DISPLAY_RESULTS = 50  # Maximum results to display
+# Query and search defaults - unified for consistency
+DEFAULT_RESULTS = 250  # Default results for both query and display (2.5x increase for massive context)
+MAX_RESULTS = 500      # Maximum results allowed for both query and display (massive context testing)
 
 # Performance optimization constants
 ENABLE_TOKEN_CACHE = True  # Cache token calculations to avoid re-processing

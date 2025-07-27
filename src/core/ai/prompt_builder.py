@@ -13,7 +13,7 @@ from utils.logging import get_logger
 GLOBAL_CODE_ATTRIBUTION = """
 **Code Attribution**: When showing existing code examples from the codebase, always \
 prefix each code block with a comment indicating the source file path \
-(e.g., `// From: path/to/file.tsx`)."""
+(e.g., `// From: embedding-name/path/to/file.tsx`)."""
 
 
 class PromptBuilder:
