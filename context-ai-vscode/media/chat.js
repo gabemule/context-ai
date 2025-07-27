@@ -392,7 +392,7 @@ Special commands:
     function formatMarkdownPreservingBreaks(text) {
         // ✅ USAR marked.js para formatação perfeita
         if (typeof marked !== 'undefined') {
-            console.log('✅ Using marked.js for markdown formatting');
+            // console.log('✅ Using marked.js for markdown formatting');
             
             // ✅ CONFIGURAÇÃO do marked.js com breaks: true
             marked.setOptions({
@@ -408,7 +408,8 @@ Special commands:
                 .replace(/\n{2,}/g, '\n')  // Max 1 quebras
                 .trim();
             
-            console.log('📄 Input text sample:', cleaned.substring(0, 200) + '...');
+            // Debug: Ver sample text
+            // console.log('📄 Input text sample:', cleaned.substring(0, 200) + '...');
             
             const result = marked.parse(cleaned);
             

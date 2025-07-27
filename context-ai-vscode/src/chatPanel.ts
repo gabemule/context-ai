@@ -530,7 +530,7 @@ Special commands:
                             <button class="example-btn" data-question="How auth works?">
                                 🔐 How auth works?
                             </button>
-                            <button class="example-btn" data-question="Explain the main components and their relationships">
+                            <button class="example-btn" data-question="Explain the project architecture and its exports">
                                 🏗️ Explain the architecture
                             </button>
                         </div>
