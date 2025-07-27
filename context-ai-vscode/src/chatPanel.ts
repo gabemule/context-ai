@@ -83,6 +83,8 @@ export class ChatPanel {
 
     private async _handleSendMessage(text: string) {
         try {
+            console.log('🚀 _handleSendMessage START:', text);
+            
             // Show loading state
             this._panel.webview.postMessage({
                 command: 'showLoading',
@@ -90,17 +92,21 @@ export class ChatPanel {
             });
 
             // Execute context-ai CLI
-            const response = await this._executeContextAI(text);
+            await this._executeContextAI(text);
 
-            // Send empty receiveMessage for compatibility (streaming already handled the response)
+            console.log('✅ _executeContextAI completed, sending streamComplete');
+            
+            // ✅ GARANTIR que loading para SEMPRE
             this._panel.webview.postMessage({
-                command: 'receiveMessage',
-                text: '', // Empty - streaming already showed the response
-                isLoading: false
+                command: 'streamComplete'
             });
 
+            console.log('🏁 _handleSendMessage SUCCESS completed');
+
         } catch (error) {
-            // Handle errors
+            console.log('❌ _handleSendMessage ERROR:', error);
+            
+            // Handle errors - only send receiveMessage for errors
             this._panel.webview.postMessage({
                 command: 'receiveMessage',
                 text: `❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -209,6 +215,18 @@ export class ChatPanel {
                 });
 
                 console.log(`🚀 Process PID: ${this._chatProcess.pid}`);
+
+                // ✅ DETECTAR falha imediatamente
+                if (!this._chatProcess.pid) {
+                    console.log(`❌ Process failed to start (PID undefined)`);
+                    throw new Error('Process failed to start - PID undefined');
+                }
+
+                // ✅ DETECTAR erro de spawn imediatamente
+                this._chatProcess.on('error', (error: Error) => {
+                    console.log(`❌ Process spawn error: ${error.message}`);
+                    throw error;
+                });
 
                 // Set up initialization listener to capture chat ready info
                 await this._waitForChatInitialization();
@@ -363,9 +381,10 @@ Special commands:
 
             // RESPONSE HANDLING (only after initialization)
             
-            // Look for the "You:" prompt to know when response is complete
-            if (chunk.includes('You:')) {
-                console.log('🏁 Found "You:" prompt - response complete');
+            // Look for the "You:" prompt OR Rich panel start to know when response is complete
+            if (chunk.includes('You:') || 
+                chunk.includes('╭─────────────────────────── 🤖 Context-AI\'s Answer')) {
+                console.log('🏁 Response complete (found end marker or Rich panel start)');
                 cleanupAndResolve(output.trim());
                 return;
             }
@@ -507,7 +526,7 @@ Special commands:
                     <div class="examples">
                         <p>💡 <strong>Try asking:</strong></p>
                         <div class="example-questions">
-                            <button class="example-btn" data-question="How does authentication work in this project?">
+                            <button class="example-btn" data-question="How does authentication work?">
                                 🔐 How does authentication work?
                             </button>
                             <button class="example-btn" data-question="Explain the main components and their relationships">

@@ -196,9 +196,15 @@
     }
 
     function removeLoadingMessage() {
-        if (currentLoadingMessage && currentLoadingMessage.parentNode) {
-            currentLoadingMessage.parentNode.removeChild(currentLoadingMessage);
+        console.log('🧹 removeLoadingMessage called, currentLoadingMessage:', currentLoadingMessage);
+        
+        if (currentLoadingMessage) {
+            console.log('🧹 Removing loading message');
+            currentLoadingMessage.remove();
             currentLoadingMessage = null;
+            console.log('🧹 Loading message removed successfully');
+        } else {
+            console.log('🧹 No currentLoadingMessage to remove');
         }
     }
 
@@ -263,8 +269,20 @@
                 
             case 'streamStart':
                 // Start streaming - replace loading with streaming message
+                console.log('🎯 streamStart - forcing loading removal');
+                
                 setLoading(false);
                 removeLoadingMessage();
+                
+                // ✅ FORÇAR remoção de TODOS os loadings (força bruta)
+                const loadingMessages = document.querySelectorAll('.loading-message');
+                console.log('🧹 Found loading messages:', loadingMessages.length);
+                loadingMessages.forEach(el => {
+                    console.log('🧹 Removing loading element:', el);
+                    el.remove();
+                });
+                currentLoadingMessage = null;
+                
                 startStreaming();
                 break;
                 
