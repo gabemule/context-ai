@@ -22,6 +22,10 @@
     init();
 
     function init() {
+        // ✅ GARANTIR estado inicial correto do botão
+        sendText.style.display = 'inline';
+        loadingText.style.display = 'none';
+        
         // Show empty state initially
         showEmptyState();
         
@@ -409,10 +413,10 @@ Special commands:
             const result = marked.parse(cleaned);
             
             // ✅ DEBUG: Ver HTML gerado pelo marked.js
-            console.log('🎯 HTML gerado pelo marked.js:', result);
-            console.log('🔍 Contains <li><p>:', result.includes('<li><p>'));
-            console.log('🔍 Contains <ul>:', result.includes('<ul>'));
-            console.log('🔍 Contains <li> only:', result.match(/<li>/g)?.length || 0);
+            // console.log('🎯 HTML gerado pelo marked.js:', result);
+            // console.log('🔍 Contains <li><p>:', result.includes('<li><p>'));
+            // console.log('🔍 Contains <ul>:', result.includes('<ul>'));
+            // console.log('🔍 Contains <li> only:', result.match(/<li>/g)?.length || 0);
             
             return result;
         } else {

@@ -527,17 +527,11 @@ Special commands:
                     <div class="examples">
                         <p>💡 <strong>Try asking:</strong></p>
                         <div class="example-questions">
-                            <button class="example-btn" data-question="How does authentication work?">
-                                🔐 How does authentication work?
+                            <button class="example-btn" data-question="How auth works?">
+                                🔐 How auth works?
                             </button>
                             <button class="example-btn" data-question="Explain the main components and their relationships">
                                 🏗️ Explain the architecture
-                            </button>
-                            <button class="example-btn" data-question="What are the main API endpoints?">
-                                🌐 Show me the API endpoints
-                            </button>
-                            <button class="example-btn" data-question="How do I run this project locally?">
-                                🚀 How to run locally?
                             </button>
                         </div>
                     </div>
