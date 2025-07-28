@@ -96,7 +96,6 @@ export class ChatPanel {
 
             console.log('✅ _executeContextAI completed, sending streamComplete');
             
-            // ✅ GARANTIR que loading para SEMPRE
             this._panel.webview.postMessage({
                 command: 'streamComplete'
             });
@@ -211,18 +210,20 @@ export class ChatPanel {
                 this._chatProcess = spawn(cmd, cmdArgs, {
                     cwd: cwd,
                     shell: false,
-                    stdio: ['pipe', 'pipe', 'pipe']
+                    stdio: ['pipe', 'pipe', 'pipe'],
+                    env: {
+                        ...process.env,
+                        CONTEXT_AI_VSCODE: 'true'  // Enable VSCode integration mode
+                    }
                 });
 
                 console.log(`🚀 Process PID: ${this._chatProcess.pid}`);
 
-                // ✅ DETECTAR falha imediatamente
                 if (!this._chatProcess.pid) {
                     console.log(`❌ Process failed to start (PID undefined)`);
                     throw new Error('Process failed to start - PID undefined');
                 }
 
-                // ✅ DETECTAR erro de spawn imediatamente
                 this._chatProcess.on('error', (error: Error) => {
                     console.log(`❌ Process spawn error: ${error.message}`);
                     throw error;
@@ -251,26 +252,21 @@ export class ChatPanel {
     private async _waitForChatInitialization(): Promise<void> {
         return new Promise((resolve, reject) => {
             let initTimeout: NodeJS.Timeout;
-
-            // TODO: Capturar instruções dinâmicamente do Context-AI
-            // Por enquanto, usar mock das instruções para garantir UX
-            const MOCK_CHAT_INFO = `Ask questions about your codebase. Chat history will be maintained for context.
-
-Special commands:
-    /embeddings - Show active embeddings
-    /history    - Show chat statistics  
-    /clear      - Reset conversation history
-    /verbose    - Toggle detailed logging
-    /mode       - Change prompt mode (minimal|standard|comprehensive|strict)
-    exit        - Quit chat session`;
+            let accumulatedInitOutput = ''; // Accumulate chunks for panel processing
 
             const initDataHandler = (data: Buffer) => {
                 const chunk = data.toString();
                 console.log(`📥 Init chunk (${chunk.length} chars):`, JSON.stringify(chunk));
+                
+                // Accumulate output for panel processing
+                accumulatedInitOutput += chunk;
+                
+                // Process panels during initialization
+                this.processCompletePanels(accumulatedInitOutput);
 
                 // Detectar quando chat está pronto para receber mensagens
-                if (chunk.includes('You:')) {
-                    console.log('🎯 Chat ready - sending chatReady signal with mock info');
+                if (chunk.includes('#= Context-AI Loaded =#')) {
+                    console.log('🎯 Chat ready - initialization complete (Context-AI Loaded marker found)');
 
                     // Remove initialization listener
                     this._chatProcess.stdout.off('data', initDataHandler);
@@ -279,12 +275,7 @@ Special commands:
                     // Clear timeout
                     clearTimeout(initTimeout);
 
-                    // Send chat ready with mock info (always works)
-                    this._panel.webview.postMessage({
-                        command: 'chatReady',
-                        chatInfo: MOCK_CHAT_INFO
-                    });
-
+                    // Panel processing already handled by processCompletePanels above
                     resolve();
                     return;
                 }
@@ -354,23 +345,31 @@ Special commands:
             reject(error);
         };
 
+        let accumulatedOutput = ''; // Accumulate chunks for token stats detection
+        
         const dataHandler = (data: Buffer) => {
             if (requestCompleted) return; // Ignore if already completed
             
             const chunk = data.toString();
             console.log(`📥 Received stdout chunk (${chunk.length} chars):`, JSON.stringify(chunk));
             
+            // Accumulate all output for token stats detection
+            accumulatedOutput += chunk;
+            
+            // Check for complete Rich panels (generic detection)
+            const shouldStopCollecting = this.processCompletePanels(accumulatedOutput);
+            if (shouldStopCollecting && isCollecting) {
+                console.log('🎯 Stopping chunk streaming due to Answer panel detection');
+                isCollecting = false;
+            }
+            
             // ONLY handle initialization if chat hasn't been initialized yet
             if (!this._chatInitialized) {
-                // Detect initialization completion
-                if (chunk.includes('You:')) {
+                // Detect initialization completion with safe marker
+                if (chunk.includes('#= Context-AI Loaded =#')) {
                     this._chatInitialized = true;
-                    console.log('🎯 Chat initialized - sending chatReady signal');
-                    
-                    this._panel.webview.postMessage({
-                        command: 'chatReady',
-                        chatInfo: 'Context-AI chat is ready! You can now ask questions about your codebase.'
-                    });
+                    console.log('🎯 Chat initialized - waiting for dynamic panel content (Context-AI Loaded marker)');
+                    // Don't send chatReady here - let processCompletePanels handle it with dynamic content
                     return;
                 }
                 
@@ -381,18 +380,17 @@ Special commands:
 
             // RESPONSE HANDLING (only after initialization)
             
-            // Look for the "You:" prompt OR Rich panel start to know when response is complete
-            if (chunk.includes('You:') || 
-                chunk.includes('╭─────────────────────────── 🤖 Context-AI\'s Answer')) {
-                console.log('🏁 Response complete (found end marker or Rich panel start)');
+            // Only stop when we see Context-AI End marker (this comes after panel ends and stats are sent)
+            if (chunk.includes('#= Context-AI End =#')) {
+                console.log('🏁 Response complete (found Context-AI End marker - panel closed, stats sent)');
                 cleanupAndResolve(output.trim());
                 return;
             }
 
-            // Start collecting after we see streaming indicator
-            if (chunk.includes('🌊') || chunk.includes('Streaming Response')) {
+            // Start collecting when we see streaming start marker
+            if (chunk.includes('#= Context-AI Streaming START =#')) {
                 if (!isCollecting) {
-                    console.log('🎯 Started streaming response');
+                    console.log('🎯 Started streaming response (Context-AI Streaming START marker)');
                     isCollecting = true;
                     responseStarted = true;
                     
@@ -401,6 +399,13 @@ Special commands:
                         command: 'streamStart'
                     });
                 }
+                return;
+            }
+
+            // Stop collecting when we see streaming end marker
+            if (chunk.includes('#= Context-AI Streaming END =#')) {
+                console.log('🎯 Streaming ended (Context-AI Streaming END marker)');
+                isCollecting = false;
                 return;
             }
 
@@ -456,6 +461,146 @@ Special commands:
         };
     }
 
+    private processCompletePanels(accumulatedOutput: string): boolean {
+        let shouldStopCollecting = false;
+        
+        // Detectar todos os panels conhecidos automaticamente
+        this.detectPanel(accumulatedOutput, 'Token Usage', (panelContent: string) => {
+            const stats = this.extractStatsFromTokenPanel(panelContent);
+            if (stats) {
+                console.log('📊 Successfully extracted token stats from panel:', stats);
+                
+                // Send stats to webview
+                this._panel.webview.postMessage({
+                    command: 'updateTokenStats',
+                    stats: stats
+                });
+            }
+        });
+        
+        this.detectPanel(accumulatedOutput, 'Context-AI Chat Session with History', (panelContent: string) => {
+            const chatInfo = this.extractChatInfoFromPanel(panelContent);
+            if (chatInfo) {
+                console.log('🎯 Found dynamic Chat Session panel, sending chatReady');
+                
+                // Send dynamic chat info instead of mock
+                this._panel.webview.postMessage({
+                    command: 'chatReady',
+                    chatInfo: chatInfo
+                });
+            } else {
+                console.log('⚠️ Chat info extraction failed, sending fallback chatReady');
+                
+                // Send fallback to ensure loading is removed
+                this._panel.webview.postMessage({
+                    command: 'chatReady',
+                    chatInfo: 'Ask questions about your codebase. Chat history will be maintained for context.\n\nSpecial commands:\n/embeddings - Show active embeddings\n/history - Show chat statistics\n/clear - Reset conversation history\n/verbose - Toggle detailed logging\n/mode - Change prompt mode\nexit - Quit chat session'
+                });
+            }
+        });
+        
+        
+        return shouldStopCollecting;
+    }
+
+    private detectPanel(
+        accumulatedOutput: string, 
+        panelTitle: string, 
+        onPanelFound: (panelContent: string) => void
+    ): void {
+        if (accumulatedOutput.includes(panelTitle) &&
+            accumulatedOutput.includes('╭───') &&
+            accumulatedOutput.includes('───╮') &&
+            accumulatedOutput.includes('╰───') &&
+            accumulatedOutput.includes('───╯')) {
+            
+            console.log(`🎯 Found complete ${panelTitle} panel`);
+            onPanelFound(accumulatedOutput);
+        }
+    }
+
+    private extractStatsFromTokenPanel(panelText: string): any {
+        try {
+            // Extract data from Rich panel text
+            // Look for patterns like:
+            // "Total: 100,411 tokens (50.2%)"
+            // "Input: 98,420 • Output: 1,991"
+            // "Breakdown: 91K code + 1K history"
+            
+            const totalMatch = panelText.match(/Total:\s*([\d,]+)\s*tokens\s*\(([\d.]+)%\)/);
+            const inputOutputMatch = panelText.match(/Input:\s*([\d,]+)\s*•\s*Output:\s*([\d,]+)/);
+            const breakdownMatch = panelText.match(/Breakdown:\s*(.+?)(?:\n|$)/);
+            
+            if (totalMatch && inputOutputMatch) {
+                const totalTokens = parseInt(totalMatch[1].replace(/,/g, ''));
+                const percentage = parseFloat(totalMatch[2]);
+                const inputTokens = parseInt(inputOutputMatch[1].replace(/,/g, ''));
+                const outputTokens = parseInt(inputOutputMatch[2].replace(/,/g, ''));
+                const breakdown = breakdownMatch ? breakdownMatch[1].trim() : '';
+                
+                return {
+                    total_tokens: totalTokens,
+                    percentage: percentage,
+                    input_tokens: inputTokens,
+                    output_tokens: outputTokens,
+                    breakdown: breakdown
+                };
+            }
+        } catch (error) {
+            console.error('❌ Failed to extract stats from Token Usage panel:', error);
+        }
+        
+        return null;
+    }
+
+    private extractChatInfoFromPanel(panelText: string): string | null {
+        try {
+            // Extract content from Rich panel, removing borders and formatting
+            // Look for the panel content between the borders
+            
+            // Simpler approach: find content between ╭─── and ╰───
+            const panelStart = panelText.indexOf('╭───');
+            const panelEnd = panelText.indexOf('╰───');
+            
+            if (panelStart !== -1 && panelEnd !== -1 && panelEnd > panelStart) {
+                let content = panelText.substring(panelStart, panelEnd + 10); // Include closing border
+                
+                // Extract just the text lines, removing borders
+                const lines = content.split('\n');
+                const contentLines = [];
+                
+                for (const line of lines) {
+                    // Remove lines that are just borders
+                    if (line.includes('╭───') || line.includes('╰───') || line.includes('─')) {
+                        continue;
+                    }
+                    
+                    // Clean line: remove │ and leading/trailing spaces
+                    const cleanLine = line.replace(/^[\s]*│[\s]*/, '').replace(/[\s]*│[\s]*$/, '').trim();
+                    
+                    // Only add non-empty lines
+                    if (cleanLine) {
+                        contentLines.push(cleanLine);
+                    }
+                }
+                
+                const finalContent = contentLines.join('\n').trim();
+                
+                if (finalContent && finalContent.length > 10) {
+                    console.log('📝 Extracted chat info from panel:', finalContent.substring(0, 100) + '...');
+                    return finalContent;
+                }
+            }
+            
+            console.log('⚠️ Could not extract chat info from panel, using fallback');
+            return null;
+            
+        } catch (error) {
+            console.error('❌ Failed to extract chat info from panel:', error);
+            return null;
+        }
+    }
+
     public dispose() {
         ChatPanel.currentPanel = undefined;
 
@@ -506,8 +651,11 @@ Special commands:
             <body>
                 <div class="container">
                     <div class="header">
-                        <h1>🤖 Context-AI Chat</h1>
-                        <button id="clearBtn" class="clear-btn">Clear Chat</button>
+                        <div class="header-row">
+                            <h1>🤖 Context-AI Chat</h1>
+                            <button id="clearBtn" class="clear-btn">Clear Chat</button>
+                        </div>
+                        <div id="tokenStats" class="token-stats" style="display: none;"></div>
                     </div>
                     
                     <div id="messages" class="messages"></div>

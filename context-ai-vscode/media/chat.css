@@ -22,12 +22,17 @@ body {
 
 .header {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
     margin-bottom: 16px;
     padding-bottom: 12px;
     border-bottom: 1px solid var(--vscode-panel-border);
     position: relative;
+}
+
+.header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 /* ✅ Progress bar animada no header (mesmo estilo do streaming) */
@@ -64,7 +69,21 @@ body {
 }
 
 .clear-btn:hover {
-    background-color: var(--vscode-button-secondaryHoverBackground);
+    background-color: var(--vscode-button-hoverBackground);
+}
+
+/* Token Stats */
+.token-stats {
+    display: none;
+    margin-top: 8px;
+    padding: 6px 12px;
+    background-color: var(--vscode-editorWidget-background);
+    border: 1px solid var(--vscode-editorWidget-border);
+    border-radius: 4px;
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+    font-family: var(--vscode-font-family);
+    line-height: 1.2;
 }
 
 .messages {

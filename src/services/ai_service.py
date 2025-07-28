@@ -463,11 +463,18 @@ class AIService:
 
     def start_chat(self, verbose: bool = False) -> None:
         """Start interactive chat session with optional verbose mode."""
+        import os
         from rich.console import Console
         from rich.panel import Panel
         from rich.text import Text
 
-        self.logger.info("💬 Starting chat session with Claude...")
+        # Detect VSCode integration mode
+        self._vscode_mode = os.getenv('CONTEXT_AI_VSCODE') == 'true'
+        
+        if self._vscode_mode:
+            self.logger.info("💬 Starting chat session with Claude (VSCode mode)...")
+        else:
+            self.logger.info("💬 Starting chat session with Claude...")
 
         # Check and display active embeddings
         active = self.settings_manager.get_active_embeddings()
@@ -512,6 +519,10 @@ class AIService:
         console.print()
         console.print(welcome_panel)
         console.print()
+        
+        # Send initialization complete marker for VSCode (only in VSCode mode)
+        if self._vscode_mode:
+            print("\n#= Context-AI Loaded =#\n", flush=True)
 
         try:
             while True:
@@ -660,6 +671,10 @@ class AIService:
 
     def _display_response(self, content: str) -> None:
         """Display response with rich formatting."""
+        # Only show Answer panel in CLI mode (not in VSCode)
+        if hasattr(self, '_vscode_mode') and self._vscode_mode:
+            return  # Skip panel display in VSCode mode
+            
         from rich.console import Console
         from rich.markdown import Markdown
         from rich.panel import Panel
@@ -693,67 +708,60 @@ class AIService:
         code_context_tokens: int = 0,
         chat_context_tokens: int = 0,
     ) -> None:
-        """Display token usage statistics using logging."""
+        """Display token usage statistics with Rich panel."""
+        from rich.console import Console
+        from rich.panel import Panel
+        from rich.text import Text
         from config.providers import get_max_tokens
 
         # Get actual usage from response
         actual_input = response.usage.get("input_tokens", input_tokens)
         actual_output = response.usage.get("output_tokens", 0)
         total_used = actual_input + actual_output
+        max_tokens = get_max_tokens()
 
         # Calculate percentages
-        total_pct = (total_used / get_max_tokens()) * 100
+        total_pct = (total_used / max_tokens) * 100
 
-        if verbose:
-            # Detailed breakdown for verbose mode
-            context_pct = (context_tokens / get_max_tokens()) * 100
-            question_pct = (question_tokens / get_max_tokens()) * 100
-            input_pct = (actual_input / get_max_tokens()) * 100
-            output_pct = (actual_output / get_max_tokens()) * 100
-
-            self.logger.info("📊 Token Usage Details:")
-            self.logger.info(
-                "  Context: %s tokens (%.1f%%)", f"{context_tokens:,}", context_pct
-            )
-            self.logger.info(
-                "  Question: %s tokens (%.1f%%)", f"{question_tokens:,}", question_pct
-            )
-            self.logger.info(
-                "  Input Total: %s tokens (%.1f%%)", f"{actual_input:,}", input_pct
-            )
-            self.logger.info(
-                "  Response: %s tokens (%.1f%%)", f"{actual_output:,}", output_pct
-            )
-            self.logger.info(
-                "  Total Used: %s tokens (%.1f%%)", f"{total_used:,}", total_pct
-            )
-            self.logger.info(
-                "  Remaining: %s tokens (%.1f%%)",
-                f"{get_max_tokens() - total_used:,}",
-                100 - total_pct,
-            )
+        console = Console()
+        
+        # Create stats text
+        stats_text = Text()
+        
+        # Title line
+        stats_text.append("📊 Token Usage\n", style="bold cyan")
+        
+        # Main usage line
+        stats_text.append(f"Total: {total_used:,} tokens ({total_pct:.1f}%)\n", style="bold")
+        
+        # Input/Output breakdown
+        stats_text.append(f"Input: {actual_input:,} • Output: {actual_output:,}\n")
+        
+        # Context breakdown
+        if include_history and chat_context_tokens > 0:
+            stats_text.append(f"Breakdown: {code_context_tokens//1000}K code + {chat_context_tokens//1000}K history\n")
         else:
-            # Compact one-liner with history breakdown when available
-            if include_history and chat_context_tokens > 0:
-                self.logger.info(
-                    "📊 Tokens: %s in (%dK code + %dK history) + %s out = %s total (%.1f%% of %s)",
-                    f"{actual_input:,}",
-                    code_context_tokens // 1000,
-                    chat_context_tokens // 1000,
-                    f"{actual_output:,}",
-                    f"{total_used:,}",
-                    total_pct,
-                    f"{get_max_tokens():,}",
-                )
-            else:
-                self.logger.info(
-                    "📊 Tokens: %s in + %s out = %s total (%.1f%% of %s)",
-                    f"{actual_input:,}",
-                    f"{actual_output:,}",
-                    f"{total_used:,}",
-                    total_pct,
-                    f"{get_max_tokens():,}",
-                )
+            stats_text.append(f"Context: {code_context_tokens//1000}K tokens\n")
+        
+        # Model limit
+        remaining = max_tokens - total_used
+        stats_text.append(f"Remaining: {remaining:,} tokens ({100-total_pct:.1f}%)", style="dim")
+        
+        # Create panel
+        panel = Panel(
+            stats_text,
+            title="📊 Token Usage",
+            border_style="cyan",
+            padding=(0, 1)
+        )
+        
+        # Display panel
+        console.print()
+        console.print(panel)
+        
+        # Send end marker for VSCode (only for chat sessions in VSCode mode)
+        if hasattr(self, '_vscode_mode') and self._vscode_mode:
+            print("\n#= Context-AI End =#\n", flush=True)
 
     def _ask_claude_with_progress(
         self,
@@ -793,6 +801,10 @@ class AIService:
                 from rich.markdown import Markdown
                 from rich.panel import Panel
                 
+                # Send streaming start marker for VSCode (only in VSCode mode)
+                if self._vscode_mode:
+                    print("\n#= Context-AI Streaming START =#\n", flush=True)
+                
                 # Print header with Rich styling
                 console.print("🌊 Context-AI Streaming Response...\n", style="bold green")
                 
@@ -815,22 +827,28 @@ class AIService:
                 elapsed = time.time() - start_time
                 response_tokens = response.usage.get("output_tokens", 0)
                 
-                # After streaming, add final formatted panel to terminal history
+                # Send streaming end marker for VSCode (only in VSCode mode)
+                if self._vscode_mode:
+                    print("\n#= Context-AI Streaming END =#\n", flush=True)
+                
+                # After streaming, add final formatted panel to terminal history (only in CLI mode)
                 print("\n")  # Add some spacing
                 
-                try:
-                    final_content = Markdown(accumulated_text.strip()) if accumulated_text.strip() else "No response received"
-                except:
-                    final_content = accumulated_text.strip() if accumulated_text.strip() else "No response received"
-                
-                final_panel = Panel(
-                    final_content,
-                    title="🤖 Context-AI's Answer",
-                    title_align="center",
-                    border_style="green",
-                    padding=(1, 2)
-                )
-                console.print(final_panel)
+                # Only show final panel in CLI mode (not in VSCode)
+                if not (hasattr(self, '_vscode_mode') and self._vscode_mode):
+                    try:
+                        final_content = Markdown(accumulated_text.strip()) if accumulated_text.strip() else "No response received"
+                    except:
+                        final_content = accumulated_text.strip() if accumulated_text.strip() else "No response received"
+                    
+                    final_panel = Panel(
+                        final_content,
+                        title="🤖 Context-AI's Answer",
+                        title_align="center",
+                        border_style="green",
+                        padding=(1, 2)
+                    )
+                    console.print(final_panel)
                 
             except Exception:
                 elapsed = time.time() - start_time

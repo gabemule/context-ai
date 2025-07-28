@@ -276,9 +276,18 @@
                 setLoading(message.isLoading);
                 break;
                 
-            case 'clearMessages':
-                clearChat();
-                break;
+                case 'clearMessages':
+                    messagesDiv.innerHTML = '';
+                    // Hide token stats when clearing
+                    const tokenStats = document.getElementById('tokenStats');
+                    if (tokenStats) {
+                        tokenStats.style.display = 'none';
+                    }
+                    break;
+
+                case 'updateTokenStats':
+                    updateTokenStats(event.data.stats);
+                    break;
                 
             case 'addQuestion':
                 addMessage(message.text, 'user');
@@ -566,6 +575,35 @@ Special commands:
         // Scroll to bottom
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
         console.log('🎯 showChatInfo COMPLETE');
+    }
+
+    function updateTokenStats(stats) {
+        const tokenStatsDiv = document.getElementById('tokenStats');
+        if (!tokenStatsDiv) return;
+        
+        const { total_tokens, percentage, breakdown, output_tokens } = stats;
+        
+        // Format numbers nicely with 1 decimal place
+        const totalK = (total_tokens / 1000).toFixed(1);
+        const outputK = (output_tokens / 1000).toFixed(1);
+        
+        // Create display text
+        let displayText = `📊 ${totalK}K tokens (${percentage}%)`;
+        
+        // Add breakdown if available
+        if (breakdown) {
+            displayText += ` • ${breakdown}`;
+        }
+        
+        // Add output tokens if significant
+        if (parseFloat(outputK) > 0) {
+            displayText += ` • ${outputK}K out`;
+        }
+        
+        tokenStatsDiv.innerHTML = displayText;
+        tokenStatsDiv.style.display = 'block';
+        
+        console.log('📊 Updated token stats:', displayText);
     }
 
     // Auto-resize textarea
