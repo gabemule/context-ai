@@ -49,6 +49,7 @@ dev = [
 ]
 
 [project.scripts]
+# Entry point mapeia raiz para src/, então cli:main aponta para src/cli.py:main
 context-ai = "cli:main"
 
 [project.urls]
@@ -56,8 +57,9 @@ Homepage = "https://github.com/gabemule/context-ai"
 Repository = "https://github.com/gabemule/context-ai"
 Issues = "https://github.com/gabemule/context-ai/issues"
 
-[tool.setuptools.packages.find]
-where = ["src"]
+# Configuração setuptools: mapeia raiz do pacote para pasta src/
+[tool.setuptools]
+package-dir = {"" = "src"}  # Raiz do pacote Python = pasta src/
 
 [tool.black]
 line-length = 88
