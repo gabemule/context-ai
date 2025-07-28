@@ -678,8 +678,11 @@ export class ChatPanel {
                             <button class="example-btn" data-question="How auth works?">
                                 🔐 How auth works?
                             </button>
-                            <button class="example-btn" data-question="Explain the project architecture and its exports">
+                            <button class="example-btn" data-question="Explain the project architecture">
                                 🏗️ Explain the architecture
+                            </button>
+                            <button class="example-btn" data-question="Detail the libraries and its exports">
+                                📚 Detail libraries
                             </button>
                         </div>
                     </div>
