@@ -172,7 +172,7 @@ class GuidelinesManager:
 
     def detect_languages_in_context(self, context: str) -> List[str]:
         """
-        Detect programming languages mentioned in the context.
+        Detect programming languages by file extensions only.
 
         Args:
             context: The context string to analyze
@@ -180,55 +180,37 @@ class GuidelinesManager:
         Returns:
             List of detected language names
         """
-        # Simple detection based on keywords and file extensions
-        languages = []
-        context_lower = context.lower()
-
-        # Python detection
-        python_keywords = ["python", "py", "pip", "poetry", "django", "flask", "fastapi", "pytest", "pandas", "numpy"]
+        languages = set()  # Use set to avoid duplicates
         
-        # JavaScript/TypeScript detection
-        js_keywords = ["javascript", "js", "jsx", "react", "node.js", "npm", "yarn"]
-        ts_keywords = ["typescript", "ts", "tsx", "interface", "type"]
-
-        # Check for Python keywords
-        if any(keyword in context_lower for keyword in python_keywords):
-            languages.append("python")
-        
-        # Check for JS/TS keywords
-        if any(keyword in context_lower for keyword in ts_keywords):
-            languages.append("typescript")
-        elif any(keyword in context_lower for keyword in js_keywords):
-            languages.append("javascript")
-
-        # File extension detection
+        # Use constants from the system
+        from config.constants import EXTENSION_TO_LANGUAGE, GUIDELINES_LANGUAGES
         import re
 
-        # Look for code blocks with language hints
-        code_block_pattern = r"```(\w+)"
-        matches = re.findall(code_block_pattern, context_lower)
-        for match in matches:
-            if match in self._guidelines_cache:
-                if match not in languages:
-                    languages.append(match)
-
-        # Look for file extensions in file paths
-        file_ext_pattern = r"\.(\w+)(?:\s|$|,|;|\))"
-        ext_matches = re.findall(file_ext_pattern, context_lower)
+        # Look for file extensions in context: .py, .ts, .js, .cjs, etc.
+        file_ext_pattern = r'\.(\w+)(?:\s|$|,|;|\)|/|\n)'
+        ext_matches = re.findall(file_ext_pattern, context.lower())
+        
         for ext in ext_matches:
-            if ext == "py":
-                if "python" not in languages:
-                    languages.append("python")
-            elif ext in ["js", "jsx", "ts", "tsx"]:
-                lang = "typescript" if ext in ["ts", "tsx"] else "javascript"
-                if lang not in languages:
-                    languages.append(lang)
+            full_ext = f".{ext}"
+            if full_ext in EXTENSION_TO_LANGUAGE:
+                language = EXTENSION_TO_LANGUAGE[full_ext]
+                
+                # Only add if we have guidelines for this language
+                if language in GUIDELINES_LANGUAGES:
+                    languages.add(language)
 
-        return languages
+        # Also check for code blocks ```python, ```javascript, ```typescript
+        code_block_pattern = r'```(\w+)'
+        code_matches = re.findall(code_block_pattern, context.lower())
+        for match in code_matches:
+            if match in GUIDELINES_LANGUAGES:
+                languages.add(match)
+
+        return list(languages)  # Convert to list at the end
 
     def should_apply_guidelines(self, context: str, question: str) -> bool:
         """
-        Determine if guidelines should be applied based on context and question.
+        Determine if guidelines should be applied based on detected languages in context.
 
         Args:
             context: The retrieved context
@@ -237,36 +219,9 @@ class GuidelinesManager:
         Returns:
             True if guidelines should be applied
         """
-        # Apply guidelines if:
-        # 1. Code-related keywords in question
-        # 2. Programming languages detected in context
-        # 3. Implementation/development related queries
-
-        question_lower = question.lower()
-        code_keywords = [
-            "implement",
-            "code",
-            "function",
-            "class",
-            "component",
-            "method",
-            "refactor",
-            "optimize",
-            "create",
-            "build",
-            "develop",
-            "write",
-            "how to",
-            "example",
-            "pattern",
-            "architecture",
-            "design",
-        ]
-
-        has_code_intent = any(keyword in question_lower for keyword in code_keywords)
-        has_languages = len(self.detect_languages_in_context(context)) > 0
-
-        return has_code_intent or has_languages
+        # Apply guidelines if we detect supported languages in context
+        languages = self.detect_languages_in_context(context)
+        return len(languages) > 0
 
     def get_applicable_guidelines(self, context: str, question: str) -> Optional[str]:
         """
@@ -279,21 +234,28 @@ class GuidelinesManager:
         Returns:
             Guidelines string or None if not applicable
         """
-        if not self.should_apply_guidelines(context, question):
-            return None
-
         languages = self.detect_languages_in_context(context)
-        if not languages:
-            # If no specific language detected but code intent exists,
-            # provide general guidelines
+        self.logger.debug("📋 Detected languages in context: %s", languages or "none")
+        
+        if not self.should_apply_guidelines(context, question):
+            self.logger.debug("📋 No guidelines: no supported languages detected")
             return None
 
+        if not languages:
+            self.logger.debug("📋 No guidelines: language detection failed after should_apply returned True")
+            return None
+
+        self.logger.debug("📋 Getting guidelines for languages: %s", ", ".join(languages))
         guidelines = self.get_guidelines_for_languages(languages)
 
         if guidelines:
-            self.logger.debug(
-                "Applying guidelines for languages: %s", ", ".join(languages)
-            )
+            # Always show when guidelines are applied (not just in verbose mode)
+            if len(languages) == 1:
+                self.logger.info("📋 Applied %s coding guidelines", languages[0].title())
+            else:
+                self.logger.info("📋 Applied coding guidelines: %s", ", ".join(lang.title() for lang in languages))
+        else:
+            self.logger.debug("📋 No guidelines found for: %s", ", ".join(languages))
 
         return guidelines
 

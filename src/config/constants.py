@@ -18,9 +18,9 @@ CHAT_SUMMARY_THRESHOLD = 5  # After N turns, start summarizing old history
 
 # Supported file extensions by language
 LANGUAGE_EXTENSIONS = {
-    "python": {".py", ".pyx", ".pyi"},
-    "javascript": {".js", ".jsx", ".mjs"},
-    "typescript": {".ts", ".tsx"},
+    "python": {".py", ".pyx", ".pyi", ".pyw"},
+    "javascript": {".js", ".jsx", ".mjs", ".cjs"},
+    "typescript": {".ts", ".tsx", ".d.ts", ".cts", ".mts"},
     "markdown": {".md", ".mdx", ".markdown"},
     "html": {".html", ".htm", ".xhtml"},
     "css": {".css", ".scss", ".sass", ".less"},
