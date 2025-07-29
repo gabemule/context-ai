@@ -101,6 +101,7 @@ class ContextAIConfig(BaseModel):
     system_prompt_strategy: str = Field(
         DEFAULT_SYSTEM_PROMPT_STRATEGY, description="System prompt strategy to use"
     )
+    prompt_mode: str = Field("standard", description="Active prompt mode")
 
     class Config:
         """Pydantic config."""

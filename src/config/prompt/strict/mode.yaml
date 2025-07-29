@@ -1,0 +1,11 @@
+name: "Strict Mode"
+description: "All features + enforced coding standards + detailed code review approach. Best for code generation tasks."
+author: "Context-AI Team"
+version: "1.0"
+enabled: true
+
+features:
+  security: true          # Incluir security_instructions.md global
+  cross_analysis: true    # Ativar análise cross-project com foco em code review
+  guidelines: true        # Aplicar coding guidelines com enforcement estrito
+  debug: false            # Não mostrar debug info por padrão

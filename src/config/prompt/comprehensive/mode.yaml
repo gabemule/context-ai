@@ -1,0 +1,11 @@
+name: "Comprehensive Mode"
+description: "Full cross-project comparison analysis + coding guidelines + architectural insights. Best for complex queries."
+author: "Context-AI Team"
+version: "1.0"
+enabled: true
+
+features:
+  security: true          # Incluir security_instructions.md global
+  cross_analysis: true    # Ativar análise cross-project detalhada
+  guidelines: true        # Aplicar coding guidelines com explicações arquiteturais
+  debug: false            # Não mostrar debug info por padrão

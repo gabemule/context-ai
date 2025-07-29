@@ -82,20 +82,21 @@ def execute_ask_command(args: argparse.Namespace) -> int:
 
     console = Console()
 
-    # Set prompt mode if specified
-    if args.prompt_mode:
-        import config.constants
-
-        original_mode = config.constants.PROMPT_MODE
-        config.constants.PROMPT_MODE = args.prompt_mode
-        if args.verbose:
-            logger.info("🎯 Using prompt mode: %s", args.prompt_mode)
-
     # Load heavy imports with loading indicator
     with console.status("[bold green]Loading AI service...", spinner="dots"):
         from services.ai_service import get_ai_service
+        from config.settings import get_settings_manager
 
         service = get_ai_service()
+        settings_manager = get_settings_manager()
+
+    # Set prompt mode if specified
+    original_mode = None
+    if args.prompt_mode:
+        original_mode = settings_manager.get_prompt_mode()
+        settings_manager.set_prompt_mode(args.prompt_mode)
+        if args.verbose:
+            logger.info("🎯 Using prompt mode: %s", args.prompt_mode)
 
     try:
         service.ask_question(
@@ -107,8 +108,8 @@ def execute_ask_command(args: argparse.Namespace) -> int:
         )
     finally:
         # Restore original mode
-        if args.prompt_mode:
-            config.constants.PROMPT_MODE = original_mode
+        if args.prompt_mode and original_mode:
+            settings_manager.set_prompt_mode(original_mode)
         
         # End session logging
         end_command_session()

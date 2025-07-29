@@ -1,0 +1,11 @@
+name: "Minimal Mode"
+description: "Basic context + question only. No additional instructions or analysis prompts. Fastest processing."
+author: "Context-AI Team"
+version: "1.0"
+enabled: true
+
+features:
+  security: true          # Incluir security_instructions.md global
+  cross_analysis: false   # Desativado análise cross-project para máxima velocidade
+  guidelines: false       # Desativado coding guidelines para máxima velocidade
+  debug: false            # Não mostrar debug info

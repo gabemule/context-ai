@@ -605,9 +605,7 @@ class AIService:
                         parts = question.split()
                         if len(parts) == 1:
                             # Show current mode and available options
-                            import config.constants
-
-                            current_mode = config.constants.PROMPT_MODE
+                            current_mode = self.settings_manager.get_prompt_mode()
                             self.logger.info("🎯 Current prompt mode: %s", current_mode)
                             self.logger.info(
                                 "📋 Available modes: minimal, standard, comprehensive, strict"
@@ -622,10 +620,8 @@ class AIService:
                         ]:
                             # Change mode
                             new_mode = parts[1]
-                            import config.constants
-
-                            old_mode = config.constants.PROMPT_MODE
-                            config.constants.PROMPT_MODE = new_mode
+                            old_mode = self.settings_manager.get_prompt_mode()
+                            self.settings_manager.set_prompt_mode(new_mode)
                             self.logger.info(
                                 "🎯 Prompt mode changed: %s → %s", old_mode, new_mode
                             )

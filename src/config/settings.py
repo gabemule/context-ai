@@ -143,6 +143,18 @@ class SettingsManager:
         self.save_config(config)
         self.logger.info("Model for %s set to: %s", active_provider, model)
 
+    def get_prompt_mode(self) -> str:
+        """Get the current prompt mode."""
+        config = self.get_config()
+        return config.prompt_mode
+
+    def set_prompt_mode(self, mode: str) -> None:
+        """Set the prompt mode."""
+        config = self.get_config()
+        config.prompt_mode = mode
+        self.save_config(config)
+        self.logger.info("Prompt mode set to: %s", mode)
+
     def set_active_embeddings(self, embedding_names: List[str]) -> None:
         """Set active embeddings."""
         active = ActiveEmbeddings(selected=embedding_names, last_updated=datetime.now())

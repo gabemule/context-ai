@@ -69,26 +69,21 @@ CONTEXT_CACHE_TTL = 300  # Context cache TTL in seconds
 # Streaming configuration
 STREAMING_THRESHOLD_TOKENS = 50000  # Use streaming for contexts larger than this
 
-# Prompt configuration
-PROMPT_MODE = "standard"  # Modes: "minimal", "standard", "comprehensive", "strict"
-ENABLE_CROSS_PROJECT_PROMPTS = True  # Add cross-project analysis instructions
-ENABLE_CODING_GUIDELINES = (
-    True  # Include coding guidelines in prompts (always when applicable)
-)
-GUIDELINES_AUTO_DETECT = True  # Automatically detect when to apply guidelines
+# Guidelines configuration
 GUIDELINES_LANGUAGES = ["python", "javascript", "typescript"]  # Supported guideline languages
 
-# Prompt mode descriptions - each mode builds upon the previous
-PROMPT_MODES = {
-    "minimal": "Basic context + question only. No additional instructions "
-    "or analysis prompts. Fastest processing.",
-    "standard": "Context + question + cross-project awareness when multiple "
-    "projects detected. Includes coding guidelines when Python/JS/TS detected.",
-    "comprehensive": "Full cross-project comparison analysis + coding "
-    "guidelines + architectural insights. Best for complex queries.",
-    "strict": "All features + enforced coding standards + detailed code "
-    "review approach. Best for code generation tasks.",
-}
+# File-based prompt system constants
+PROMPT_CONFIG_SUBDIR = "config/prompt"  # Subdir in user config for prompt files
+PROMPT_REQUIRED_FILES = ["mode.yaml", "core_instructions.md"]  # Required files per mode
+PROMPT_OPTIONAL_FILES = [  # Optional files that may be loaded
+    "cross_analysis.md",
+    "final_instructions.md", 
+    "error_handling.md",
+    "output_format.md",
+    "validation_rules.md",
+    "debug_info.md"
+]
+PROMPT_GLOBAL_FILES = ["global_instructions.md", "security_instructions.md"]
 
 # Language-specific text separators for chunking
 LANGUAGE_SEPARATORS = {

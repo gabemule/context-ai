@@ -1,0 +1,11 @@
+name: "Standard Mode"
+description: "Balanced mode with cross-project awareness and guidelines"
+author: "Context-AI Team"
+version: "1.0"
+enabled: true
+
+features:
+  security: true          # Incluir security_instructions.md global
+  cross_analysis: true    # Ativar análise cross-project (precisa lógica)
+  guidelines: true        # Aplicar coding guidelines (precisa lógica)
+  debug: false            # Não mostrar debug info por padrão
