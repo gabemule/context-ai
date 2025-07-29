@@ -13,11 +13,10 @@ from .base import ConfigurableModel
 from ..constants.chunking import (
     DEFAULT_CHUNK_SIZE,
     DEFAULT_CHUNK_OVERLAP,
-    DEFAULT_MIN_CHUNK_SIZE,
-    DEFAULT_MAX_CHUNKS,
-    DEFAULT_PRIORITIZE_CROSS_PROJECT,
     DEFAULT_INCLUDE_METADATA,
-    SUPPORTED_EXTENSIONS,
+    DEFAULT_MAX_CHUNKS,
+    DEFAULT_MIN_CHUNK_SIZE,
+    DEFAULT_PRIORITIZE_CROSS_PROJECT,
 )
 
 __all__ = [
@@ -39,8 +38,15 @@ class ChunkingConfig(ConfigurableModel):
         DEFAULT_MIN_CHUNK_SIZE, description="Minimum chunk size"
     )
     supported_extensions: List[str] = Field(
-        default=list(SUPPORTED_EXTENSIONS), description="Supported file extensions"
+        default_factory=lambda: list(_get_supported_extensions()), 
+        description="Supported file extensions"
     )
+
+
+def _get_supported_extensions() -> set:
+    """Get supported extensions dynamically from LanguagesManager."""
+    from ..languages.manager import get_languages_manager
+    return get_languages_manager().get_supported_extensions()
 
 
 class ContextAssemblyConfig(ConfigurableModel):

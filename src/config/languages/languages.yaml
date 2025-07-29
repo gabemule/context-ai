@@ -1,0 +1,330 @@
+# Context-AI Language Configuration
+# This file defines supported programming languages, their file extensions,
+# and text separators used for intelligent chunking.
+
+languages:
+  python:
+    name: "Python"
+    extensions: 
+      - ".py"
+      - ".pyx" 
+      - ".pyi"
+      - ".pyw"
+    separators:
+      - "\nclass "
+      - "\ndef "
+      - "\nasync def "
+      - "\nif __name__"
+      - "\nfrom "
+      - "\nimport "
+      - "\n\n"
+      - "\n"
+      - " "
+      - ""
+    chunking_priority: "high"
+    
+  javascript:
+    name: "JavaScript"
+    extensions:
+      - ".js"
+      - ".jsx"
+      - ".mjs"
+      - ".cjs"
+    separators:
+      - "\nclass "
+      - "\nfunction "
+      - "\nexport "
+      - "\nimport "
+      - "\nconst "
+      - "\nlet "
+      - "\nvar "
+      - "\n\n"
+      - "\n"
+      - " "
+      - ""
+    chunking_priority: "high"
+    
+  typescript:
+    name: "TypeScript"
+    extends: "javascript"
+    extensions:
+      - ".ts"
+      - ".tsx"
+      - ".d.ts"
+      - ".cts" 
+      - ".mts"
+    additional_separators:
+      - "\ninterface "
+      - "\ntype "
+      - "\nenum "
+      - "\nnamespace "
+    chunking_priority: "high"
+      
+  markdown:
+    name: "Markdown"
+    extensions:
+      - ".md"
+      - ".mdx"
+      - ".markdown"
+    separators:
+      - "\n# "
+      - "\n## "
+      - "\n### "
+      - "\n#### "
+      - "\n##### "
+      - "\n\n"
+      - "\n"
+      - " "
+      - ""
+    chunking_priority: "medium"
+    
+  html:
+    name: "HTML"
+    extensions:
+      - ".html"
+      - ".htm"
+      - ".xhtml"
+    separators:
+      - "\n<div"
+      - "\n<section"
+      - "\n<article"
+      - "\n<p"
+      - "\n\n"
+      - "\n"
+      - " "
+      - ""
+    chunking_priority: "medium"
+    
+  css:
+    name: "CSS"
+    extensions:
+      - ".css"
+      - ".scss"
+      - ".sass" 
+      - ".less"
+    separators:
+      - "\n."
+      - "\n#"
+      - "\n@media"
+      - "\n@import"
+      - "\n\n"
+      - "\n"
+      - " "
+      - ""
+    chunking_priority: "low"
+    
+  json:
+    name: "JSON"
+    extensions:
+      - ".json"
+    separators:
+      - "\n\n"
+      - "\n"
+      - " "
+      - ""
+    chunking_priority: "low"
+    
+  yaml:
+    name: "YAML"
+    extensions:
+      - ".yaml"
+      - ".yml"
+    separators:
+      - "\n---"
+      - "\n"
+      - " "
+      - ""
+    chunking_priority: "low"
+    
+  go:
+    name: "Go"
+    extensions:
+      - ".go"
+    separators:
+      - "\nfunc "
+      - "\ntype "
+      - "\nvar "
+      - "\nconst "
+      - "\npackage "
+      - "\nimport "
+      - "\nstruct "
+      - "\ninterface "
+      - "\n\n"
+      - "\n"
+      - " "
+      - ""
+    chunking_priority: "medium"
+    
+  rust:
+    name: "Rust"
+    extensions:
+      - ".rs"
+    separators:
+      - "\nfn "
+      - "\nstruct "
+      - "\nenum "
+      - "\nimpl "
+      - "\nmod "
+      - "\nuse "
+      - "\npub fn "
+      - "\npub struct "
+      - "\n\n"
+      - "\n"
+      - " "
+      - ""
+    chunking_priority: "medium"
+    
+  java:
+    name: "Java"
+    extensions:
+      - ".java"
+    separators:
+      - "\nclass "
+      - "\npublic class "
+      - "\nprivate class "
+      - "\nprotected class "
+      - "\npublic "
+      - "\nprivate "
+      - "\nprotected "
+      - "\npackage "
+      - "\nimport "
+      - "\n\n"
+      - "\n"
+      - " "
+      - ""
+    chunking_priority: "medium"
+    
+  cpp:
+    name: "C/C++"
+    extensions:
+      - ".cpp"
+      - ".cc"
+      - ".cxx"
+      - ".c++"
+      - ".c"
+      - ".h"
+      - ".hpp"
+      - ".hxx"
+    separators:
+      - "\nclass "
+      - "\nstruct "
+      - "\nvoid "
+      - "\nint "
+      - "\nfloat "
+      - "\ndouble "
+      - "\n#include"
+      - "\nnamespace "
+      - "\n\n"
+      - "\n"
+      - " "
+      - ""
+    chunking_priority: "medium"
+    
+  # Frontend Frameworks
+  vue:
+    name: "Vue"
+    extends: "javascript"
+    extensions:
+      - ".vue"
+    additional_separators:
+      - "\n<template"
+      - "\n<script"
+      - "\n<style"
+    chunking_priority: "medium"
+    
+  svelte:
+    name: "Svelte"
+    extends: "javascript"
+    extensions:
+      - ".svelte"
+    additional_separators:
+      - "\n<script"
+      - "\n<style"
+    chunking_priority: "medium"
+    
+  astro:
+    name: "Astro"
+    extends: "typescript"
+    extensions:
+      - ".astro"
+    additional_separators:
+      - "\n---"
+      - "\n<script"
+      - "\n<style"
+    chunking_priority: "medium"
+    
+  twig:
+    name: "Twig"
+    extensions:
+      - ".twig"
+    separators:
+      - "\n{%"
+      - "\n{{"
+      - "\n{#"
+      - "\n\n"
+      - "\n"
+      - " "
+      - ""
+    chunking_priority: "low"
+    
+  sql:
+    name: "SQL"
+    extensions:
+      - ".sql"
+      - ".ddl"
+      - ".dml"
+    separators:
+      - "\nSELECT"
+      - "\nINSERT"
+      - "\nUPDATE"
+      - "\nDELETE"
+      - "\nCREATE"
+      - "\nALTER"
+      - "\nDROP"
+      - "\nWITH"
+      - "\n\n"
+      - "\n"
+      - " "
+      - ""
+    chunking_priority: "low"
+    
+  graphql:
+    name: "GraphQL"
+    extensions:
+      - ".graphql"
+      - ".gql"
+    separators:
+      - "\ntype "
+      - "\nquery "
+      - "\nmutation "
+      - "\nsubscription "
+      - "\nfragment "
+      - "\ninput "
+      - "\nenum "
+      - "\ninterface "
+      - "\n\n"
+      - "\n"
+      - " "
+      - ""
+    chunking_priority: "low"
+    
+  xml:
+    name: "XML"
+    extensions:
+      - ".xml"
+      - ".xsd"
+      - ".xsl"
+    separators:
+      - "\n<"
+      - "\n\n"
+      - "\n"
+      - " "
+      - ""
+    chunking_priority: "low"
+
+# Global settings
+settings:
+  default_chunking_priority: "low"
+  auto_detect_languages: true
+  cache_language_configs: true
+  reload_on_change: true

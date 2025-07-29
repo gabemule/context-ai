@@ -109,6 +109,14 @@ CONFIG_GUIDELINES_HELP = {
     "arguments": {}
 }
 
+CONFIG_LANGUAGES_HELP = {
+    "help": "Manage programming languages configuration",
+    "description": "View and manage supported programming languages, their file extensions, "
+                  "and chunking configurations. This allows you to see what languages "
+                  "are supported and customize their behavior.",
+    "arguments": {}
+}
+
 GUIDELINES_SUBCOMMANDS_HELP = {
     "list": {
         "help": "List available coding guidelines",
@@ -163,6 +171,51 @@ Examples:
         "epilog": """
 Examples:
   context-ai config guidelines path        # Show guidelines directory and files
+        """
+    }
+}
+
+LANGUAGES_SUBCOMMANDS_HELP = {
+    "list": {
+        "help": "List all configured programming languages",
+        "description": "Show all supported programming languages with their file extensions, chunking priorities, and guidelines status.",
+        "epilog": """
+Examples:
+  context-ai config languages list         # Show all configured languages
+        """
+    },
+    "show": {
+        "help": "Show detailed configuration for a specific language",
+        "description": "Display complete configuration for a language including extensions, separators, inheritance, and guidelines status.",
+        "epilog": """
+Examples:
+  context-ai config languages show python      # Show Python language configuration
+  context-ai config languages show vue         # Show Vue configuration (with inheritance)
+        """,
+        "arguments": {
+            "language": "Programming language to show configuration for (e.g., python, javascript, vue, go)"
+        }
+    },
+    "reset": {
+        "help": "Reset a language configuration to default",
+        "description": "Reset language configuration back to the default template. "
+                      "This will overwrite any custom changes you've made to the language settings.",
+        "epilog": """
+Examples:
+  context-ai config languages reset python     # Reset Python configuration to default
+  context-ai config languages reset vue        # Reset Vue configuration to default
+        """,
+        "arguments": {
+            "language": "Programming language to reset configuration for (e.g., python, javascript, vue)"
+        }
+    },
+    "path": {
+        "help": "Show path to languages configuration file",
+        "description": "Display the file system path where language configurations are stored, "
+                      "along with configuration statistics and validation status.",
+        "epilog": """
+Examples:
+  context-ai config languages path         # Show languages configuration file and stats
         """
     }
 }
@@ -270,6 +323,45 @@ def add_config_parser(subparsers) -> argparse.ArgumentParser:
         epilog=GUIDELINES_SUBCOMMANDS_HELP["path"]["epilog"]
     )
 
+    # Config languages
+    config_languages = config_subparsers.add_parser(
+        "languages", 
+        help=CONFIG_LANGUAGES_HELP["help"],
+        description=CONFIG_LANGUAGES_HELP["description"]
+    )
+    languages_subparsers = config_languages.add_subparsers(dest="languages_action", help="Languages actions")
+    
+    # Languages subcommands
+    languages_list = languages_subparsers.add_parser(
+        "list", 
+        help=LANGUAGES_SUBCOMMANDS_HELP["list"]["help"],
+        description=LANGUAGES_SUBCOMMANDS_HELP["list"]["description"],
+        epilog=LANGUAGES_SUBCOMMANDS_HELP["list"]["epilog"]
+    )
+    
+    languages_show = languages_subparsers.add_parser(
+        "show", 
+        help=LANGUAGES_SUBCOMMANDS_HELP["show"]["help"],
+        description=LANGUAGES_SUBCOMMANDS_HELP["show"]["description"],
+        epilog=LANGUAGES_SUBCOMMANDS_HELP["show"]["epilog"]
+    )
+    languages_show.add_argument("language", help=LANGUAGES_SUBCOMMANDS_HELP["show"]["arguments"]["language"])
+    
+    languages_reset = languages_subparsers.add_parser(
+        "reset", 
+        help=LANGUAGES_SUBCOMMANDS_HELP["reset"]["help"],
+        description=LANGUAGES_SUBCOMMANDS_HELP["reset"]["description"],
+        epilog=LANGUAGES_SUBCOMMANDS_HELP["reset"]["epilog"]
+    )
+    languages_reset.add_argument("language", help=LANGUAGES_SUBCOMMANDS_HELP["reset"]["arguments"]["language"])
+    
+    languages_path = languages_subparsers.add_parser(
+        "path", 
+        help=LANGUAGES_SUBCOMMANDS_HELP["path"]["help"],
+        description=LANGUAGES_SUBCOMMANDS_HELP["path"]["description"],
+        epilog=LANGUAGES_SUBCOMMANDS_HELP["path"]["epilog"]
+    )
+
     parser.set_defaults(func=execute_config_command)
     return parser
 
@@ -289,7 +381,8 @@ def execute_config_command(args: argparse.Namespace) -> int:
         "test": _handle_config_test,
         "validate": _handle_config_validate,
         "models": _handle_config_models,
-        "guidelines": _handle_config_guidelines
+        "guidelines": _handle_config_guidelines,
+        "languages": _handle_config_languages
     }
     
     handler = handlers.get(args.config_action)
@@ -731,7 +824,7 @@ def _display_file_types(extensions: List[str], logger) -> None:
 def _guidelines_list(guidelines_manager, logger) -> int:
     """List available guidelines."""
     logger.info("📋 Available coding guidelines:")
-    available = guidelines_manager.list_available_guidelines()
+    available = guidelines_manager.get_available_languages()
     
     if available:
         for language in available:
@@ -749,7 +842,7 @@ def _guidelines_list(guidelines_manager, logger) -> int:
 def _guidelines_show(language: str, guidelines_manager, logger) -> int:
     """Show guideline content."""
     language = language.lower()
-    content = guidelines_manager.get_guideline_content(language)
+    content = guidelines_manager.get_guideline(language)
     
     if content:
         logger.info("📋 Guidelines for %s:", language)
@@ -759,7 +852,7 @@ def _guidelines_show(language: str, guidelines_manager, logger) -> int:
         return 0
     else:
         logger.error("❌ No guidelines found for language: %s", language)
-        available = guidelines_manager.list_available_guidelines()
+        available = guidelines_manager.get_available_languages()
         if available:
             logger.info("Available languages: %s", ", ".join(available))
         return 1
@@ -773,7 +866,7 @@ def _guidelines_edit(language: str, guidelines_manager, logger) -> int:
     # Create file with default content if it doesn't exist
     if not file_path.exists():
         logger.info("📝 Creating default guidelines for %s...", language)
-        if not guidelines_manager.reset_guideline_to_default(language):
+        if not guidelines_manager.reset_to_default(language):
             logger.error("❌ Failed to create default guidelines for %s", language)
             return 1
     
@@ -808,7 +901,7 @@ def _guidelines_reset(language: str, guidelines_manager, logger) -> int:
     language = language.lower()
     
     logger.info("🔄 Resetting %s guidelines to default...", language)
-    if guidelines_manager.reset_guideline_to_default(language):
+    if guidelines_manager.reset_to_default(language):
         logger.info("✅ Guidelines for %s reset successfully", language)
         return 0
     else:
@@ -818,7 +911,8 @@ def _guidelines_reset(language: str, guidelines_manager, logger) -> int:
 
 def _guidelines_path(guidelines_manager, logger) -> int:
     """Show guidelines directory path."""
-    guidelines_dir = guidelines_manager._get_guidelines_directory()
+    from config.guidelines.manager import PathResolver
+    guidelines_dir = PathResolver.get_guidelines_directory()
     logger.info("📁 Guidelines directory: %s", guidelines_dir)
     
     # Show file listing
@@ -832,5 +926,185 @@ def _guidelines_path(guidelines_manager, logger) -> int:
             logger.info("📁 Directory exists but no guideline files found")
     else:
         logger.info("📁 Directory will be created on first use")
+    
+    return 0
+
+
+def _handle_config_languages(args, settings_manager, logger) -> int:
+    """Handle languages management (SRP)."""
+    from config.languages.manager import get_languages_manager
+    languages_manager = get_languages_manager()
+    
+    action_handlers = {
+        "list": lambda: _languages_list(languages_manager, logger),
+        "show": lambda: _languages_show(args.language, languages_manager, logger),
+        "reset": lambda: _languages_reset(args.language, languages_manager, logger),
+        "path": lambda: _languages_path(languages_manager, logger)
+    }
+    
+    handler = action_handlers.get(args.languages_action)
+    if handler:
+        return handler()
+    else:
+        logger.error("❌ Unknown languages action: %s", args.languages_action)
+        return 1
+
+
+# =============================================================================
+# LANGUAGES HANDLERS (Clean separation)
+# =============================================================================
+
+def _languages_list(languages_manager, logger) -> int:
+    """List all configured languages."""
+    logger.info("📋 Configured languages:")
+    
+    all_languages = languages_manager.get_all_languages()
+    guidelines_languages = set(languages_manager.get_guidelines_languages())
+    
+    if not all_languages:
+        logger.warning("⚠️  No languages configured")
+        return 1
+    
+    # Sort by priority then name
+    priority_order = {"high": 0, "medium": 1, "low": 2}
+    sorted_languages = sorted(
+        all_languages.items(),
+        key=lambda x: (priority_order.get(x[1].chunking_priority, 3), x[0])
+    )
+    
+    for name, config in sorted_languages:
+        # Format extensions
+        extensions_str = ", ".join(config.extensions)
+        
+        # Show inheritance
+        inheritance_info = ""
+        if hasattr(config, 'extends') and config.extends:
+            inheritance_info = f" extends {config.extends}"
+        
+        # Show guidelines status
+        guidelines_status = "✅" if name in guidelines_languages else "📝"
+        
+        logger.info("  🔸 %s (%s)%s - %s priority %s", 
+                   name, extensions_str, inheritance_info, 
+                   config.chunking_priority, guidelines_status)
+    
+    logger.info("")
+    logger.info("📊 Total: %d languages, %d extensions", 
+               len(all_languages), len(languages_manager.get_supported_extensions()))
+    logger.info("📋 Legend: ✅ = guidelines available, 📝 = no guidelines")
+    logger.info("")
+    logger.info("💡 Usage:")
+    logger.info("  context-ai config languages show <language>")
+    logger.info("  context-ai config guidelines edit <language>  # Create guidelines")
+    
+    return 0
+
+
+def _languages_show(language: str, languages_manager, logger) -> int:
+    """Show detailed configuration for a specific language."""
+    language = language.lower()
+    config = languages_manager.get_language_config(language)
+    
+    if not config:
+        logger.error("❌ Language '%s' not found", language)
+        available = languages_manager.get_language_names()
+        if available:
+            logger.info("Available languages: %s", ", ".join(available[:10]))
+            if len(available) > 10:
+                logger.info("... and %d more", len(available) - 10)
+        return 1
+    
+    logger.info("📋 Language configuration for '%s':", language)
+    logger.info("=" * 50)
+    logger.info("Name: %s", config.name)
+    logger.info("Extensions: %s", ", ".join(config.extensions))
+    
+    # Show inheritance info
+    if hasattr(config, 'extends') and config.extends:
+        logger.info("Extends: %s", config.extends)
+        base_separators = len(languages_manager.get_language_separators(config.extends))
+        additional = len(config.separators) - base_separators
+        logger.info("Separators: %d total (%d inherited + %d additional)", 
+                   len(config.separators), base_separators, additional)
+    else:
+        logger.info("Separators: %d total", len(config.separators))
+    
+    logger.info("Chunking priority: %s", config.chunking_priority)
+    
+    # Show guidelines status
+    guidelines_languages = languages_manager.get_guidelines_languages()
+    if language in guidelines_languages:
+        logger.info("Guidelines: ✅ available")
+    else:
+        logger.info("Guidelines: 📝 not available (create with: context-ai config guidelines edit %s)", language)
+    
+    # Show some separators
+    separators = config.separators[:8]  # Show first 8
+    logger.info("")
+    logger.info("🔸 Separators preview:")
+    for i, sep in enumerate(separators):
+        display_sep = repr(sep) if len(sep) <= 10 else f"{repr(sep[:10])}..."
+        logger.info("  %d. %s", i + 1, display_sep)
+    
+    if len(config.separators) > 8:
+        logger.info("  ... and %d more", len(config.separators) - 8)
+    
+    logger.info("=" * 50)
+    return 0
+
+
+def _languages_reset(language: str, languages_manager, logger) -> int:
+    """Reset language configuration to default."""
+    language = language.lower()
+    
+    # Check if language exists
+    if not languages_manager.has_language(language):
+        logger.error("❌ Language '%s' not found", language)
+        available = languages_manager.get_language_names()
+        if available:
+            logger.info("Available languages: %s", ", ".join(available[:10]))
+        return 1
+    
+    logger.info("🔄 Resetting %s language configuration to default...", language)
+    if languages_manager.reset_language_to_default(language):
+        logger.info("✅ Language configuration for %s reset successfully", language)
+        return 0
+    else:
+        logger.error("❌ Failed to reset language configuration for %s", language)
+        return 1
+
+
+def _languages_path(languages_manager, logger) -> int:
+    """Show languages configuration file path and statistics."""
+    config_file = languages_manager.get_config_file_path()
+    config_info = languages_manager.get_config_info()
+    
+    logger.info("📁 Languages configuration: %s", config_file)
+    
+    # File status
+    if config_file.exists():
+        file_size = config_file.stat().st_size
+        logger.info("📊 File size: %s bytes", f"{file_size:,}")
+        logger.info("📊 Status: ✅ valid")
+    else:
+        logger.info("📊 Status: ❌ file not found")
+        return 1
+    
+    # Configuration statistics
+    logger.info("")
+    logger.info("📊 Configuration statistics:")
+    logger.info("  Languages: %d configured", config_info["total_languages"])
+    logger.info("  Extensions: %d supported", config_info["extensions_count"])
+    logger.info("  Guidelines: %d available", config_info["guidelines_available"])
+    
+    # Show guidelines status
+    total_languages = config_info["total_languages"]
+    guidelines_available = config_info["guidelines_available"]
+    guidelines_missing = total_languages - guidelines_available
+    
+    if guidelines_missing > 0:
+        logger.info("  📝 %d languages can have guidelines created", guidelines_missing)
+        logger.info("")
+        logger.info("💡 Create guidelines with: context-ai config guidelines edit <language>")
     
     return 0

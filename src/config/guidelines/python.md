@@ -1,8 +1,3 @@
-"""
-Python coding guidelines for Context-AI.
-"""
-
-PYTHON_GUIDELINES = """
 ## 🐍 Python Coding Guidelines
 
 When providing Python code suggestions, follow these principles:
@@ -102,16 +97,16 @@ class Item:
     category: str
 
 def calculate_total(items: List[Item]) -> Decimal:
-    \"\"\"Calculate total price of items.\"\"\"
+    """Calculate total price of items."""
     return sum(item.price for item in items)
 
 def apply_discount(total: Decimal, discount_percent: float) -> Decimal:
-    \"\"\"Apply percentage discount to total.\"\"\"
+    """Apply percentage discount to total."""
     return total * (1 - Decimal(str(discount_percent)) / 100)
 
 @lru_cache(maxsize=128)
 def format_currency(amount: Decimal, currency: str = "USD") -> str:
-    \"\"\"Format amount as currency string.\"\"\"
+    """Format amount as currency string."""
     return f"${amount:.2f}" if currency == "USD" else f"{amount:.2f} {currency}"
 
 # ✅ Composition over classes using protocols
@@ -123,7 +118,7 @@ def create_order_processor(
     shipping_cost: Decimal,
     payment_processor: PaymentProcessor
 ) -> dict:
-    \"\"\"Create order processor with injected dependencies.\"\"\"
+    """Create order processor with injected dependencies."""
     
     def calculate(items: List[Item], discount: float = 0) -> Decimal:
         subtotal = calculate_total(items)
@@ -151,14 +146,14 @@ def create_order_processor(
 
 # ✅ Error handling with custom exceptions
 class PaymentError(Exception):
-    \"\"\"Raised when payment processing fails.\"\"\"
+    """Raised when payment processing fails."""
     
     def __init__(self, message: str, error_code: Optional[str] = None):
         super().__init__(message)
         self.error_code = error_code
 
 async def process_payment(payment_data: dict) -> dict:
-    \"\"\"Process payment and return result.\"\"\"
+    """Process payment and return result."""
     try:
         result = await payment_api.charge(payment_data)
         return {"success": True, "data": result}
@@ -177,7 +172,7 @@ from pathlib import Path
 
 @contextmanager
 def file_processor(file_path: Path):
-    \"\"\"Context manager for safe file processing.\"\"\"
+    """Context manager for safe file processing."""
     file_handle = None
     try:
         file_handle = file_path.open("r", encoding="utf-8")
@@ -190,7 +185,7 @@ def file_processor(file_path: Path):
 
 # ✅ Generator for memory-efficient processing
 def process_large_dataset(data_source: List[dict]) -> Iterator[dict]:
-    \"\"\"Process large dataset efficiently using generator.\"\"\"
+    """Process large dataset efficiently using generator."""
     for item in data_source:
         if item.get("valid", False):
             processed = transform_item(item)
@@ -209,4 +204,3 @@ def process_large_dataset(data_source: List[dict]) -> Iterator[dict]:
 - **Final**: For constants and methods that shouldn't be overridden
 
 **Remember**: Always prioritize readability, maintainability, and testability over clever one-liners or premature optimization. "Explicit is better than implicit" - The Zen of Python.
-"""

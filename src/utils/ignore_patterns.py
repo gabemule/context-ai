@@ -16,8 +16,8 @@ from config.constants import (
     GITIGNORE_FILENAME,
     MAX_FILE_SIZE_BYTES,
     SAMPLE_CONTEXTIGNORE_CONTENT,
-    SUPPORTED_EXTENSIONS,
 )
+from config.languages.manager import get_languages_manager
 from utils.logging import get_logger
 
 
@@ -305,8 +305,9 @@ class FileFilter:
         resolver = IgnoreFileResolver(project_path)
         self.ignore_matcher = resolver.resolve_ignore_patterns(custom_ignore_file)
 
-        # Supported extensions
-        self.supported_extensions = SUPPORTED_EXTENSIONS
+        # Get supported extensions dynamically from LanguagesManager
+        self.languages_manager = get_languages_manager()
+        self.supported_extensions = self.languages_manager.get_supported_extensions()
 
         self.logger.debug("FileFilter initialized for %s", self.project_path)
 
