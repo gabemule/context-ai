@@ -14,11 +14,9 @@ from config.providers import get_max_tokens
 from core.query.result_merger import QueryResult
 from utils.logging import get_logger
 
-CONTEXT_HEADER_TEMPLATE = "=== CONTEXT FROM MULTIPLE SOURCES ==="
 RESULT_HEADER_TEMPLATE = "## Result {index} (score: {score:.3f}, source: {source})"
 SOURCE_HEADER_TEMPLATE = "## From {source} (similarity: {similarity:.2f}):"
 FILE_INFO_TEMPLATE = "**File:** {file_path} ({language})"
-CROSS_REFERENCE_HEADER = "## Cross-reference analysis:"
 
 # Token calculation with caching for performance
 _token_cache = {}
@@ -244,8 +242,8 @@ class ContextFormatter:
             content_parts.append(project_structure)
             token_count += count_tokens(project_structure)
 
-        # Add header
-        header = CONTEXT_HEADER_TEMPLATE
+        # Add header with XML tag
+        header = "<similarity_matches>"
         content_parts.append(header)
         token_count += count_tokens(header)
 
@@ -326,6 +324,11 @@ class ContextFormatter:
                     stats["count"],
                     stats["tokens"] // 1000,
                 )
+
+        # Close similarity matches section
+        closing_tag = "</similarity_matches>"
+        content_parts.append(closing_tag)
+        token_count += count_tokens(closing_tag)
 
         # Add cross-reference analysis if space permits
         if not truncated and len(sources) > 1:
@@ -439,7 +442,7 @@ class ContextFormatter:
         if not projects:
             return ""
         
-        structure_parts = ["=== PROJECT STRUCTURES ==="]
+        structure_parts = ["<project_structures>"]
         
         for source, files in projects.items():
             # Build directory tree
@@ -452,7 +455,7 @@ class ContextFormatter:
             structure_parts.append(header)
             structure_parts.extend(self._format_tree(tree, max_depth=max_depth))
         
-        structure_parts.append("")  # Empty line after structure
+        structure_parts.extend(["", "</project_structures>"])  # Empty line and closing tag
         return "\n".join(structure_parts)
     
     def _build_directory_tree(self, file_paths):
@@ -511,7 +514,7 @@ class ContextFormatter:
     def _generate_cross_reference_analysis(self, results: List[QueryResult]) -> str:
         """Generate enhanced cross-reference analysis section with project \
 correlation."""
-        analysis_parts = [f"\n{CROSS_REFERENCE_HEADER}"]
+        analysis_parts = ["\n<cross_reference_analysis>"]
 
         # Group results by project (source_embedding)
         projects_data = {}
@@ -614,6 +617,7 @@ correlation."""
                     "  - Review function signatures and error handling patterns"
                 )
 
+        analysis_parts.append("</cross_reference_analysis>")
         return "\n".join(analysis_parts)
 
     def _format_json(

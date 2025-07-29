@@ -154,22 +154,32 @@ class AIService:
         self.chat_history = ChatHistoryManager()
         self._context_cache = {}  # Cache for expensive context operations
 
-        # Get Claude configuration
+        # Get current configuration
         config = self.settings_manager.get_config()
-        self.claude_config = config.ai.get("claude")
+        self.active_provider = config.active_provider or "claude"
+        self.provider_config = config.ai.get(self.active_provider)
 
-        if not self.claude_config or not self.claude_config.api_key:
+        if not self.provider_config or not self.provider_config.api_key:
+            provider_name = self.active_provider.title()
             raise ConfigurationError(
-                "Claude API key not configured. Set it with: "
-                "context-ai config set --claude-key YOUR_KEY"
+                f"{provider_name} API key not configured. Set it with: "
+                f"context-ai config set --{self.active_provider}-key YOUR_KEY"
             )
 
-        self.claude_client = get_claude_client(
-            self.claude_config.api_key, self.claude_config.default_model
-        )
+        # Initialize provider-specific client
+        if self.active_provider == "claude":
+            self.claude_client = get_claude_client(
+                self.provider_config.api_key, self.provider_config.default_model
+            )
+        # Future providers can be added here
+        # elif self.active_provider == "openai":
+        #     self.openai_client = get_openai_client(...)
+        else:
+            raise ConfigurationError(f"Unsupported AI provider: {self.active_provider}")
 
         self.logger.debug(
-            "AI service initialized with model: %s", self.claude_config.default_model
+            "AI service initialized with %s model: %s", 
+            self.active_provider, self.provider_config.default_model
         )
 
     def ask_question(
@@ -344,8 +354,9 @@ class AIService:
                     context_tokens // 1000,
                 )
 
-            # Always show input total and performance expectation
-            self.logger.info("📊 Input: %sK tokens → Claude", input_tokens // 1000)
+            # Always show input total and performance expectation 
+            provider_name = self.active_provider.title()
+            self.logger.info("📊 Input: %sK tokens → %s", input_tokens // 1000, provider_name)
             
             # Performance diagnostic (always useful)
             if input_tokens > 100000:
@@ -390,7 +401,13 @@ class AIService:
                     "results_count": CONTEXT_DEFAULT_CHUNKS,  # We can make this more accurate later
                     "truncated": False  # We can determine this from context formatter
                 }
-                session.save_context(context, question, context_metadata)
+                
+                # Capture guidelines that will be applied to the prompt
+                from core.ai.prompt_builder import get_prompt_builder
+                prompt_builder = get_prompt_builder()
+                guidelines = prompt_builder._get_applicable_guidelines(context, question)
+                
+                session.save_context(context, question, context_metadata, guidelines)
 
             # Use simple progress for all queries
             import time
@@ -402,12 +419,16 @@ class AIService:
 
             # Save response to session logger if available
             if session:
+                from config.providers import get_provider_display_name
+                
                 response_metadata = {
                     "tokens_in": response.usage.get("input_tokens", input_tokens),
                     "tokens_out": response.usage.get("output_tokens", 0),
-                    "duration_seconds": duration
+                    "duration_seconds": duration,
+                    "provider": get_provider_display_name(self.active_provider),
+                    "model": self.provider_config.default_model
                 }
-                session.save_response(response.content, response_metadata)
+                session.save_response(response.content, response_metadata, question)
 
             # Add to chat history if this is part of a conversation
             if include_history:
@@ -471,10 +492,11 @@ class AIService:
         # Detect VSCode integration mode
         self._vscode_mode = os.getenv('CONTEXT_AI_VSCODE') == 'true'
         
+        provider_name = self.active_provider.title()
         if self._vscode_mode:
-            self.logger.info("💬 Starting chat session with Claude (VSCode mode)...")
+            self.logger.info("💬 Starting chat session with %s (VSCode mode)...", provider_name)
         else:
-            self.logger.info("💬 Starting chat session with Claude...")
+            self.logger.info("💬 Starting chat session with %s...", provider_name)
 
         # Check and display active embeddings
         active = self.settings_manager.get_active_embeddings()
@@ -780,7 +802,8 @@ class AIService:
         console = Console()
 
         # Log the question BEFORE starting timer
-        self.logger.info("Asking Claude: %s", question)
+        provider_name = self.active_provider.title()
+        self.logger.info("Asking %s: %s", provider_name, question)
 
         # Build full prompt to check if streaming will be used
         from core.ai.prompt_builder import get_prompt_builder

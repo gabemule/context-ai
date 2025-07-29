@@ -48,24 +48,45 @@ class CommandSession:
         self._write_session_header()
         self.logger.info(f"📁 Session logs: {self.session_dir}")
     
-    def save_context(self, context: str, question: str, metadata: Dict[str, Any]) -> None:
-        """Save the context sent to Claude."""
+    def save_context(self, context: str, question: str, metadata: Dict[str, Any], guidelines: Optional[str] = None) -> None:
+        """Save the context sent to Claude with optional guidelines and structured format."""
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
+        # Build structured content with XML-like tags for better organization
         content = [
             f"# Context Sent to Claude",
+            "",
+            "<context_session>",
+            "<session_info>",
             f"**Timestamp:** {timestamp}",
             f"**Question:** {question}",
             f"**Token Count:** {metadata.get('token_count', 'unknown')} tokens",
             f"**Active Embeddings:** {', '.join(metadata.get('embeddings_used', []))}",
-            "",
-            "---",
-            "",
+            "</session_info>",
+            ""
+        ]
+        
+        # Add guidelines section if provided
+        if guidelines and guidelines.strip():
+            content.extend([
+                "<applied_guidelines>",
+                f"**Guidelines Applied:**",
+                "",
+                guidelines,
+                "</applied_guidelines>",
+                ""
+            ])
+        
+        # Add main context content
+        content.extend([
+            "<context_results>",
             context,
+            "</context_results>",
+            "</context_session>",
             "",
             "=" * 80,
             ""
-        ]
+        ])
         
         # For chat sessions, append to file. For ask sessions, overwrite
         if self.command_name == "chat":
@@ -84,21 +105,74 @@ class CommandSession:
         })
         self.logger.info(f"💾 Context saved: {self.context_file}")
     
-    def save_response(self, response: str, response_metadata: Dict[str, Any]) -> None:
-        """Save Claude's response."""
+    def save_response(self, response: str, response_metadata: Dict[str, Any], question: Optional[str] = None) -> None:
+        """Save AI provider response with structured format and question context."""
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Extract metadata for structured format
+        tokens_in = response_metadata.get('tokens_in', 0)
+        tokens_out = response_metadata.get('tokens_out', 0)
+        duration = response_metadata.get('duration_seconds', 0)
+        provider = response_metadata.get('provider', 'AI Provider')
+        model = response_metadata.get('model', 'Unknown Model')
+        
+        # Calculate additional metrics
+        total_tokens = tokens_in + tokens_out
+        tokens_per_sec = tokens_out / duration if duration > 0 else 0
+        context_ratio = (tokens_out / tokens_in * 100) if tokens_in > 0 else 0
+        
+        # Build structured content with XML-like tags
         content = [
-            f"# Response from Claude",
-            f"**Timestamp:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-            f"**Tokens Used:** {response_metadata.get('tokens_in', 0)} in + {response_metadata.get('tokens_out', 0)} out",
-            f"**Duration:** {response_metadata.get('duration_seconds', 0):.1f}s",
+            f"# Response from AI Provider",
             "",
-            "---",
-            "",
+            "<response_session>",
+            "<response_info>",
+            f"**Timestamp:** {timestamp}",
+        ]
+        
+        # Add question if provided
+        if question and question.strip():
+            content.append(f"**Question:** {question}")
+            
+        content.extend([
+            f"**Tokens Used:** {tokens_in:,} in + {tokens_out:,} out",
+            f"**Duration:** {duration:.1f}s",
+        ])
+        
+        # Add provider and model info if available
+        if provider != 'AI Provider':
+            content.append(f"**Provider:** {provider}")
+        if model != 'Unknown Model':
+            content.append(f"**Model:** {model}")
+            
+        content.extend([
+            "</response_info>",
+            ""
+        ])
+        
+        # Add performance metrics if meaningful
+        if tokens_out > 0 and duration > 0:
+            content.extend([
+                "<response_metadata>",
+                f"**Input Tokens:** {tokens_in:,}",
+                f"**Output Tokens:** {tokens_out:,}",
+                f"**Total Tokens:** {total_tokens:,}",
+                f"**Response Speed:** {tokens_per_sec:.1f} tokens/sec",
+                f"**Context Efficiency:** {tokens_in//1000}K context → {tokens_out//1000}K response ({context_ratio:.1f}% ratio)",
+                "</response_metadata>",
+                ""
+            ])
+        
+        # Add main response content
+        content.extend([
+            "<api_response>",
             response,
+            "</api_response>",
+            "</response_session>",
             "",
             "=" * 80,
             ""
-        ]
+        ])
         
         # For chat sessions, append to file. For ask sessions, overwrite
         if self.command_name == "chat":

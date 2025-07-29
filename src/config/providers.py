@@ -88,6 +88,13 @@ ALL_PROVIDERS = {
     # "openai": OPENAI_MODELS,  # Future - move to first position to make it default
 }
 
+# Map provider keys to human-readable names
+PROVIDER_NAMES = {
+    "claude": "Anthropic Claude",
+    # "openai": "OpenAI GPT",  # Future
+    # "gemini": "Google Gemini"  # Future
+}
+
 def get_first_item(obj: dict) -> str:
     """Get the first key from any dictionary."""
     return next(iter(obj)) if obj else ""
@@ -132,3 +139,8 @@ def get_available_models(provider: str = None) -> list[str]:
 def get_available_providers() -> list[str]:
     """Get list of available AI providers."""
     return list(ALL_PROVIDERS.keys())
+
+def get_provider_display_name(provider: str = None) -> str:
+    """Get human-readable display name for a provider."""
+    provider = provider or DEFAULT_AI_PROVIDER
+    return PROVIDER_NAMES.get(provider, f"{provider.title()} AI")

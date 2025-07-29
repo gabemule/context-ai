@@ -48,19 +48,19 @@ class PromptBuilder:
 
     def _build_minimal_prompt(self, question: str, context: str) -> str:
         """Build minimal prompt with no extra instructions - fastest processing."""
-        return f"""Based on the following context from the codebase, please answer \
-the question.
+        return f"""Based on the following context from the codebase, please answer the question.
 {GLOBAL_CODE_ATTRIBUTION}
 
-## Context:
+<context>
 {context}
+</context>
 
-## Question:
-{question}"""
+<question>
+{question}
+</question>"""
 
     def _build_standard_prompt(self, question: str, context: str) -> str:
-        """Build standard prompt with cross-project awareness and coding \
-guidelines."""
+        """Build standard prompt with cross-project awareness and coding guidelines."""
         base_instructions = (
             "Based on the following context from the codebase, "
             "please answer the question."
@@ -76,8 +76,9 @@ guidelines."""
         if is_cross_project:
             base_instructions += """
 
-Note: This context contains code from multiple projects - consider \
-comparing approaches when relevant."""
+<cross_analysis>
+Note: This context contains code from multiple projects - consider comparing approaches when relevant.
+</cross_analysis>"""
 
         # Always include coding guidelines when applicable
         guidelines = self._get_applicable_guidelines(context, question)
@@ -85,24 +86,27 @@ comparing approaches when relevant."""
             self.logger.debug("📋 Guidelines applied in standard mode")
             guidelines_section = f"""
 
+<coding_guidelines>
 {guidelines}
 
-**When providing code examples or suggestions, please follow the above guidelines.**"""
+**When providing code examples or suggestions, please follow the above guidelines.**
+</coding_guidelines>"""
             base_instructions += guidelines_section
         else:
             self.logger.debug("📋 No guidelines applied in standard mode")
 
         return f"""{base_instructions}
 
-## Context:
+<context>
 {context}
+</context>
 
-## Question:
-{question}"""
+<question>
+{question}
+</question>"""
 
     def _build_comprehensive_prompt(self, question: str, context: str) -> str:
-        """Build comprehensive prompt with full cross-project analysis and \
-architectural insights."""
+        """Build comprehensive prompt with full cross-project analysis and architectural insights."""
         base_instructions = (
             "Based on the following context from the codebase, "
             "please answer the question."
@@ -125,6 +129,7 @@ architectural insights."""
             if ENABLE_CROSS_PROJECT_PROMPTS:
                 cross_project_instructions = """
 
+<cross_analysis>
 **CROSS-PROJECT ANALYSIS**: This context contains code from multiple projects. Please:
 - Compare implementations across different projects
 - Highlight similarities and differences between approaches
@@ -132,7 +137,8 @@ architectural insights."""
 - Suggest opportunities for standardization or consistency improvements
 - Point out which project has the most robust/complete implementation
 - Consider architectural differences and their implications
-- Recommend best practices based on the patterns observed"""
+- Recommend best practices based on the patterns observed
+</cross_analysis>"""
 
                 base_instructions += cross_project_instructions
 
@@ -141,26 +147,27 @@ architectural insights."""
         if guidelines:
             guidelines_section = f"""
 
+<coding_guidelines>
 {guidelines}
 
-**When providing code examples or suggestions, please follow the above \
-guidelines and explain your architectural choices.**"""
+**When providing code examples or suggestions, please follow the above guidelines and explain your architectural choices.**
+</coding_guidelines>"""
             base_instructions += guidelines_section
 
         return f"""{base_instructions}
 
-## Context:
+<context>
 {context}
+</context>
 
-## Question:
+<question>
 {question}
+</question>
 
-Please provide a comprehensive answer with architectural insights and \
-best practices recommendations."""
+Please provide a comprehensive answer with architectural insights and best practices recommendations."""
 
     def _build_strict_prompt(self, question: str, context: str) -> str:
-        """Build strict prompt with enforced coding standards and detailed \
-code review approach."""
+        """Build strict prompt with enforced coding standards and detailed code review approach."""
         base_instructions = (
             "Based on the following context from the codebase, please answer the "
             "question with a focus on code quality and best practices."
@@ -179,13 +186,14 @@ code review approach."""
         if is_cross_project:
             cross_project_instructions = """
 
-**CODE REVIEW APPROACH**: Analyze implementations across projects and provide \
-detailed feedback on:
+<cross_analysis>
+**CODE REVIEW APPROACH**: Analyze implementations across projects and provide detailed feedback on:
 - Code quality and maintainability differences
 - Performance implications of different approaches
 - Security considerations
 - Testing strategies
-- Documentation quality"""
+- Documentation quality
+</cross_analysis>"""
             base_instructions += cross_project_instructions
 
         # Always try to include guidelines with force=True
@@ -193,23 +201,24 @@ detailed feedback on:
         if guidelines:
             guidelines_section = f"""
 
+<coding_guidelines>
 {guidelines}
 
-**STRICT ENFORCEMENT**: All code suggestions must strictly adhere to the \
-above guidelines. Review existing code for violations and suggest \
-improvements."""
+**STRICT ENFORCEMENT**: All code suggestions must strictly adhere to the above guidelines. Review existing code for violations and suggest improvements.
+</coding_guidelines>"""
             base_instructions += guidelines_section
 
         return f"""{base_instructions}
 
-## Context:
+<context>
 {context}
+</context>
 
-## Question:
+<question>
 {question}
+</question>
 
-Provide a detailed answer with code review insights, strict adherence to \
-guidelines, and actionable improvement recommendations."""
+Provide a detailed answer with code review insights, strict adherence to guidelines, and actionable improvement recommendations."""
 
     def _get_applicable_guidelines(
         self, context: str, question: str, force: bool = False
