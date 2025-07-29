@@ -153,6 +153,18 @@ EXIT_SUCCESS = 0
 EXIT_ERROR = 1
 EXIT_INTERRUPTED = 130
 
+# Session logging configuration  
+LOGGING_ENABLED = True
+LOG_LEVEL = "complete"  # basic, complete, debug
+LOG_RETENTION_DAYS = 30
+LOG_MAX_SIZE_MB = 100
+
+# Classification settings
+AUTO_CLASSIFY_SESSIONS = True
+SAVE_RAW_PROMPT = True
+SAVE_RAW_RESPONSE = True
+SESSION_LOGGING_FORMAT = "4_files"  # 4_files: session.json, prompt_sent.txt, response_received.txt, metadata.json
+
 # File filtering constants
 MAX_FILE_SIZE_MB = 10
 MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * BYTES_PER_MB

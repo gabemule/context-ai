@@ -1,11 +1,8 @@
 """
 Session logging for Context-AI commands.
 
-Manages detailed logging for individual command sessions including:
-- Complete session logs
-- Context sent to AI
-- Responses received
-- Session metadata
+🆕 NEW SYSTEM: Raw, Complete, Future-Ready logging
+Following SOLID principles with separated responsibilities.
 """
 
 import json
@@ -16,13 +13,156 @@ from typing import Any, Dict, Optional
 from utils.logging import get_logger
 
 
+class SessionDataManager:
+    """Manages session data structures (SRP)."""
+    
+    @staticmethod
+    def create_chat_session_data(session_id: str, timestamp: str, command: str) -> Dict[str, Any]:
+        return {
+            "session_id": session_id,
+            "timestamp": timestamp,
+            "command": command,
+            "current_turn": 0,
+            "total_turns": 0,
+            "turns": [],
+            "session_totals": {"total_tokens": 0, "total_prompt_tokens": 0, "total_response_tokens": 0},
+            "embeddings_used": [],
+            "features_enabled": {"security": False, "cross_analysis": False, "guidelines": False, "debug": False},
+            "performance": {"total_execution_ms": 0},
+            "status": "started",
+            "error": None
+        }
+    
+    @staticmethod
+    def create_ask_session_data(session_id: str, timestamp: str, command: str) -> Dict[str, Any]:
+        return {
+            "session_id": session_id,
+            "timestamp": timestamp,
+            "command": command,
+            "user_question": "",
+            "prompt_mode": "unknown",
+            "model": "unknown",
+            "tokens": {"prompt": 0, "response": 0, "total": 0},
+            "context": {"embeddings_used": [], "files_analyzed": 0, "similarity_matches": 0, "context_relevance": 0.0},
+            "prompt_sections": {"global_instructions": False, "security_instructions": False, "core_instructions": False, "cross_analysis": False, "guidelines": [], "final_instructions": False},
+            "features_enabled": {"security": False, "cross_analysis": False, "guidelines": False, "debug": False},
+            "performance": {"context_retrieval_ms": 0, "prompt_building_ms": 0, "claude_response_ms": 0, "total_execution_ms": 0},
+            "status": "started", 
+            "error": None
+        }
+    
+    @staticmethod
+    def create_query_session_data(session_id: str, timestamp: str, command: str) -> Dict[str, Any]:
+        return {
+            "session_id": session_id,
+            "timestamp": timestamp,
+            "command": command,
+            "user_question": "",
+            "query_format": "unknown",
+            "results_count": 0,
+            "result_file": "query_result.txt",
+            "context": {"embeddings_used": [], "files_analyzed": 0, "similarity_matches": 0, "context_relevance": 0.0},
+            "performance": {"context_retrieval_ms": 0, "total_execution_ms": 0},
+            "status": "started",
+            "error": None
+        }
+
+
+class FileManager:
+    """Manages file operations (SRP)."""
+    
+    def __init__(self, session_dir: Path, is_chat: bool):
+        self.session_dir = session_dir
+        self.is_chat = is_chat
+        self.prompt_file = None
+        self.response_file = None
+        self.logger = get_logger(__name__)
+        
+        if not is_chat:
+            self.prompt_file = session_dir / "prompt_sent.txt"
+            self.response_file = session_dir / "response_received.txt"
+    
+    def setup_turn_files(self, turn: int) -> None:
+        """Setup files for chat turn."""
+        if self.is_chat:
+            self.prompt_file = self.session_dir / f"turn{turn}_prompt_sent.txt"
+            self.response_file = self.session_dir / f"turn{turn}_response_received.txt"
+    
+    def save_prompt(self, prompt: str) -> None:
+        """Save RAW prompt to file."""
+        try:
+            self.prompt_file.write_text(prompt, encoding="utf-8")
+            self.logger.debug("💾 Prompt saved: %s", self.prompt_file.name)
+        except Exception as e:
+            self.logger.error("❌ Failed to save prompt: %s", e)
+    
+    def save_response(self, response: str) -> None:
+        """Save RAW response to file."""
+        try:
+            self.response_file.write_text(response, encoding="utf-8")
+            self.logger.debug("💾 Response saved: %s", self.response_file.name)
+        except Exception as e:
+            self.logger.error("❌ Failed to save response: %s", e)
+    
+    def save_json(self, filepath: Path, data: Dict[str, Any]) -> None:
+        """Save JSON data to file."""
+        try:
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            self.logger.debug("💾 JSON saved: %s", filepath.name)
+        except Exception as e:
+            self.logger.error("❌ Failed to save JSON: %s", e)
+    
+    def save_query_result(self, result: str) -> None:
+        """Save query result to RAW file (SRP)."""
+        try:
+            query_file = self.session_dir / "query_result.txt"
+            query_file.write_text(result, encoding="utf-8")
+            self.logger.debug("💾 Query result saved: %s", query_file.name)
+        except Exception as e:
+            self.logger.error("❌ Failed to save query result: %s", e)
+
+
+class ChatTurnManager:
+    """Manages chat turns (SRP)."""
+    
+    def __init__(self):
+        self.current_turn = 0
+        self.logger = get_logger(__name__)
+    
+    def add_turn(self, session_data: Dict[str, Any], question: str) -> Dict[str, Any]:
+        """Add new chat turn and return turn data."""
+        self.current_turn += 1
+        session_data["current_turn"] = self.current_turn
+        
+        turn_data = {
+            "turn": self.current_turn,
+            "timestamp": datetime.now().isoformat(),
+            "user_question": question,
+            "tokens": {"prompt": 0, "response": 0, "total": 0},
+            "prompt_mode": "unknown",
+            "model": "unknown",
+            "prompt_sections": {"global_instructions": False, "security_instructions": False, "core_instructions": False, "cross_analysis": False, "guidelines": [], "final_instructions": False},
+            "performance": {"claude_response_ms": 0},
+            "prompt_file": f"turn{self.current_turn}_prompt_sent.txt",
+            "response_file": f"turn{self.current_turn}_response_received.txt"
+        }
+        
+        session_data["turns"].append(turn_data)
+        session_data["total_turns"] = len(session_data["turns"])
+        
+        self.logger.debug("🔄 Added turn #%d: %s", self.current_turn, question[:50] + "..." if len(question) > 50 else question)
+        return turn_data
+
+
 class CommandSession:
-    """Manages logging for a single command session."""
+    """Main session coordinator (follows SRP and DIP)."""
     
     def __init__(self, command_name: str, args: Dict[str, Any]):
         self.command_name = command_name
         self.timestamp = datetime.now()
-        self.session_id = self.timestamp.strftime(f"{command_name}_cmd_%Y-%m-%d_%H-%M-%S")
+        self.session_id = self.timestamp.strftime(f"session_{command_name}_%Y-%m-%d_%H-%M-%S")
+        self.is_chat = command_name == "chat"
         
         # Create session directory
         from config.constants import DEFAULT_CONFIG_DIR
@@ -30,201 +170,147 @@ class CommandSession:
         self.session_dir = config_dir / "logs" / self.session_id
         self.session_dir.mkdir(parents=True, exist_ok=True)
         
-        # Session files
-        self.log_file = self.session_dir / "session.log"
-        self.context_file = self.session_dir / "context_sent.md"
-        self.response_file = self.session_dir / "response_received.md"
-        self.metadata_file = self.session_dir / "metadata.json"
+        # Initialize components (Dependency Injection)
+        self.file_manager = FileManager(self.session_dir, self.is_chat)
+        self.chat_manager = ChatTurnManager() if self.is_chat else None
         
-        # Initialize metadata
+        # Initialize session data
+        timestamp_iso = self.timestamp.isoformat()
+        if self.is_chat:
+            self.session_data = SessionDataManager.create_chat_session_data(self.session_id, timestamp_iso, command_name)
+        elif command_name == "query":
+            self.session_data = SessionDataManager.create_query_session_data(self.session_id, timestamp_iso, command_name)
+        else:
+            self.session_data = SessionDataManager.create_ask_session_data(self.session_id, timestamp_iso, command_name)
+        
+        # Metadata
         self.metadata = {
-            "command": command_name,
-            "timestamp": self.timestamp.isoformat(),
-            "args": args,
-            "session_id": self.session_id
+            "session_classification": {"task_type": "unknown", "domain": "unknown", "technology": "unknown", "complexity": "unknown", "user_intent": "unknown", "programming_language": "unknown"},
+            "quality_metrics": {"context_relevance": 0.0, "response_completeness": 0.0, "user_satisfaction": None, "follow_up_needed": False},
+            "content_analysis": {"topics_covered": [], "code_examples_provided": 0, "external_links_referenced": 0, "files_mentioned": []},
+            "usage_patterns": {"time_of_day": self.timestamp.strftime("%H:%M"), "day_of_week": self.timestamp.strftime("%A").lower(), "prompt_mode_chosen": "unknown", "context_heavy": False}
         }
         
         self.logger = get_logger(__name__)
-        self._write_session_header()
         self.logger.info(f"📁 Session logs: {self.session_dir}")
     
+    def add_chat_turn(self, question: str) -> None:
+        """Add new chat turn."""
+        if not self.is_chat:
+            return
+        
+        turn_data = self.chat_manager.add_turn(self.session_data, question)
+        self.file_manager.setup_turn_files(turn_data["turn"])
+    
+    def log_prompt_built(self, prompt_data: Dict[str, Any]) -> None:
+        """Log prompt data from PromptBuilder."""
+        token_count = prompt_data.get('token_count', 0)
+        prompt_mode = prompt_data.get('prompt_mode', 'unknown')
+        
+        if self.is_chat:
+            # Update current turn data
+            if self.session_data["turns"]:
+                current_turn = self.session_data["turns"][-1]
+                current_turn.update({
+                    "prompt_mode": prompt_mode,
+                    "tokens": {"prompt": token_count, "response": 0, "total": token_count}
+                })
+            
+            # Update features at session level
+            mode_config = prompt_data.get('mode_config', {})
+            features = mode_config.get('features', {})
+            self.session_data["features_enabled"].update(features)
+        else:
+            # Original ask/query behavior
+            self.session_data.update({
+                "user_question": prompt_data.get('sections', {}).get('question', ''),
+                "prompt_mode": prompt_mode,
+                "tokens": {"prompt": token_count, "response": 0, "total": token_count}
+            })
+            
+            # Update features
+            mode_config = prompt_data.get('mode_config', {})
+            features = mode_config.get('features', {})
+            self.session_data["features_enabled"].update(features)
+        
+        # Save RAW prompt
+        self.file_manager.save_prompt(prompt_data.get('final_prompt', ''))
+        
+        self.logger.debug("🔍 Prompt logged: %s mode, %dK tokens", prompt_mode, token_count // 1000)
+    
+    def log_response_received(self, response: str) -> None:
+        """Log raw response from Claude."""
+        self.file_manager.save_response(response)
+        self.logger.debug("📝 Response logged: %d chars", len(response))
+    
+    def log_query_result(self, result: str, question: str, format_type: str, results_count: int) -> None:
+        """Log query result and update session data (SRP)."""
+        try:
+            # Save RAW result to file
+            self.file_manager.save_query_result(result)
+            
+            # Update session data
+            self.session_data.update({
+                "user_question": question,
+                "query_format": format_type,
+                "results_count": results_count
+            })
+            
+            self.logger.debug("🔍 Query result logged: %s format, %d results", format_type, results_count)
+        except Exception as e:
+            self.logger.error("❌ Failed to log query result: %s", e)
+    
     def save_context(self, context: str, question: str, metadata: Dict[str, Any], guidelines: Optional[str] = None) -> None:
-        """Save the context sent to Claude with optional guidelines and structured format."""
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        
-        # Build structured content with XML-like tags for better organization
-        content = [
-            f"# Context Sent to Claude",
-            "",
-            "<context_session>",
-            "<session_info>",
-            f"**Timestamp:** {timestamp}",
-            f"**Question:** {question}",
-            f"**Token Count:** {metadata.get('token_count', 'unknown')} tokens",
-            f"**Active Embeddings:** {', '.join(metadata.get('embeddings_used', []))}",
-            "</session_info>",
-            ""
-        ]
-        
-        # Add guidelines section if provided
-        if guidelines and guidelines.strip():
-            content.extend([
-                "<applied_guidelines>",
-                f"**Guidelines Applied:**",
-                "",
-                guidelines,
-                "</applied_guidelines>",
-                ""
-            ])
-        
-        # Add main context content
-        content.extend([
-            "<context_results>",
-            context,
-            "</context_results>",
-            "</context_session>",
-            "",
-            "=" * 80,
-            ""
-        ])
-        
-        # For chat sessions, append to file. For ask sessions, overwrite
-        if self.command_name == "chat":
-            # Append mode for chat sessions
-            with open(self.context_file, "a", encoding="utf-8") as f:
-                if self.context_file.exists() and self.context_file.stat().st_size > 0:
-                    f.write("\n\n")  # Add spacing between entries
-                f.write("\n".join(content))
-        else:
-            # Overwrite mode for ask sessions
-            self.context_file.write_text("\n".join(content), encoding="utf-8")
-        
-        self.metadata.update({
-            "question": question,
-            "context_stats": metadata
-        })
-        self.logger.info(f"💾 Context saved: {self.context_file}")
-    
-    def save_response(self, response: str, response_metadata: Dict[str, Any], question: Optional[str] = None) -> None:
-        """Save AI provider response with structured format and question context."""
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        
-        # Extract metadata for structured format
-        tokens_in = response_metadata.get('tokens_in', 0)
-        tokens_out = response_metadata.get('tokens_out', 0)
-        duration = response_metadata.get('duration_seconds', 0)
-        provider = response_metadata.get('provider', 'AI Provider')
-        model = response_metadata.get('model', 'Unknown Model')
-        
-        # Calculate additional metrics
-        total_tokens = tokens_in + tokens_out
-        tokens_per_sec = tokens_out / duration if duration > 0 else 0
-        context_ratio = (tokens_out / tokens_in * 100) if tokens_in > 0 else 0
-        
-        # Build structured content with XML-like tags
-        content = [
-            f"# Response from AI Provider",
-            "",
-            "<response_session>",
-            "<response_info>",
-            f"**Timestamp:** {timestamp}",
-        ]
-        
-        # Add question if provided
-        if question and question.strip():
-            content.append(f"**Question:** {question}")
-            
-        content.extend([
-            f"**Tokens Used:** {tokens_in:,} in + {tokens_out:,} out",
-            f"**Duration:** {duration:.1f}s",
-        ])
-        
-        # Add provider and model info if available
-        if provider != 'AI Provider':
-            content.append(f"**Provider:** {provider}")
-        if model != 'Unknown Model':
-            content.append(f"**Model:** {model}")
-            
-        content.extend([
-            "</response_info>",
-            ""
-        ])
-        
-        # Add performance metrics if meaningful
-        if tokens_out > 0 and duration > 0:
-            content.extend([
-                "<response_metadata>",
-                f"**Input Tokens:** {tokens_in:,}",
-                f"**Output Tokens:** {tokens_out:,}",
-                f"**Total Tokens:** {total_tokens:,}",
-                f"**Response Speed:** {tokens_per_sec:.1f} tokens/sec",
-                f"**Context Efficiency:** {tokens_in//1000}K context → {tokens_out//1000}K response ({context_ratio:.1f}% ratio)",
-                "</response_metadata>",
-                ""
-            ])
-        
-        # Add main response content
-        content.extend([
-            "<api_response>",
-            response,
-            "</api_response>",
-            "</response_session>",
-            "",
-            "=" * 80,
-            ""
-        ])
-        
-        # For chat sessions, append to file. For ask sessions, overwrite
-        if self.command_name == "chat":
-            # Append mode for chat sessions
-            with open(self.response_file, "a", encoding="utf-8") as f:
-                if self.response_file.exists() and self.response_file.stat().st_size > 0:
-                    f.write("\n\n")  # Add spacing between entries
-                f.write("\n".join(content))
-        else:
-            # Overwrite mode for ask sessions
-            self.response_file.write_text("\n".join(content), encoding="utf-8")
-        
-        self.metadata.update({
-            "response_stats": response_metadata
-        })
-        self.logger.info(f"💾 Response saved: {self.response_file}")
-    
-    def log_to_session(self, message: str, level: str = "INFO") -> None:
-        """Log a message to the session file."""
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        log_line = f"[{timestamp}] - {level} - {message}\n"
-        
-        with open(self.log_file, "a", encoding="utf-8") as f:
-            f.write(log_line)
+        """Update session with context metadata."""
+        try:
+            if self.is_chat:
+                self.session_data["embeddings_used"] = metadata.get('embeddings_used', [])
+            else:
+                self.session_data["context"]["embeddings_used"] = metadata.get('embeddings_used', [])
+                self.session_data["context"]["files_analyzed"] = metadata.get('results_count', 0)
+                self.session_data["context"]["similarity_matches"] = metadata.get('results_count', 0)
+                
+                if metadata.get('token_count', 0) > 0:
+                    relevance = min(1.0, metadata.get('token_count', 0) / 50000)
+                    self.session_data["context"]["context_relevance"] = round(relevance, 2)
+
+                if not self.session_data.get("user_question"):
+                    self.session_data["user_question"] = question
+
+            self.logger.debug("🔍 Context updated: %d embeddings", len(metadata.get('embeddings_used', [])))
+        except Exception as e:
+            self.logger.error("❌ Failed to update context: %s", e)
     
     def finalize(self) -> None:
-        """Finalize the session and save metadata."""
-        self.metadata["completed_at"] = datetime.now().isoformat()
-        self.metadata["duration_seconds"] = (
-            datetime.now() - self.timestamp
-        ).total_seconds()
-        
-        self.metadata_file.write_text(
-            json.dumps(self.metadata, indent=2, ensure_ascii=False),
-            encoding="utf-8"
-        )
-        self.log_to_session(f"✅ Session completed: {self.session_id}")
-        self.logger.info(f"✅ Session completed: {self.session_id}")
-    
-    def _write_session_header(self) -> None:
-        """Write session header to log file."""
-        header = [
-            f"=== {self.command_name.upper()} COMMAND SESSION ===",
-            f"Session ID: {self.session_id}",
-            f"Timestamp: {self.timestamp.strftime('%Y-%m-%d %H:%M:%S')}",
-            f"Command Args: {self.metadata['args']}",
-            "",
-        ]
-        
-        # Write to log file
-        with open(self.log_file, "w", encoding="utf-8") as f:
-            f.write("\n".join(header) + "\n\n")
+        """Finalize session and save all files."""
+        try:
+            completion_time = datetime.now()
+            self.session_data["status"] = "completed"
+            
+            duration_seconds = (completion_time - self.timestamp).total_seconds()
+            self.session_data["performance"]["total_execution_ms"] = int(duration_seconds * 1000)
+            
+            # Calculate final totals for chat sessions
+            if self.is_chat and self.session_data["turns"]:
+                total_prompt = sum(turn["tokens"]["prompt"] for turn in self.session_data["turns"])
+                total_response = sum(turn["tokens"]["response"] for turn in self.session_data["turns"])
+                
+                self.session_data["session_totals"]["total_prompt_tokens"] = total_prompt
+                self.session_data["session_totals"]["total_response_tokens"] = total_response
+                self.session_data["session_totals"]["total_tokens"] = total_prompt + total_response
+            
+            self.metadata["completed_at"] = completion_time.isoformat()
+            self.metadata["duration_seconds"] = duration_seconds
+            
+            # Save files
+            self.file_manager.save_json(self.session_dir / "session.json", self.session_data)
+            self.file_manager.save_json(self.session_dir / "metadata.json", self.metadata)
+            
+            self.logger.info("✅ Session completed: %s", self.session_id)
+        except Exception as e:
+            self.logger.error("❌ Failed to finalize session: %s", e)
+            self.session_data["status"] = "error"
+            self.session_data["error"] = str(e)
 
 
 # Global session instance
@@ -249,9 +335,3 @@ def end_command_session() -> None:
     if _current_session:
         _current_session.finalize()
         _current_session = None
-
-
-def log_to_current_session(message: str, level: str = "INFO") -> None:
-    """Log a message to the current session if one exists."""
-    if _current_session:
-        _current_session.log_to_session(message, level)

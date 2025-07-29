@@ -395,7 +395,11 @@ class PromptBuilder:
                     "   You can change mode with: context-ai config set prompt_mode <mode>",
                     prompt_mode, ", ".join(available_modes)
                 )
-                return self._build_file_based_prompt(question, context, "standard", self._get_mode_config("standard"))
+                final_prompt = self._build_file_based_prompt(question, context, "standard", self._get_mode_config("standard"))
+                
+                # 🆕 NOVO: Log prompt data for fallback mode
+                self._log_prompt_if_available(final_prompt, question, context, "standard", self._get_mode_config("standard"))
+                return final_prompt
             
             # No fallback available
             error_msg = (
@@ -408,7 +412,12 @@ class PromptBuilder:
             raise ValueError(f"Invalid prompt mode '{prompt_mode}'. Available: {', '.join(available_modes)}")
         
         # Build prompt using file-based system
-        return self._build_file_based_prompt(question, context, prompt_mode, mode_config)
+        final_prompt = self._build_file_based_prompt(question, context, prompt_mode, mode_config)
+        
+        # 🆕 NOVO: Log prompt data
+        self._log_prompt_if_available(final_prompt, question, context, prompt_mode, mode_config)
+        
+        return final_prompt
     
     def _get_mode_config(self, mode: str) -> Optional[PromptModeConfig]:
         """Get configuration for the specified mode."""
@@ -594,6 +603,60 @@ class PromptBuilder:
     def get_user_config_path(self) -> Path:
         """Get the path to user's prompt configuration directory."""
         return self._prompt_base_dir
+    
+    def _log_prompt_if_available(self, final_prompt: str, question: str, context: str, mode: str, config: PromptModeConfig):
+        """Log prompt data if session logger is available."""
+        if not hasattr(self, '_session_logger') or not self._session_logger:
+            return
+        
+        try:
+            # Count tokens (simple approximation)
+            def count_tokens(text: str) -> int:
+                return len(text.split()) + len(text) // 4
+            
+            # Get all sections for logging
+            mode_dir = self._prompt_base_dir / mode
+            
+            # Load individual sections
+            global_instructions = self.file_loader.load_global_file(self._prompt_base_dir, "global_instructions.md") or ""
+            security_instructions = self.file_loader.load_global_file(self._prompt_base_dir, "security_instructions.md") if config.features.get('security', False) else ""
+            core_instructions = self.file_loader.load_mode_file(mode_dir, "core_instructions.md") or ""
+            cross_analysis = self.file_loader.load_mode_file(mode_dir, "cross_analysis.md") if config.features.get('cross_analysis', False) and self._is_cross_project_context(context) else ""
+            final_instructions = self.file_loader.load_mode_file(mode_dir, "final_instructions.md") or ""
+            
+            # Get applicable guidelines
+            guidelines = ""
+            if config.features.get('guidelines', False):
+                guidelines = self._get_applicable_guidelines(context, question) or ""
+            
+            # Prepare prompt data for logging
+            prompt_data = {
+                'final_prompt': final_prompt,
+                'sections': {
+                    'global_instructions': global_instructions,
+                    'security_instructions': security_instructions,
+                    'core_instructions': core_instructions,
+                    'cross_analysis': cross_analysis,
+                    'guidelines': guidelines,
+                    'context': context,
+                    'question': question,
+                    'final_instructions': final_instructions
+                },
+                'mode_config': {
+                    'name': config.name,
+                    'description': config.description,
+                    'version': config.version,
+                    'features': config.features
+                },
+                'prompt_mode': mode,
+                'token_count': count_tokens(final_prompt)
+            }
+            
+            # Send to session logger
+            self._session_logger.log_prompt_built(prompt_data)
+            
+        except Exception as e:
+            self.logger.error("Failed to log prompt data: %s", e)
 
 
 # Global prompt builder instance

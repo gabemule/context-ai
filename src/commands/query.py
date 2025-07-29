@@ -84,9 +84,22 @@ def execute_query_command(args: argparse.Namespace) -> None:
     logger = get_logger(__name__)
     logger.info("🚀 Initializing query command...")
 
-    try:
-        from rich.console import Console
+    from rich.console import Console
+    from utils.session_logger import start_command_session, end_command_session
 
+    # Start session logging
+    session_args = {
+        "question": args.question,
+        "format": args.format,
+        "max_results": args.max_results,
+        "verbose": args.verbose,
+        "debug": args.debug,
+        "copy": args.copy,
+        "output": args.output
+    }
+    start_command_session("query", session_args)
+
+    try:
         console = Console()
 
         # Initialize query service with loading
@@ -126,6 +139,14 @@ def execute_query_command(args: argparse.Namespace) -> None:
                 verbose=args.verbose,
             )
 
+        # Log query result to session
+        from utils.session_logger import get_current_session
+        session = get_current_session()
+        if session:
+            # Estimate results count from context_result length
+            results_count = len(context_result.split('\n---')) if '---' in context_result else 1
+            session.log_query_result(context_result, args.question, args.format, results_count)
+
         # Handle output
         if args.output:
             _save_to_file(context_result, args.output, logger)
@@ -149,6 +170,9 @@ def execute_query_command(args: argparse.Namespace) -> None:
 
             logger.debug("Full traceback: %s", traceback.format_exc())
         exit(1)
+    finally:
+        # End session logging
+        end_command_session()
 
 
 def _save_to_file(content: str, file_path: str, logger) -> None:

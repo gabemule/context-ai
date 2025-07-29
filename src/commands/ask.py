@@ -84,10 +84,10 @@ def execute_ask_command(args: argparse.Namespace) -> int:
 
     # Load heavy imports with loading indicator
     with console.status("[bold green]Loading AI service...", spinner="dots"):
-        from services.ai_service import get_ai_service
+        from services.ai_service import AIService
         from config.settings import get_settings_manager
 
-        service = get_ai_service()
+        service = AIService()
         settings_manager = get_settings_manager()
 
     # Set prompt mode if specified
