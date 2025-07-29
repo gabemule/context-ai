@@ -97,7 +97,7 @@ class EmbeddingModelManager:
         self.logger = get_logger(__name__)
         self.storage_manager = get_storage_manager()
         self._loaded_models: Dict[str, SentenceTransformer] = {}
-        self._model_cache_dir = self.storage_manager.models_dir
+        self._model_cache_dir = self.storage_manager.path_manager.models_dir
 
         # Ensure cache directory exists
         self._model_cache_dir.mkdir(parents=True, exist_ok=True)
