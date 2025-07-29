@@ -68,7 +68,6 @@ dmypy.json
 *.log
 
 # Model files (these can be large)
-models/
 *.model
 *.bin
 
