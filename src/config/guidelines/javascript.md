@@ -1,79 +1,106 @@
-## ⚡ JavaScript Coding Guidelines
+<language_guidelines>
+
+# ⚡ JavaScript Coding Guidelines
+
+<header>
+<language_name>JavaScript</language_name>
+<paradigm>Functional-first programming with ES6+ features</paradigm>
+<philosophy>Immutable, composable, and declarative code</philosophy>
+</header>
 
 When providing JavaScript code suggestions, follow these principles:
 
+<core_principles>
+
 ### 📐 Architecture Principles
-- **SOLID Principles**: Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion
-- **DRY (Don't Repeat Yourself)**: Eliminate code duplication through abstraction
-- **YAGNI (You Aren't Gonna Need It)**: Don't implement features until they're actually needed
-- **Clean Code**: Write self-documenting, readable code with meaningful names
 
-### 🔧 Functional Programming Focus
-- **PREFER functional programming over classes** - Use functions, higher-order functions, and composition
-- **Immutability**: Prefer const, avoid mutations, use spread operators and pure functions
-- **Pure functions**: Functions should not have side effects and return predictable outputs
-- **Function composition**: Break complex logic into small, composable functions
-- **Avoid classes** unless absolutely necessary (e.g., for React components, specific APIs)
+<solid_principles>
+- **Single Responsibility**: Each function should have one clear purpose
+- **Open/Closed**: Use higher-order functions and composition for extensibility
+- **Dependency Inversion**: Depend on abstractions through function parameters
+</solid_principles>
 
-### 🛠️ Code Style Guidelines
-- **Arrow functions**: Prefer `const fn = () => {}` over `function fn() {}`
-- **Destructuring**: Use object/array destructuring for cleaner code
-- **Template literals**: Use backticks for string interpolation
-- **Async/await**: Prefer over .then() chains for promises
-- **Optional chaining**: Use `?.` for safe property access
-- **Nullish coalescing**: Use `??` instead of `||` when checking for null/undefined
+<dry_principle>
+- **Don't Repeat Yourself**: Use higher-order functions and composition
+- **Functional composition**: Break complex logic into small, reusable functions
+- **Shared utilities**: Extract common patterns to utility functions
+- **Module reusability**: Create composable modules and functions
+</dry_principle>
 
-### 📦 Module Organization
-- **ES6 modules**: Use import/export syntax
-- **Named exports**: Prefer named exports over default exports for better refactoring
-- **Barrel exports**: Use index.js files to create clean public APIs
-- **Dependency injection**: Pass dependencies as parameters rather than importing globally
+<clean_code>
+- **Meaningful names**: Use descriptive function and variable names
+- **Pure functions**: Functions without side effects and predictable outputs
+- **Small functions**: Keep functions focused and testable
+- **Declarative style**: Express what, not how
+</clean_code>
+
+<yagni>
+- **Start simple**: Don't implement features until they're actually needed
+- **Avoid over-abstraction**: Keep solutions simple until complexity is required
+- **Progressive enhancement**: Build basic functionality first, enhance later
+</yagni>
+
+</core_principles>
+
+<language_specific>
+
+### 🛠️ JavaScript-Specific Best Practices
+
+<best_practices>
+- **Functional programming**: Prefer functions over classes for most use cases
+- **Immutability**: Use const, avoid mutations, prefer pure functions
+- **ES6+ features**: Arrow functions, destructuring, template literals
+- **Async/await**: Modern asynchronous programming patterns
+- **Module system**: ES6 imports/exports with named exports preferred
+- **Error handling**: Explicit error handling with Result/Either patterns
+</best_practices>
+
+<idioms>
+- **"Functions first"**: Use functions and composition over classes
+- **"Immutable by default"**: Avoid mutations, use pure functions
+- **"Compose don't inherit"**: Build complexity through function composition
+- **"Explicit is better"**: Make side effects and dependencies explicit
+- **"Fail fast"**: Validate inputs early and throw meaningful errors
+</idioms>
+
+<performance>
+- **Lazy evaluation**: Load and compute only when needed
+- **Memoization**: Cache expensive computations
+- **Event optimization**: Debounce/throttle frequent events
+- **Bundle optimization**: Tree shaking and code splitting
+- **Memory management**: Clean up event listeners and subscriptions
+</performance>
+
+</language_specific>
 
 ### 🎨 Naming Conventions
-- **camelCase**: For variables, functions, and methods
-- **PascalCase**: For types, interfaces, and React components
-- **SCREAMING_SNAKE_CASE**: For constants
-- **Descriptive names**: Use clear, descriptive names that explain intent
+- **Functions/variables**: camelCase (getUserData, isValid)
+- **Constants**: SCREAMING_SNAKE_CASE (API_BASE_URL, MAX_RETRIES)
+- **Classes**: PascalCase (only when necessary - UserService, ApiClient)
+- **Files**: kebab-case (user-service.js, api-client.js)
+- **Descriptive names**: Express intent clearly (calculateTotal vs calc)
 
-### 🔍 Error Handling
+### 🔍 Functional Programming Guidelines
+- **Pure functions**: No side effects, same input = same output
+- **Immutability**: Don't mutate data, return new copies
+- **Higher-order functions**: Functions that take/return other functions
+- **Function composition**: Build complex logic from simple functions
+- **Avoid classes**: Use functions and closures for encapsulation
+
+### ⚡ Modern JavaScript Features
+- **Arrow functions**: Preferred for most function expressions
+- **Destructuring**: Clean object/array property extraction
+- **Template literals**: String interpolation with backticks
+- **Optional chaining**: Safe property access with `?.`
+- **Nullish coalescing**: Use `??` for null/undefined checks
+- **Async/await**: Modern promise handling
+
+### 🎯 Error Handling Patterns
+- **Result/Either pattern**: Return success/error objects instead of throwing
 - **Explicit error handling**: Always handle errors explicitly
-- **Result/Either pattern**: Consider using Result types for error handling
-- **Fail fast**: Validate inputs early and throw meaningful errors
+- **Meaningful errors**: Include context and actionable information
+- **Fail fast**: Validate inputs early in function execution
 - **No silent failures**: Don't ignore or suppress errors
-
-### ⚡ Performance Guidelines
-- **Lazy loading**: Load code/data only when needed
-- **Memoization**: Cache expensive computations
-- **Debouncing/throttling**: For event handlers and API calls
-- **Bundle optimization**: Use tree shaking and code splitting
-
-### 🧪 Testing Philosophy
-- **Test-driven development**: Write tests first when possible
-- **Unit tests**: Test individual functions in isolation
-- **Integration tests**: Test component interactions
-- **Pure functions are easier to test**: Another reason to prefer functional style
-
-### 📝 Documentation
-- **JSDoc comments**: For public APIs and complex functions
-- **Type annotations**: Use TypeScript types for better documentation
-- **README files**: Document setup, usage, and architecture decisions
-
-### 🚫 Anti-patterns to Avoid
-- **Classes for stateless logic**: Don't use classes just for namespacing
-- **Inheritance**: Prefer composition over inheritance
-- **Global state**: Minimize global variables and state
-- **Magic numbers/strings**: Use named constants
-- **Deep nesting**: Keep cyclomatic complexity low
-- **Premature optimization**: Focus on clean code first, optimize later
-
-### 💡 Recommended Patterns
-- **Higher-order functions**: For reusable logic
-- **Currying**: For creating specialized functions
-- **Closures**: For encapsulation without classes
-- **Module pattern**: For organizing related functionality
-- **Observer/PubSub**: For decoupled communication
-- **Command pattern**: For encapsulating operations
-- **Strategy pattern**: Using function composition instead of class inheritance
 
 ### 🌟 Examples of Good Practices
 

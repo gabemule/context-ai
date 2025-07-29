@@ -53,12 +53,37 @@ class LanguagesManager:
         self._ensure_config_exists()
     
     def _ensure_config_exists(self) -> None:
-        """Ensure configuration file exists, create default if missing."""
+        """Ensure configuration files exist, create defaults if missing."""
         try:
-            ensure_default_config_exists(self.languages_file)
+            # Use new SOLID architecture for comprehensive file copying
+            from .loader import DefaultConfigGenerator
+            
+            # Ensure the directory exists
+            self.config_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Copy all language-related files (languages.yaml + README.md)
+            copy_result = DefaultConfigGenerator.copy_all_language_files(self.config_dir)
+            
+            if copy_result.has_changes:
+                self.logger.info(
+                    f"Initialized {copy_result.files_copied} language configuration files: "
+                    f"languages.yaml, README.md"
+                )
+            
+            if not copy_result.success and copy_result.errors:
+                error_details = "; ".join(copy_result.errors)
+                self.logger.warning(f"Configuration initialization completed with warnings: {error_details}")
+            
+            # Verify that at least the main configuration file exists
+            if not self.languages_file.exists():
+                raise ConfigurationError(f"Languages configuration file was not created: {self.languages_file}")
+                
         except ConfigurationError as e:
             self.logger.error(f"Failed to ensure configuration exists: {e}")
             raise
+        except Exception as e:
+            self.logger.error(f"Unexpected error during configuration initialization: {e}")
+            raise ConfigurationError(f"Configuration initialization failed: {str(e)}")
     
     def _load_config(self, force_reload: bool = False) -> LanguagesConfig:
         """Load configuration from file with caching."""

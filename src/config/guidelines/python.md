@@ -1,85 +1,110 @@
-## 🐍 Python Coding Guidelines
+<language_guidelines>
+
+# 🐍 Python Coding Guidelines
+
+<header>
+<language_name>Python</language_name>
+<paradigm>Functional-first programming with Pythonic idioms</paradigm>
+<philosophy>"Simple is better than complex" - The Zen of Python</philosophy>
+</header>
 
 When providing Python code suggestions, follow these principles:
 
+<core_principles>
+
 ### 📐 Architecture Principles
-- **SOLID Principles**: Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion
-- **DRY (Don't Repeat Yourself)**: Eliminate code duplication through abstraction
-- **YAGNI (You Aren't Gonna Need It)**: Don't implement features until they're actually needed
-- **Clean Code**: Write self-documenting, readable code with meaningful names
 
-### 🔧 Pythonic Programming Focus
-- **PREFER functions over classes** - Use functions, decorators, and composition
-- **Immutability**: Use dataclasses with frozen=True, avoid mutations, use pure functions
-- **Pure functions**: Functions should not have side effects and return predictable outputs
-- **Function composition**: Break complex logic into small, composable functions
-- **Use classes sparingly**: Only for stateful objects, data containers, or specific APIs
+<solid_principles>
+- **Single Responsibility**: Each function/class should have one clear purpose
+- **Open/Closed**: Use protocols and composition for extensibility
+- **Liskov Substitution**: Ensure consistent interfaces and behavior
+- **Interface Segregation**: Create focused, specific protocols and interfaces
+- **Dependency Inversion**: Depend on abstractions through protocols and ABC
+</solid_principles>
 
-### 🛠️ Code Style Guidelines (PEP 8+)
-- **Type hints**: Always use type annotations for function parameters and returns
-- **f-strings**: Use f"" for string formatting instead of .format() or %
-- **List/dict comprehensions**: Prefer over loops when readable
+<dry_principle>
+- **Don't Repeat Yourself**: "There should be one obvious way to do it"
+- **Functional composition**: Break complex logic into small, reusable functions
+- **Decorators**: Extract cross-cutting concerns (logging, caching, validation)
+- **Generators**: Reusable, memory-efficient data processing patterns
+</dry_principle>
+
+<clean_code>
+- **"Readability counts"**: Write self-documenting, clear code
+- **"Explicit is better than implicit"**: Make intent obvious
+- **"Simple is better than complex"**: Prefer straightforward solutions
+- **Meaningful names**: Use descriptive, intention-revealing names
+</clean_code>
+
+<yagni>
+- **"You aren't gonna need it"**: Don't implement features until needed
+- **Start simple**: "Simple is better than complex"
+- **Progressive enhancement**: Build basic functionality first
+</yagni>
+
+</core_principles>
+
+<language_specific>
+
+### 🛠️ Python-Specific Best Practices
+
+<best_practices>
+- **Functional programming**: Prefer functions over classes for most use cases
+- **Type hints**: Always use type annotations for better documentation and tooling
+- **Dataclasses**: Use @dataclass for data containers instead of regular classes
 - **Context managers**: Use `with` statements for resource management
-- **Pathlib**: Use `pathlib.Path` instead of `os.path`
-- **Dataclasses**: Use `@dataclass` for simple data containers
+- **Generators**: For memory-efficient iteration and processing
+- **Pathlib**: Use pathlib.Path instead of os.path
+</best_practices>
 
-### 📦 Module Organization
-- **Clear imports**: Use absolute imports, group by standard/third-party/local
-- **__all__**: Define public API explicitly in modules
-- **Package structure**: Use __init__.py to create clean public APIs
-- **Dependency injection**: Pass dependencies as parameters rather than importing globally
+<idioms>
+- **"Pythonic code"**: Follow Python's idioms and conventions
+- **"Duck typing"**: "If it walks like a duck and quacks like a duck..."
+- **"EAFP"**: Easier to Ask for Forgiveness than Permission
+- **"Batteries included"**: Leverage Python's rich standard library
+- **"Import this"**: Follow the Zen of Python principles
+</idioms>
 
-### 🎨 Naming Conventions
-- **snake_case**: For variables, functions, and methods
-- **PascalCase**: For classes and exceptions
-- **SCREAMING_SNAKE_CASE**: For constants
-- **Descriptive names**: Use clear, descriptive names that explain intent
-- **Private attributes**: Use single underscore for internal use
-
-### 🔍 Error Handling
-- **Specific exceptions**: Catch specific exception types, not bare except
-- **Custom exceptions**: Create domain-specific exception classes
-- **Fail fast**: Validate inputs early with meaningful error messages
-- **Context in exceptions**: Include relevant context in error messages
-- **Exception chaining**: Use `raise ... from` to preserve original traceback
-
-### ⚡ Performance Guidelines
-- **Generators**: Use generators for memory-efficient iteration
-- **Built-in functions**: Leverage built-ins like map(), filter(), any(), all()
-- **Caching**: Use @lru_cache for expensive computations
-- **Lazy evaluation**: Load data only when needed
+<performance>
+- **Built-in functions**: Leverage map(), filter(), any(), all()
 - **List comprehensions**: Often faster than equivalent loops
+- **Generators**: Memory-efficient iteration
+- **Caching**: Use @lru_cache for expensive computations
+- **NumPy/Pandas**: For numerical computations and data processing
+</performance>
 
-### 🧪 Testing Philosophy
-- **Test-driven development**: Write tests first when possible
-- **pytest**: Use pytest for testing framework
-- **Pure functions are easier to test**: Another reason to prefer functional style
-- **Fixtures**: Use pytest fixtures for test setup
-- **Mock external dependencies**: Isolate units under test
+</language_specific>
 
-### 📝 Documentation
-- **Docstrings**: Use Google or NumPy style docstrings for all public functions/classes
-- **Type hints**: Serve as inline documentation and enable better IDE support
-- **README files**: Document setup, usage, and architecture decisions
-- **Examples in docstrings**: Include usage examples when helpful
+### 🎨 Naming Conventions (PEP 8)
+- **Functions/variables**: snake_case (get_user_data, is_valid)
+- **Classes**: PascalCase (UserService, DataProcessor)
+- **Constants**: SCREAMING_SNAKE_CASE (API_BASE_URL, MAX_RETRIES)
+- **Private attributes**: _private_method, __very_private
+- **Files/modules**: snake_case (user_service.py, data_utils.py)
 
-### 🚫 Anti-patterns to Avoid
-- **Classes for stateless logic**: Don't use classes just for namespacing
-- **Inheritance**: Prefer composition over inheritance
-- **Global state**: Minimize global variables and state
-- **Magic numbers/strings**: Use named constants or enums
-- **Deep nesting**: Keep cyclomatic complexity low
-- **Bare except**: Always catch specific exceptions
-- **Mutable default arguments**: Use None and initialize inside function
-
-### 💡 Recommended Patterns
-- **Decorators**: For cross-cutting concerns (logging, timing, caching)
+### 🔍 Pythonic Programming Guidelines
+- **Functions first**: Use functions and composition over classes
+- **Immutability**: Prefer immutable data structures and pure functions
+- **Generators**: For lazy evaluation and memory efficiency
 - **Context managers**: For resource management and setup/teardown
-- **Generators**: For memory-efficient data processing
-- **Dataclasses**: For data containers and configuration objects
-- **Protocols**: For structural typing (duck typing with types)
-- **Dependency injection**: For testable, modular code
-- **Factory functions**: Instead of complex class hierarchies
+- **Decorators**: For cross-cutting concerns and function enhancement
+
+### ⚡ Modern Python Features
+- **Type hints**: Static type checking with mypy
+- **Dataclasses**: Automatic generation of special methods
+- **f-strings**: Modern string formatting
+- **Pathlib**: Object-oriented filesystem paths
+- **Context managers**: Custom `with` statement behavior
+- **Async/await**: Asynchronous programming patterns
+
+### 🎯 Error Handling Patterns
+- **Specific exceptions**: Catch specific exception types
+- **Custom exceptions**: Create domain-specific exception classes
+- **Exception chaining**: Use `raise ... from` to preserve context
+- **EAFP**: "Easier to Ask for Forgiveness than Permission"
+- **Fail fast**: Validate inputs early with meaningful messages
+
+<examples>
 
 ### 🌟 Examples of Good Practices
 
@@ -193,8 +218,49 @@ def process_large_dataset(data_source: List[dict]) -> Iterator[dict]:
                 yield processed
 ```
 
-### 🔷 Advanced Python Patterns
+</examples>
 
+<ecosystem>
+
+### 🧪 Testing Philosophy
+
+<testing>
+- **pytest**: Modern Python testing framework
+- **Test-driven development**: Write tests first when possible
+- **Pure functions**: Easier to test, prefer functional style
+- **Fixtures**: Use pytest fixtures for test setup
+- **Mock external dependencies**: Isolate units under test
+</testing>
+
+### 📝 Documentation
+
+<documentation>
+- **Docstrings**: Google or NumPy style for all public functions/classes
+- **Type hints**: Serve as inline documentation
+- **README files**: Setup, usage, and architecture decisions
+- **Examples in docstrings**: Include usage examples when helpful
+</documentation>
+
+### 🔧 Tools
+
+<tools>
+- **mypy**: Static type checking
+- **black**: Code formatting
+- **pytest**: Testing framework
+- **pylint/flake8**: Code quality and linting
+- **poetry/pip-tools**: Dependency management
+</tools>
+
+</ecosystem>
+
+### 💡 Python Philosophy
+- **"Beautiful is better than ugly"**: Write aesthetically pleasing code
+- **"Explicit is better than implicit"**: Make intentions clear
+- **"Simple is better than complex"**: Prefer straightforward solutions
+- **"Readability counts"**: Code is read more than written
+- **"There should be one obvious way to do it"**: Follow Python idioms
+
+### 🔷 Advanced Python Patterns
 - **Metaclasses**: Only when absolutely necessary, prefer class decorators
 - **Descriptors**: For advanced attribute access control
 - **Async/await**: For I/O-bound operations, prefer over threading
@@ -204,3 +270,5 @@ def process_large_dataset(data_source: List[dict]) -> Iterator[dict]:
 - **Final**: For constants and methods that shouldn't be overridden
 
 **Remember**: Always prioritize readability, maintainability, and testability over clever one-liners or premature optimization. "Explicit is better than implicit" - The Zen of Python.
+
+</language_guidelines>
