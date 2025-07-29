@@ -160,8 +160,13 @@ class GuidelinesLoader:
         if language not in self._cache:
             guidelines_dir = PathResolver.get_guidelines_directory()
             file_path = guidelines_dir / f"{language}.md"
-            content = self.file_ops.read_text(file_path)
             
+            # Check if file exists before trying to read (avoid error logs for missing guidelines)
+            if not file_path.exists():
+                self.logger.debug(f"No guidelines found for language: {language}")
+                return None
+            
+            content = self.file_ops.read_text(file_path)
             if content:
                 self._cache[language] = content.strip()
         

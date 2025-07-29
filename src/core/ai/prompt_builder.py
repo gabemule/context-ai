@@ -1,8 +1,9 @@
 """
 File-based prompt building system for Context-AI.
 
-This new implementation loads prompts from Markdown and YAML files,
-replacing the hardcoded approach with a configurable system.
+Loads prompts from configurable Markdown and YAML files instead of hardcoded templates.
+Supports multiple prompt modes (minimal, standard, comprehensive, strict) with features
+like security instructions, coding guidelines, and cross-project analysis.
 """
 
 import os
@@ -13,6 +14,7 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 
 from utils.logging import get_logger
+from .language_detector import get_language_detector
 
 
 @dataclass
@@ -437,6 +439,10 @@ class PromptBuilder:
         """Build prompt using the file-based system following the defined order."""
         prompt_parts = []
         
+        # Initialize language detection data for reuse
+        self._last_detected_languages = None
+        self._last_guidelines_content = None
+        
         # 1. Global instructions (always)
         global_instructions = self.file_loader.load_global_file(self._prompt_base_dir, "global_instructions.md")
         if global_instructions:
@@ -460,11 +466,33 @@ class PromptBuilder:
             if cross_analysis:
                 prompt_parts.append(f"\n<cross_analysis>\n{cross_analysis}\n</cross_analysis>")
         
-        # 5. Coding guidelines (if guidelines: true AND languages detected)
+        # 5. Coding guidelines (if guidelines: true) - SINGLE language detection here
         if config.features.get('guidelines', False):
-            guidelines = self._get_applicable_guidelines(context, question)
-            if guidelines:
-                prompt_parts.append(f"\n<coding_guidelines>\n{guidelines}\n</coding_guidelines>")
+            # Detect languages ONLY when guidelines are enabled
+            language_detector = get_language_detector()
+            detected_languages = language_detector.detect_languages_from_context(context, question)
+            
+            if detected_languages:
+                self.logger.info(f"✅ Languages detected: {detected_languages}")
+                
+                # Get guidelines for detected languages
+                try:
+                    from config.guidelines.manager import get_guidelines_manager
+                    guidelines_manager = get_guidelines_manager()
+                    guidelines_content = guidelines_manager.get_guidelines_for_languages(detected_languages)
+                    
+                    if guidelines_content:
+                        prompt_parts.append(f"\n<coding_guidelines>\n{guidelines_content}\n</coding_guidelines>")
+                        self.logger.debug(f"Applied guidelines for languages: {', '.join(detected_languages)}")
+                        self._last_guidelines_content = guidelines_content
+                    else:
+                        self.logger.debug(f"No guidelines found for languages: {', '.join(detected_languages)}")
+                
+                except Exception as e:
+                    self.logger.error("Failed to load guidelines: %s", e)
+            
+            # Store for logging reuse
+            self._last_detected_languages = detected_languages
         
         # 6-9. Optional mode files
         from config.constants import PROMPT_OPTIONAL_FILES
@@ -508,15 +536,33 @@ class PromptBuilder:
         return "Cross-Project Analysis" in context and "Project Correlations" in context
     
     def _get_applicable_guidelines(self, context: str, question: str) -> Optional[str]:
-        """Get applicable coding guidelines (controlled by mode features)."""
+        """Get applicable coding guidelines - optimized to reuse already processed data."""
+        # If we already processed guidelines in the current prompt build, reuse them
+        if hasattr(self, '_last_guidelines_content') and self._last_guidelines_content:
+            return self._last_guidelines_content
+        
+        # Otherwise, this is likely a standalone call, so process normally
         try:
-            from config.guidelines.manager import get_guidelines_manager
+            language_detector = get_language_detector()
+            detected_languages = language_detector.detect_languages_from_context(context, question)
             
+            if not detected_languages:
+                self.logger.debug("No languages detected in context for guidelines")
+                return None
+            
+            from config.guidelines.manager import get_guidelines_manager
             guidelines_manager = get_guidelines_manager()
-            return guidelines_manager.get_applicable_guidelines(context, question)
+            guidelines = guidelines_manager.get_guidelines_for_languages(detected_languages)
+            
+            if guidelines:
+                self.logger.debug(f"Applied guidelines for languages: {', '.join(detected_languages)}")
+            else:
+                self.logger.debug(f"No guidelines found for languages: {', '.join(detected_languages)}")
+            
+            return guidelines
             
         except Exception as e:
-            self.logger.debug("Failed to load guidelines: %s", e)
+            self.logger.error("Failed to load guidelines: %s", e)
             return None
     
     def discover_available_modes(self) -> Dict[str, PromptModeConfig]:
@@ -624,10 +670,8 @@ class PromptBuilder:
             cross_analysis = self.file_loader.load_mode_file(mode_dir, "cross_analysis.md") if config.features.get('cross_analysis', False) and self._is_cross_project_context(context) else ""
             final_instructions = self.file_loader.load_mode_file(mode_dir, "final_instructions.md") or ""
             
-            # Get applicable guidelines
-            guidelines = ""
-            if config.features.get('guidelines', False):
-                guidelines = self._get_applicable_guidelines(context, question) or ""
+            # Get applicable guidelines (reuse already processed data)
+            guidelines = getattr(self, '_last_guidelines_content', '') or ''
             
             # Prepare prompt data for logging
             prompt_data = {
