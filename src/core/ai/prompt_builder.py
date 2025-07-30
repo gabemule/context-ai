@@ -14,7 +14,6 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 
 from utils.logging import get_logger
-from .language_detector import get_language_detector
 
 
 @dataclass
@@ -529,8 +528,25 @@ class PromptBuilder:
         return prompt
     
     def _is_cross_project_context(self, context: str) -> bool:
-        """Check if context contains multiple projects."""
-        return "Cross-Project Analysis" in context and "Project Correlations" in context
+        """Check if context contains multiple projects using XML structure."""
+        try:
+            import xml.etree.ElementTree as ET
+            
+            # Parse XML context
+            root = ET.fromstring(context)
+            
+            # Check if there are multiple projects in the overview
+            projects_elem = root.find('.//projects')
+            if projects_elem is not None:
+                project_count = len(projects_elem.findall('project'))
+                return project_count > 1
+                
+        except Exception as e:
+            self.logger.debug(f"XML parsing failed for cross-project detection, using fallback: {e}")
+            # Fallback to old method if XML parsing fails
+            return "Cross-Project Analysis" in context and "Project Correlations" in context
+        
+        return False
     
     def _extract_languages_from_xml_context(self, context: str) -> List[str]:
         """Extract languages from XML context tech_stack."""
@@ -594,36 +610,6 @@ class PromptBuilder:
         
         self.logger.debug("❌ No technology_stack found in context")
         return []
-    
-    def _get_applicable_guidelines(self, context: str, question: str) -> Optional[str]:
-        """Get applicable coding guidelines - optimized to reuse already processed data."""
-        # If we already processed guidelines in the current prompt build, reuse them
-        if hasattr(self, '_last_guidelines_content') and self._last_guidelines_content:
-            return self._last_guidelines_content
-        
-        # Otherwise, this is likely a standalone call, so process normally
-        try:
-            language_detector = get_language_detector()
-            detected_languages = language_detector.detect_languages_from_context(context, question)
-            
-            if not detected_languages:
-                self.logger.debug("No languages detected in context for guidelines")
-                return None
-            
-            from config.guidelines.manager import get_guidelines_manager
-            guidelines_manager = get_guidelines_manager()
-            guidelines = guidelines_manager.get_guidelines_for_languages(detected_languages)
-            
-            if guidelines:
-                self.logger.debug(f"Applied guidelines for languages: {', '.join(detected_languages)}")
-            else:
-                self.logger.debug(f"No guidelines found for languages: {', '.join(detected_languages)}")
-            
-            return guidelines
-            
-        except Exception as e:
-            self.logger.error("Failed to load guidelines: %s", e)
-            return None
     
     def discover_available_modes(self) -> Dict[str, PromptModeConfig]:
         """Discover and load all available prompt modes from user config directory."""

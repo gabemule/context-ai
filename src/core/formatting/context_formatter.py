@@ -368,40 +368,6 @@ class ContextFormatter:
             sources=sorted(list(sources)),
         )
 
-    def _generate_project_structure(self, results: List[QueryResult], max_depth: int = 4) -> str:
-        """Generate project structure overview from query results."""
-        if not results:
-            return ""
-        
-        # Group files by source embedding
-        projects = {}
-        for result in results:
-            source = result.source_embedding
-            file_path = result.metadata.get("file_path", "unknown")
-            
-            if source not in projects:
-                projects[source] = set()
-            projects[source].add(file_path)
-        
-        if not projects:
-            return ""
-        
-        structure_parts = ["<project_structures>"]
-        
-        for source, files in projects.items():
-            # Build directory tree
-            tree = self._build_directory_tree(files)
-            
-            # Simple header with just the project name
-            # Claude will infer project type from file extensions
-            header = f"\n📁 {source}:"
-            
-            structure_parts.append(header)
-            structure_parts.extend(self._format_tree(tree, max_depth=max_depth))
-        
-        structure_parts.extend(["", "</project_structures>"])  # Empty line and closing tag
-        return "\n".join(structure_parts)
-    
     def _build_directory_tree(self, file_paths):
         """Build a nested directory tree from file paths."""
         tree = {}

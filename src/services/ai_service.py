@@ -692,9 +692,8 @@ class AIService:
             
             from core.ai.prompt_builder import get_prompt_builder
             prompt_builder = get_prompt_builder()
-            guidelines = prompt_builder._get_applicable_guidelines(context, question)
             
-            session.save_context(context, question, context_metadata, guidelines)
+            session.save_context(context, question, context_metadata, None)
             
             # Connect session logger to prompt builder
             prompt_builder._session_logger = session
