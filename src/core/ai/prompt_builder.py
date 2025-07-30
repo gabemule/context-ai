@@ -466,14 +466,13 @@ class PromptBuilder:
             if cross_analysis:
                 prompt_parts.append(f"\n<cross_analysis>\n{cross_analysis}\n</cross_analysis>")
         
-        # 5. Coding guidelines (if guidelines: true) - SINGLE language detection here
+        # 5. Coding guidelines (if guidelines: true) - Extract from XML tech_stack
         if config.features.get('guidelines', False):
-            # Detect languages ONLY when guidelines are enabled
-            language_detector = get_language_detector()
-            detected_languages = language_detector.detect_languages_from_context(context, question)
+            # Extract languages from XML context (more efficient than regex)
+            detected_languages = self._extract_languages_from_xml_context(context)
             
             if detected_languages:
-                self.logger.info(f"✅ Languages detected: {detected_languages}")
+                self.logger.info(f"✅ Languages from tech_stack: {detected_languages}")
                 
                 # Get guidelines for detected languages
                 try:
@@ -513,12 +512,10 @@ class PromptBuilder:
         # Build the final prompt structure
         base_prompt = "".join(prompt_parts)
         
-        # Add context and question
+        # Add context and question (context already wrapped by ContextFormatter)
         prompt = f"""{base_prompt}
 
-<context>
 {context}
-</context>
 
 <question>
 {question}
@@ -534,6 +531,69 @@ class PromptBuilder:
     def _is_cross_project_context(self, context: str) -> bool:
         """Check if context contains multiple projects."""
         return "Cross-Project Analysis" in context and "Project Correlations" in context
+    
+    def _extract_languages_from_xml_context(self, context: str) -> List[str]:
+        """Extract languages from XML context tech_stack."""
+        try:
+            import xml.etree.ElementTree as ET
+            
+            # Parse XML context
+            root = ET.fromstring(context)
+            
+            # Extract technology_stack element
+            tech_stack_elem = root.find('.//technology_stack')
+            if tech_stack_elem is not None and tech_stack_elem.text:
+                languages = [lang.strip() for lang in tech_stack_elem.text.split(',')]
+                
+                # Filter only programming languages with guidelines
+                filtered_languages = self._filter_programming_languages(languages)
+                
+                self.logger.debug(f"🎯 XML parsing: found {len(languages)} languages, {len(filtered_languages)} with guidelines")
+                return filtered_languages
+                
+        except Exception as e:
+            self.logger.debug(f"XML parsing failed, trying fallback: {e}")
+            # Fallback to regex if XML parsing fails
+            return self._extract_languages_fallback(context)
+        
+        return []
+    
+    def _filter_programming_languages(self, languages: List[str]) -> List[str]:
+        """Filter to only include programming languages with guidelines."""
+        try:
+            from config.guidelines.manager import get_guidelines_manager
+            guidelines_manager = get_guidelines_manager()
+            available_guidelines = set(guidelines_manager.get_available_languages())
+            
+            filtered = [lang for lang in languages if lang in available_guidelines]
+            
+            if len(filtered) != len(languages):
+                filtered_out = set(languages) - set(filtered)
+                self.logger.debug(f"🚫 Filtered out languages without guidelines: {filtered_out}")
+            
+            return filtered
+            
+        except Exception as e:
+            self.logger.error(f"Error filtering languages: {e}")
+            return languages
+    
+    def _extract_languages_fallback(self, context: str) -> List[str]:
+        """Fallback regex parsing if XML fails."""
+        import re
+        
+        # Try to find technology_stack in text format
+        pattern = r'<technology_stack>([^<]+)</technology_stack>'
+        match = re.search(pattern, context)
+        
+        if match:
+            languages = [lang.strip() for lang in match.group(1).split(',')]
+            filtered_languages = self._filter_programming_languages(languages)
+            
+            self.logger.debug(f"📝 Fallback regex: found {len(languages)} languages, {len(filtered_languages)} with guidelines")
+            return filtered_languages
+        
+        self.logger.debug("❌ No technology_stack found in context")
+        return []
     
     def _get_applicable_guidelines(self, context: str, question: str) -> Optional[str]:
         """Get applicable coding guidelines - optimized to reuse already processed data."""

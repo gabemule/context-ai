@@ -225,134 +225,78 @@ class ContextFormatter:
     def _format_ai_friendly(
         self, results: List[QueryResult], query: str = "", token_limit: int = None
     ) -> FormattedContext:
-        """Format results in AI-friendly format following Plan.md example."""
+        """Format results in XML-structured AI-friendly format."""
         if token_limit is None:
             token_limit = self.max_tokens
 
-        content_parts = []
+        # Start XML context
+        content_parts = ["<context>"]
         sources = set()
-        token_count = 0
+        token_count = count_tokens("<context>")
         truncated = False
         results_sent = 0
-        source_stats = {}  # Track tokens per source
+        source_stats = {}
 
-        # Add project structure overview first (unlimited depth for complete debugging info)
-        project_structure = self._generate_project_structure(results, max_depth=None)
+        # 1. Context Overview (moved to beginning)
+        overview = self._generate_context_overview_xml(results)
+        content_parts.append(overview)
+        token_count += count_tokens(overview)
+
+        # Collect sources for tracking
+        for result in results:
+            sources.add(result.source_embedding)
+
+        # 2. Project Structures
+        project_structure = self._generate_project_structure_xml(results, max_depth=None)
         if project_structure:
             content_parts.append(project_structure)
             token_count += count_tokens(project_structure)
 
-        # Add header with XML tag
-        header = "<similarity_matches>"
-        content_parts.append(header)
-        token_count += count_tokens(header)
+        # 3. Similarity Matches
+        matches_result = self._generate_similarity_matches_xml(results, token_limit - token_count, source_stats)
+        content_parts.append(matches_result["content"])
+        token_count += matches_result["tokens"]
+        results_sent = matches_result["results_sent"]
+        truncated = matches_result["truncated"]
+        source_stats = matches_result["source_stats"]
 
-        # Process each result
-        for i, result in enumerate(results):
-            source = result.source_embedding
-            sources.add(source)
+        # Close XML context
+        content_parts.append("</context>")
+        token_count += count_tokens("</context>")
 
-            # Create result section
-            similarity = (
-                result.normalized_score
-            )  # Use properly normalized score (0-1 range)
-            file_path = result.metadata.get("file_path", "unknown")
-            language = result.metadata.get("language", "text")
-
-            # Format result header
-            result_header = "\n" + SOURCE_HEADER_TEMPLATE.format(
-                source=source, similarity=similarity
+        # Log results
+        if truncated:
+            truncated_count = len(results) - results_sent
+            self.logger.info(
+                "📊 Context Results: %d/%d sent to AI (%d truncated by %dK token limit)",
+                results_sent,
+                len(results),
+                truncated_count,
+                token_limit // 1000,
             )
-            file_info = FILE_INFO_TEMPLATE.format(
-                file_path=file_path, language=language
-            )
-
-            # Format code block
-            code_block = f"\n```{language}\n{result.text}\n```\n"
-
-            # Combine section
-            section = f"{result_header}\n{file_info}\n{code_block}"
-            section_tokens = count_tokens(section)
-
-            # Check if adding this section would exceed token limit
-            if token_count + section_tokens > token_limit:
-                truncated = True
-                # Log detailed truncation info
-                truncated_count = len(results) - results_sent
-                self.logger.info(
-                    "📊 Context Results: %d/%d sent to AI (%d truncated by %dK token limit)",
-                    results_sent,
-                    len(results),
-                    truncated_count,
-                    token_limit // 1000,
-                )
-                
-                # Log per-source breakdown
-                for source_name, stats in source_stats.items():
-                    self.logger.info(
-                        "  • %s: %d results (%dK tokens)",
-                        source_name,
-                        stats["count"],
-                        stats["tokens"] // 1000,
-                    )
-                break
-
-            content_parts.append(section)
-            token_count += section_tokens
-            results_sent += 1
-            
-            # Track tokens per source for detailed logging
-            if source not in source_stats:
-                source_stats[source] = {"count": 0, "tokens": 0}
-            source_stats[source]["count"] += 1
-            source_stats[source]["tokens"] += section_tokens
-
-        # Log successful formatting (no truncation)
-        if not truncated and results_sent > 0:
+        else:
             self.logger.info(
                 "📊 Context Results: %d/%d sent to AI (no truncation, %dK token limit)",
                 results_sent,
                 len(results),
                 token_limit // 1000,
             )
-            
-            # Log per-source breakdown
-            for source_name, stats in source_stats.items():
-                self.logger.info(
-                    "  • %s: %d results (%dK tokens)",
-                    source_name,
-                    stats["count"],
-                    stats["tokens"] // 1000,
-                )
 
-        # Close similarity matches section
-        closing_tag = "</similarity_matches>"
-        content_parts.append(closing_tag)
-        token_count += count_tokens(closing_tag)
-
-        # Add cross-reference analysis if space permits
-        if not truncated and len(sources) > 1:
-            analysis = self._generate_cross_reference_analysis(results)
-            analysis_tokens = count_tokens(analysis)
-
-            if token_count + analysis_tokens <= token_limit:
-                content_parts.append(analysis)
-                token_count += analysis_tokens
-            else:
-                truncated = True
+        # Log per-source breakdown
+        for source_name, stats in source_stats.items():
+            self.logger.info(
+                "  • %s: %d results (%dK tokens)",
+                source_name,
+                stats["count"],
+                stats["tokens"] // 1000,
+            )
 
         content = "\n".join(content_parts)
 
         return FormattedContext(
             content=content,
             token_count=token_count,
-            chunk_count=len(
-                [
-                    r
-                    for r in results
-                    if not truncated or results.index(r) < len(content_parts) - 2
-                ]
-            ),
+            chunk_count=results_sent,
             source_count=len(sources),
             truncated=truncated,
             sources=sorted(list(sources)),
@@ -511,13 +455,40 @@ class ContextFormatter:
         
         return items
     
-    def _generate_cross_reference_analysis(self, results: List[QueryResult]) -> str:
-        """Generate enhanced cross-reference analysis section with project \
-correlation."""
-        analysis_parts = ["\n<cross_reference_analysis>"]
-
-        # Group results by project (source_embedding)
+    def _generate_context_overview_xml(self, results: List[QueryResult]) -> str:
+        """Generate XML-structured context overview for the beginning of the context."""
+        projects_data = self._analyze_projects(results)
+        
+        overview_parts = ["<overview>"]
+        overview_parts.append(f"<summary>Found relevant code in {len(projects_data)} projects</summary>")
+        overview_parts.append("<projects>")
+        
+        all_languages = set()
+        all_patterns = set()
+        
+        for project, data in projects_data.items():
+            languages = ",".join(sorted(data["languages"] - {"unknown"}))
+            patterns = ",".join(sorted(set(data["patterns"])))
+            
+            overview_parts.append(
+                f'<project name="{project}" matches="{len(data["results"])}" '
+                f'languages="{languages}" patterns="{patterns}"/>'
+            )
+            
+            all_languages.update(data["languages"] - {"unknown"})
+            all_patterns.update(data["patterns"])
+        
+        overview_parts.append("</projects>")
+        overview_parts.append(f"<technology_stack>{','.join(sorted(all_languages))}</technology_stack>")
+        overview_parts.append(f"<code_patterns>{','.join(sorted(all_patterns))}</code_patterns>")
+        overview_parts.append("</overview>")
+        
+        return "\n".join(overview_parts)
+    
+    def _analyze_projects(self, results: List[QueryResult]) -> Dict[str, Dict]:
+        """Analyze query results and group by project with metadata."""
         projects_data = {}
+        
         for result in results:
             project = result.source_embedding
             if project not in projects_data:
@@ -544,81 +515,101 @@ correlation."""
                 projects_data[project]["patterns"].append("classes/interfaces")
             if "component" in text or "export default" in text:
                 projects_data[project]["patterns"].append("components")
-
-        # Project overview
-        analysis_parts.append(
-            f"- 🔄 **Cross-Project Analysis**: Found relevant code in "
-            f"{len(projects_data)} projects"
-        )
-
-        # Per-project breakdown
-        for project, data in projects_data.items():
-            result_count = len(data["results"])
-            lang_list = ", ".join(sorted(data["languages"]))
-            patterns = list(set(data["patterns"]))
-
-            project_line = f"  - **{project}**: {result_count} matches"
-            if lang_list != "unknown":
-                project_line += f" ({lang_list})"
-            if patterns:
-                project_line += f" - Contains: {', '.join(patterns)}"
-
-            analysis_parts.append(project_line)
-
-        # Cross-project correlations
-        if len(projects_data) > 1:
-            analysis_parts.append("\n- 🧩 **Project Correlations**:")
-
-            # Find common languages
-            all_languages = set()
-            common_languages = None
-            for data in projects_data.values():
-                all_languages.update(data["languages"])
-                if common_languages is None:
-                    common_languages = data["languages"].copy()
-                else:
-                    common_languages.intersection_update(data["languages"])
-
-            if common_languages and "unknown" not in common_languages:
-                analysis_parts.append(
-                    f"  - ✅ **Common stack**: {', '.join(sorted(common_languages))}"
-                )
-
-            # Find common patterns
-            all_patterns = set()
-            common_patterns = None
-            for data in projects_data.values():
-                patterns_set = set(data["patterns"])
-                all_patterns.update(patterns_set)
-                if common_patterns is None:
-                    common_patterns = patterns_set.copy()
-                else:
-                    common_patterns.intersection_update(patterns_set)
-
-            if common_patterns:
-                analysis_parts.append(
-                    f"  - 🔗 **Similar patterns**: {', '.join(common_patterns)}"
-                )
-
-            # Suggest comparison points
-            analysis_parts.append("\n- 💡 **Comparison Opportunities**:")
-            analysis_parts.append(
-                "  - Compare implementation approaches between projects"
-            )
-            analysis_parts.append("  - Look for reusable patterns or components")
-            analysis_parts.append("  - Identify opportunities for code standardization")
-
-            if "components" in all_patterns:
-                analysis_parts.append(
-                    "  - Check component APIs and prop interfaces for consistency"
-                )
-            if "functions" in all_patterns:
-                analysis_parts.append(
-                    "  - Review function signatures and error handling patterns"
-                )
-
-        analysis_parts.append("</cross_reference_analysis>")
-        return "\n".join(analysis_parts)
+        
+        return projects_data
+    
+    def _generate_project_structure_xml(self, results: List[QueryResult], max_depth: int = 4) -> str:
+        """Generate XML-structured project structures."""
+        if not results:
+            return ""
+        
+        # Group files by source embedding
+        projects = {}
+        for result in results:
+            source = result.source_embedding
+            file_path = result.metadata.get("file_path", "unknown")
+            
+            if source not in projects:
+                projects[source] = set()
+            projects[source].add(file_path)
+        
+        if not projects:
+            return ""
+        
+        structure_parts = ["<project_structures>"]
+        
+        for source, files in projects.items():
+            structure_parts.append(f'<project name="{source}">')
+            
+            # Build directory tree
+            tree = self._build_directory_tree(files)
+            
+            # Add tree structure
+            structure_parts.append(f"📁 {source}:")
+            structure_parts.extend(self._format_tree(tree, max_depth=max_depth))
+            
+            structure_parts.append("</project>")
+        
+        structure_parts.append("</project_structures>")
+        return "\n".join(structure_parts)
+    
+    def _generate_similarity_matches_xml(self, results: List[QueryResult], remaining_tokens: int, source_stats: Dict) -> Dict:
+        """Generate XML-structured similarity matches with token management."""
+        matches_parts = ["<similarity_matches>"]
+        token_count = count_tokens("<similarity_matches>")
+        results_sent = 0
+        truncated = False
+        
+        for result in results:
+            source = result.source_embedding
+            
+            # Create match XML
+            match_xml = self._create_match_xml(result)
+            match_tokens = count_tokens(match_xml)
+            
+            # Check token limit
+            if token_count + match_tokens > remaining_tokens:
+                truncated = True
+                break
+            
+            matches_parts.append(match_xml)
+            token_count += match_tokens
+            results_sent += 1
+            
+            # Track tokens per source
+            if source not in source_stats:
+                source_stats[source] = {"count": 0, "tokens": 0}
+            source_stats[source]["count"] += 1
+            source_stats[source]["tokens"] += match_tokens
+        
+        matches_parts.append("</similarity_matches>")
+        token_count += count_tokens("</similarity_matches>")
+        
+        return {
+            "content": "\n".join(matches_parts),
+            "tokens": token_count,
+            "results_sent": results_sent,
+            "truncated": truncated,
+            "source_stats": source_stats
+        }
+    
+    def _create_match_xml(self, result: QueryResult) -> str:
+        """Create XML structure for a single match."""
+        source = result.source_embedding
+        similarity = result.normalized_score
+        file_path = result.metadata.get("file_path", "unknown")
+        language = result.metadata.get("language", "text")
+        
+        # Escape XML special characters in attributes
+        file_path_escaped = file_path.replace('"', '&quot;').replace('<', '&lt;').replace('>', '&gt;')
+        
+        return f'''<match source="{source}" similarity="{similarity:.3f}" file="{file_path_escaped}" language="{language}">
+<content>
+```{language}
+{result.text}
+```
+</content>
+</match>'''
 
     def _format_json(
         self, results: List[QueryResult], query: str = ""
