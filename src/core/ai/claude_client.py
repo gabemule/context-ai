@@ -133,6 +133,12 @@ class ClaudeClient(AIClientInterface):
         prompt_builder = get_prompt_builder()
         prompt = prompt_builder.build_prompt(question, context)
 
+        # Show streaming message after prompt is built (correct position!)
+        if text_callback:  # Only show if streaming is expected
+            from rich.console import Console
+            console = Console()
+            console.print("\n🌊 Context-AI Streaming Response...\n", style="bold green")
+
         self.logger.debug(
             "Using model: %s (%s), max_tokens: %d", model, model_name, max_tokens
         )

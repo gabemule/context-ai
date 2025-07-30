@@ -326,13 +326,9 @@ class APIManager:
         start_time = time.time()
         
         try:
-            from rich.markdown import Markdown
-            from rich.panel import Panel
             
             if VSCODE_MODE:
                 print("\n#= Context-AI Streaming START =#\n", flush=True)
-            
-            console.print("🌊 Context-AI Streaming Response...\n", style="bold green")
             
             def live_streaming_callback(text_chunk: str):
                 nonlocal accumulated_text
@@ -352,10 +348,12 @@ class APIManager:
             # Show final panel only in CLI mode
             if not VSCODE_MODE:
                 try:
+                    from rich.markdown import Markdown
                     final_content = Markdown(accumulated_text.strip()) if accumulated_text.strip() else "No response received"
                 except:
                     final_content = accumulated_text.strip() if accumulated_text.strip() else "No response received"
                 
+                from rich.panel import Panel
                 final_panel = Panel(final_content, title="🤖 Context-AI's Answer", title_align="center", border_style="green", padding=(1, 2))
                 console.print(final_panel)
             
