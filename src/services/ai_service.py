@@ -7,14 +7,17 @@ Integrates AI providers with the query system following SOLID principles.
 import os
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from config.settings import get_settings_manager
 from core.ai.claude_client import get_claude_client
 from core.formatting.context_formatter import count_tokens
-from services.embedding_service import QueryService
+# LAZY IMPORT: from services.embedding_service import QueryService
 from utils.exceptions import APIError, ConfigurationError
 from utils.logging import get_logger
+
+if TYPE_CHECKING:
+    from services.embedding_service import QueryService
 
 # VSCode integration detection
 VSCODE_MODE = os.getenv('CONTEXT_AI_VSCODE') == 'true'
@@ -77,7 +80,7 @@ class TokenCalculator:
 class ContextManager:
     """Manages context retrieval and caching (SRP)."""
     
-    def __init__(self, query_service: QueryService, settings_manager):
+    def __init__(self, query_service: "QueryService", settings_manager):
         self.query_service = query_service
         self.settings_manager = settings_manager
         self._context_cache = {}
@@ -488,13 +491,30 @@ class AIService:
     
     def __init__(self):
         """Initialize AI service with dependency injection."""
-        self.logger = get_logger(__name__)
-        self.settings_manager = get_settings_manager()
-        self.query_service = QueryService()
+        import time
+        init_start_time = time.time()
         
-        # Initialize components (Dependency Injection)
+        self.logger = get_logger(__name__)
+        verbose = self.logger.isEnabledFor(10)  # DEBUG level = 10
+        
+        # Settings Manager
+        self.settings_manager = get_settings_manager()
+        
+        # Query Service (LAZY IMPORT - only when needed)
+        if verbose:
+            t2 = time.time()
+        from services.embedding_service import QueryService
+        self.query_service = QueryService()
+        if verbose:
+            self.logger.info("⏱️  QueryService: %.3fs", time.time() - t2)
+        
+        # Context Manager
         self.context_manager = ContextManager(self.query_service, self.settings_manager)
+        
+        # Display Manager
         self.display_manager = DisplayManager()
+        
+        # Chat History Manager
         self.chat_history = ChatHistoryManager()
         
         # Get AI configuration
@@ -516,7 +536,12 @@ class AIService:
         # Initialize chat command handler
         self.chat_handler = ChatCommandHandler(self.settings_manager, self.chat_history, self.logger)
         
-        self.logger.debug("AI service initialized with %s model: %s", self.active_provider, self.provider_config.default_model)
+        # Final timing summary
+        if verbose:
+            total_time = time.time() - init_start_time
+            self.logger.info("✅ AIService ready in %.3fs", total_time)
+        else:
+            self.logger.debug("AI service initialized with %s model: %s", self.active_provider, self.provider_config.default_model)
     
     def ask_question(self, question: str, context_format: str = "ai_friendly", verbose: bool = False, 
                     copy_to_clipboard: bool = False, output_file: str = None, include_history: bool = False) -> str:

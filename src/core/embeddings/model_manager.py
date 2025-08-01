@@ -159,12 +159,20 @@ class EmbeddingModelManager:
         Raises:
             ConfigurationError: If model loading fails
         """
+        import time
+        load_start_time = time.time()
+        
         if model_name is None:
             model_name = DEFAULT_MODEL_NAME
 
+        verbose = self.logger.isEnabledFor(10)  # DEBUG level = 10
+        
         # Check if model is already loaded
         if model_name in self._loaded_models:
-            self.logger.debug("Using already loaded model: %s", model_name)
+            if verbose:
+                self.logger.info("⚡ Using cached model: %s", model_name)
+            else:
+                self.logger.debug("Using already loaded model: %s", model_name)
             return self._loaded_models[model_name]
 
         # Get model info
@@ -175,7 +183,9 @@ class EmbeddingModelManager:
 
         try:
             # Check if we need to download
-            if not self.is_model_cached(model_name):
+            is_cached = self.is_model_cached(model_name)
+            
+            if not is_cached:
                 if show_progress:
                     self._show_download_info(model_info)
 
@@ -188,12 +198,19 @@ class EmbeddingModelManager:
 
             console = Console()
 
+            if verbose:
+                st_start_time = time.time()
+
             with console.status(
                 f"[bold green]Loading model {model_name}...", spinner="dots"
             ):
                 model = SentenceTransformer(
                     model_name, cache_folder=str(self._model_cache_dir)
                 )
+
+            if verbose:
+                st_load_time = time.time() - st_start_time
+                self.logger.info("⏱️  Model loading: %.3fs", st_load_time)
 
             # Cache the loaded model
             self._loaded_models[model_name] = model
@@ -205,15 +222,18 @@ class EmbeddingModelManager:
             # Save model metadata
             self._save_model_metadata(model_name, model_info)
 
-            self.logger.info(
-                "✅ Model loaded successfully: %s (%d dimensions)",
-                model_name,
-                model_info.dimensions,
-            )
+            total_load_time = time.time() - load_start_time
+            if verbose:
+                self.logger.info("✅ Model ready: %s (%d dimensions) in %.3fs", model_name, model_info.dimensions, total_load_time)
+            else:
+                self.logger.info("✅ Model loaded successfully: %s (%d dimensions)", model_name, model_info.dimensions)
 
             return model
 
         except Exception as e:
+            total_load_time = time.time() - load_start_time
+            if verbose:
+                self.logger.error("❌ Model loading failed after %.3fs: %s", total_load_time, e)
             raise ConfigurationError(f"Failed to load model '{model_name}': {e}") from e
 
     def generate_embeddings(
@@ -458,7 +478,22 @@ def get_model_manager() -> EmbeddingModelManager:
     """Get global model manager instance."""
     global _model_manager
     if _model_manager is None:
+        import time
+        from utils.logging import get_logger
+        
+        logger = get_logger(__name__)
+        verbose = logger.isEnabledFor(10)  # DEBUG level = 10
+        
+        if verbose:
+            start_time = time.time()
+            logger.info("🤖 Creating EmbeddingModelManager...")
+        
         _model_manager = EmbeddingModelManager()
+        
+        if verbose:
+            creation_time = time.time() - start_time
+            logger.info("⏱️  EmbeddingModelManager creation: %.3fs", creation_time)
+    
     return _model_manager
 
 

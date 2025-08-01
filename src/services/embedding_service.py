@@ -9,12 +9,6 @@ from typing import Any, Dict, List, Optional
 
 from config.constants import QUERY_POOL_SIZE, CONTEXT_DEFAULT_CHUNKS, CONTEXT_PERFORMANCE_LIMIT
 from config.settings import get_settings_manager
-from core.chunking import get_chunker
-from core.embeddings.model_manager import get_model_manager
-from core.embeddings.vector_store import get_vector_store
-from core.formatting.context_formatter import get_context_formatter
-from core.query.preprocessor import get_query_preprocessor
-from core.query.result_merger import get_result_merger
 from utils.error_handler import validate_embedding_name, validate_file_path
 from utils.exceptions import ValidationError
 from utils.logging import get_logger
@@ -24,11 +18,38 @@ class EmbeddingService:
     """Service for embedding-related operations."""
 
     def __init__(self):
+        import time
+        init_start_time = time.time()
+        
         self.logger = get_logger(__name__)
+        verbose = self.logger.isEnabledFor(10)  # DEBUG level = 10
+        
+        # Settings Manager
         self.settings_manager = get_settings_manager()
+        
+        # Model Manager (LAZY IMPORT - can be slow)
+        if verbose:
+            t2 = time.time()
+        from core.embeddings.model_manager import get_model_manager
         self.model_manager = get_model_manager()
+        if verbose:
+            self.logger.info("⏱️  Model Manager: %.3fs", time.time() - t2)
+        
+        # Vector Store (LAZY IMPORT - ChromaDB connection)
+        if verbose:
+            t3 = time.time()
+        from core.embeddings.vector_store import get_vector_store
         self.vector_store = get_vector_store()
+        if verbose:
+            self.logger.info("⏱️  Vector Store: %.3fs", time.time() - t3)
+        
+        # Chunker (LAZY IMPORT)
+        from core.chunking import get_chunker
         self.chunker = get_chunker()
+        
+        if verbose:
+            total_time = time.time() - init_start_time
+            self.logger.info("✅ EmbeddingService ready in %.3fs", total_time)
 
     def generate_embedding(
         self, path: str, name: str, ignore_file: str = None, show_progress: bool = True
@@ -290,12 +311,35 @@ class QueryService:
     """Service for query operations."""
 
     def __init__(self):
+        import time
+        init_start_time = time.time()
+        
         self.logger = get_logger(__name__)
+        verbose = self.logger.isEnabledFor(10)  # DEBUG level = 10
+        
+        # Settings Manager
         self.settings_manager = get_settings_manager()
+        
+        # Vector Store (LAZY IMPORT - ChromaDB connection can be slow)
+        if verbose:
+            t2 = time.time()
+        from core.embeddings.vector_store import get_vector_store
         self.vector_store = get_vector_store()
+        if verbose:
+            self.logger.info("⏱️  Vector Store: %.3fs", time.time() - t2)
+        
+        # Result Merger, Query Preprocessor, Context Formatter (LAZY IMPORTS)
+        from core.query.result_merger import get_result_merger
+        from core.query.preprocessor import get_query_preprocessor
+        from core.formatting.context_formatter import get_context_formatter
+        
         self.result_merger = get_result_merger()
         self.query_preprocessor = get_query_preprocessor()
         self.context_formatter = get_context_formatter()
+        
+        if verbose:
+            total_time = time.time() - init_start_time
+            self.logger.info("✅ QueryService ready in %.3fs", total_time)
 
     def query_context(
         self,
