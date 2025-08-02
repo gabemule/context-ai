@@ -231,13 +231,82 @@ def _get_embeddings_analytics(embeddings_list: List[str]) -> Dict:
         return {"oldest": None, "newest": None, "sizes": {}, "created_dates": {}}
 
 
-def _get_basic_analytics(embeddings_list: List[str]) -> Dict:
-    """Get basic analytics including essential embeddings metadata."""
+def _get_complete_analytics(embeddings_list: List[str], base_path: Path) -> Dict:
+    """Get complete analytics including embeddings, logs, and models."""
     return {
         "embeddings_analytics": _get_embeddings_analytics(embeddings_list),
-        "log_analytics": {"count": 0, "types": {}},
-        "models_analytics": {"count": 0, "cached_models": []},
+        "log_analytics": _get_log_analytics(base_path),
+        "models_analytics": _get_models_analytics(base_path),
     }
+
+
+def _get_log_analytics(base_path: Path) -> Dict:
+    """Get log file analytics."""
+    try:
+        logs_dir = base_path / "logs"
+        if not logs_dir.exists():
+            return {"count": 0, "types": {}, "total_size_mb": 0}
+        
+        log_files = list(logs_dir.glob("*.log"))
+        log_types = {}
+        total_size = 0
+        
+        for log_file in log_files:
+            try:
+                size = log_file.stat().st_size
+                total_size += size
+                
+                # Categorize by filename pattern
+                for log_type, pattern in LOG_TYPE_PATTERNS.items():
+                    if pattern and pattern in log_file.name:
+                        log_types[log_type] = log_types.get(log_type, 0) + 1
+                        break
+                else:
+                    log_types["general"] = log_types.get("general", 0) + 1
+                    
+            except Exception:
+                continue
+        
+        return {
+            "count": len(log_files),
+            "types": log_types,
+            "total_size_mb": round(total_size / (1024 * 1024), 2),
+        }
+        
+    except Exception:
+        return {"count": 0, "types": {}, "total_size_mb": 0}
+
+
+def _get_models_analytics(base_path: Path) -> Dict:
+    """Get cached models analytics."""
+    try:
+        models_dir = base_path / "models"
+        if not models_dir.exists():
+            return {"count": 0, "cached_models": [], "total_size_mb": 0}
+        
+        model_files = []
+        total_size = 0
+        
+        for model_path in models_dir.iterdir():
+            if model_path.is_dir():
+                try:
+                    size = sum(f.stat().st_size for f in model_path.rglob("*") if f.is_file())
+                    total_size += size
+                    model_files.append({
+                        "name": model_path.name,
+                        "size_mb": round(size / (1024 * 1024), 2),
+                    })
+                except Exception:
+                    continue
+        
+        return {
+            "count": len(model_files),
+            "cached_models": sorted(model_files, key=lambda x: x["size_mb"], reverse=True),
+            "total_size_mb": round(total_size / (1024 * 1024), 2),
+        }
+        
+    except Exception:
+        return {"count": 0, "cached_models": [], "total_size_mb": 0}
 
 
 # =============================================================================
@@ -318,7 +387,7 @@ class StorageManager:
                 "embeddings_count": len(embeddings),
                 "embeddings": embeddings,
                 "directory_sizes": dir_sizes,
-                **_get_basic_analytics(embeddings, self.path_manager.base_path),
+                **_get_complete_analytics(embeddings, self.path_manager.base_path),
                 "last_cleanup": self._get_last_cleanup_time(),
             }
 

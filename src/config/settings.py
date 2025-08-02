@@ -1,5 +1,7 @@
 """
 Settings management for Context-AI.
+
+Business logic layer for configuration management using ConfigCore.
 """
 
 import json
@@ -10,23 +12,34 @@ from typing import List, Optional
 from utils.exceptions import ConfigurationError
 from utils.logging import get_logger
 
-from .providers.registry import get_provider_registry
+from .core import get_config_core
 from .models import ActiveEmbeddings, AIProviderConfig, ContextAIConfig, EmbeddingInfo
 from .interfaces import PathProvider, get_default_path_provider
 
 
 class SettingsManager:
-    """Manages Context-AI configuration and settings."""
+    """
+    Manages Context-AI configuration and settings using ConfigCore.
+    
+    This is the business logic layer that uses ConfigCore for data operations
+    and provides higher-level configuration management.
+    """
 
-    def __init__(self, config_dir: Optional[str] = None, path_provider: Optional[PathProvider] = None):
+    def __init__(self, config_core=None, path_provider: Optional[PathProvider] = None):
         """
         Initialize settings manager.
 
         Args:
-            config_dir: Optional custom config directory path (legacy)
+            config_core: Optional ConfigCore instance for dependency injection
             path_provider: Optional path provider for dependency injection
         """
         self.logger = get_logger(__name__)
+
+        # Use dependency injection for ConfigCore (eliminates circular dependencies)
+        if config_core is not None:
+            self.config_core = config_core
+        else:
+            self.config_core = get_config_core()
 
         # Use dependency injection for paths (eliminates hardcoding)
         if path_provider is not None:
@@ -34,18 +47,11 @@ class SettingsManager:
         else:
             self.path_provider = get_default_path_provider()
 
-        # Determine config directory via PathProvider
-        if config_dir:
-            self.config_dir = Path(config_dir).expanduser()
-        else:
-            self.config_dir = self.path_provider.get_base_path()
-
         # Config file paths
-        self.config_file = self.path_provider.get_config_file_path("config.json")
+        self.config_dir = self.path_provider.get_base_path()
         self.active_file = self.path_provider.get_config_file_path("active.json")
 
-        # In-memory config cache
-        self._config: Optional[ContextAIConfig] = None
+        # In-memory active embeddings cache (config.json handled by ConfigCore)
         self._active: Optional[ActiveEmbeddings] = None
 
     def initialize(self) -> None:
@@ -54,13 +60,8 @@ class SettingsManager:
             # Create config directory
             self.config_dir.mkdir(parents=True, exist_ok=True)
 
-            # Create default config if doesn't exist
-            if not self.config_file.exists():
-                self.logger.info("Creating default configuration file")
-                default_config = ContextAIConfig()
-                self._save_config(default_config)
-
-            # Create default active embeddings if doesn't exist
+            # ConfigCore handles config.json initialization automatically
+            # We only need to handle active.json here
             if not self.active_file.exists():
                 self.logger.info("Creating default active embeddings file")
                 default_active = ActiveEmbeddings()
@@ -72,15 +73,15 @@ class SettingsManager:
             raise ConfigurationError(f"Failed to initialize configuration: {e}")
 
     def get_config(self) -> ContextAIConfig:
-        """Get current configuration."""
-        if self._config is None:
-            self._load_config()
-        return self._config
+        """Get current configuration via ConfigCore."""
+        # Use ConfigCore instead of direct file operations
+        config_data = self.config_core.get_config_data()
+        return ContextAIConfig(**config_data)
 
     def save_config(self, config: ContextAIConfig) -> None:
-        """Save configuration to file."""
-        self._save_config(config)
-        self._config = config
+        """Save configuration via ConfigCore."""
+        # Use ConfigCore instead of direct file operations
+        self.config_core.save_config_data(config.dict())
 
     def get_active_embeddings(self) -> ActiveEmbeddings:
         """Get active embeddings configuration."""
@@ -94,72 +95,44 @@ class SettingsManager:
         self._active = active
 
     def set_claude_api_key(self, api_key: str) -> None:
-        """Set Claude API key."""
-        config = self.get_config()
+        """Set Claude API key via ConfigCore."""
+        # Use ConfigCore directly - cleaner and simpler
+        self.config_core.set_provider_api_key("claude", api_key)
+        self.config_core.set_active_provider("claude")
+        
+        # Set default model and max_tokens via ProviderRegistry
+        from .providers.registry import get_provider_registry
         registry = get_provider_registry()
-
-        # Create or update Claude provider config
-        config.ai["claude"] = AIProviderConfig(
-            api_key=api_key,
-            default_model=registry.default_model,
-            max_tokens=registry.get_max_tokens(),
-        )
-
-        # Set as active provider
-        config.active_provider = "claude"
-
-        self.save_config(config)
+        default_model = registry.default_model
+        max_tokens = registry.get_max_tokens()
+        
+        self.config_core.set_provider_model("claude", default_model)
+        self.config_core.set_provider_max_tokens("claude", max_tokens)
+        
         self.logger.info("Claude API key configured successfully")
 
     def get_claude_api_key(self) -> Optional[str]:
-        """Get Claude API key."""
-        config = self.get_config()
-        claude_config = config.ai.get("claude")
-        return claude_config.api_key if claude_config else None
+        """Get Claude API key via ConfigCore."""
+        return self.config_core.get_provider_api_key("claude")
 
     def set_active_provider(self, provider: str) -> None:
-        """Set active AI provider."""
-        config = self.get_config()
-        config.active_provider = provider
-        self.save_config(config)
+        """Set active AI provider via ConfigCore."""
+        self.config_core.set_active_provider(provider)
         self.logger.info("Active provider set to: %s", provider)
 
     def set_model(self, model: str) -> None:
-        """Set model for the active provider."""
-        config = self.get_config()
-        active_provider = config.active_provider
-        
-        if active_provider == "claude":
-            # Update Claude config with new model
-            if "claude" not in config.ai:
-                # Create default Claude config if doesn't exist
-                registry = get_provider_registry()
-                config.ai["claude"] = AIProviderConfig(
-                    api_key="",  # Will need to be set separately
-                    default_model=model,
-                    max_tokens=registry.get_max_tokens(),
-                )
-            else:
-                # Update existing config
-                config.ai["claude"].default_model = model
-                
-        # Future: add support for other providers
-        # elif active_provider == "openai":
-        #     config.ai["openai"].default_model = model
-        
-        self.save_config(config)
+        """Set model for the active provider via ConfigCore."""
+        active_provider = self.config_core.get_active_provider()
+        self.config_core.set_provider_model(active_provider, model)
         self.logger.info("Model for %s set to: %s", active_provider, model)
 
     def get_prompt_mode(self) -> str:
-        """Get the current prompt mode."""
-        config = self.get_config()
-        return config.prompt_mode
+        """Get the current prompt mode via ConfigCore."""
+        return self.config_core.get_prompt_mode()
 
     def set_prompt_mode(self, mode: str) -> None:
-        """Set the prompt mode."""
-        config = self.get_config()
-        config.prompt_mode = mode
-        self.save_config(config)
+        """Set the prompt mode via ConfigCore."""
+        self.config_core.set_prompt_mode(mode)
         self.logger.info("Prompt mode set to: %s", mode)
 
     def set_active_embeddings(self, embedding_names: List[str]) -> None:
@@ -249,29 +222,6 @@ class SettingsManager:
             self.logger.error("Error deleting embedding '%s': %s", embedding_name, e)
             raise ConfigurationError(f"Failed to delete embedding '{embedding_name}': {e}")
 
-    def _load_config(self) -> None:
-        """Load configuration from file."""
-        try:
-            if not self.config_file.exists():
-                self.initialize()
-
-            with open(self.config_file, "r") as f:
-                data = json.load(f)
-                self._config = ContextAIConfig(**data)
-
-        except Exception as e:
-            raise ConfigurationError(f"Failed to load configuration: {e}")
-
-    def _save_config(self, config: ContextAIConfig) -> None:
-        """Save configuration to file."""
-        try:
-            self.config_dir.mkdir(parents=True, exist_ok=True)
-
-            with open(self.config_file, "w") as f:
-                json.dump(config.dict(), f, indent=2, default=str)
-
-        except Exception as e:
-            raise ConfigurationError(f"Failed to save configuration: {e}")
 
     def _load_active(self) -> None:
         """Load active embeddings from file."""

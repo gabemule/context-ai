@@ -31,10 +31,10 @@ class ConfigCore:
         if config_path:
             self.config_file = config_path
         else:
-            # Use default path via storage manager for consistency
-            from config.storage import get_storage_manager
-            storage = get_storage_manager()
-            self.config_file = storage.path_manager.config_file
+            # Use default path 
+            from config.constants import DEFAULT_CONFIG_DIR
+            base_path = Path(DEFAULT_CONFIG_DIR).expanduser().resolve()
+            self.config_file = base_path / "config.json"
         
         self._data: Optional[Dict] = None
     
