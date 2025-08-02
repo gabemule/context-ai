@@ -29,27 +29,71 @@ FASE 1: Análise Completa → FASE 2: Criar TokenManager → FASE 3: Migrar Toke
 
 ## 📊 **SITUAÇÃO ATUAL IDENTIFICADA:**
 
-### **🧮 TOKEN COUNTING - ANÁLISE BASE**
-- **61+ ocorrências** de token counting espalhadas
+### **🧮 TOKEN COUNTING - ANÁLISE EXPANDIDA COMPLETA**
+- **300+ ocorrências** de token-related functionality espalhadas (CONFIRMADO via busca sistemática)
 - **4 implementações principais duplicadas:**
   1. **TokenCalculator** (services/ai_service.py) ⭐ - bem estruturado, mal localizado
   2. **count_tokens** (core/formatting/context_formatter.py) ✅ - tiktoken robusto + cache básico
   3. **count_tokens simples** (core/ai/prompt_builder.py) ❌ - duplicação básica
   4. **_estimate_token_count** (core/chunking/langchain_adapter.py) ❌ - duplicação com heurística
 
-### **📁 ARQUIVOS COM TOKEN COUNTING (BASE CONHECIDA):**
-- **services/ai_service.py** (16+ usos) - TokenCalculator + métodos
-- **core/formatting/context_formatter.py** (25+ usos) - função principal + cache
-- **utils/session_logger.py** (múltiplos) - logging de tokens
-- **core/ai/claude_client.py** (streaming) - decisões baseadas em tokens
-- **core/chunking/langchain_adapter.py** (metadata) - token estimation
-- **core/ai/prompt_builder.py** (logging) - contagem para logs
-- **services/embedding_service.py** (stats) - estatísticas de contexto
+### **📁 ARQUIVOS COM TOKEN COUNTING (MAPEAMENTO COMPLETO):**
 
-### **⚠️ ANÁLISE EXPANDIDA NECESSÁRIA:**
-- **Durante execução**: Buscar casos adicionais não identificados na análise base
-- **Patterns criativos**: Imports indiretos, uso via other modules
-- **Edge cases**: Token counting em testes, utilities, configs
+**🎯 ARQUIVOS CRÍTICOS (Alta Densidade):**
+- **services/ai_service.py** (25+ usos) - TokenCalculator + display_token_stats + allocation logic
+- **core/formatting/context_formatter.py** (30+ usos) - implementação principal tiktoken + cache LRU
+- **utils/session_logger.py** (15+ usos) - token totals, statistics, metadata
+- **core/ai/claude_client.py** (10+ usos) - streaming decisions, usage logging
+- **config/constants/ai.py** (15+ constants) - ratios, thresholds, limits
+- **core/ai/prompt_builder.py** (5+ usos) - logging, simple counting
+- **config/providers/registry.py** (functions) - get_max_tokens(), get_max_output_tokens()
+
+**🔧 ARQUIVOS DE CONFIGURAÇÃO (Token Ecosystem):**
+- **config/providers/claude.py** (model configs) - max_output_tokens por modelo
+- **config/providers/base.py** (base classes) - max_context_window, max_output_tokens
+- **config/models/ai.py** (model configs) - token limits integration
+- **config/settings.py** (settings) - token-related configurations
+- **commands/config.py** (display) - token information display
+
+**⚙️ ARQUIVOS DE INTEGRAÇÃO:**
+- **core/chunking/langchain_adapter.py** (metadata) - token estimation em chunks
+- **services/embedding_service.py** (stats) - context token statistics
+- **config/constants/validation.py** (cache) - token cache settings
+
+### **📊 ECOSYSTEM DE TOKEN MANAGEMENT DESCOBERTO:**
+
+**🎯 Constants & Configuration (15+ occurrences):**
+- `CONTEXT_TOKEN_RATIO = 0.65` (65% of capacity for context)
+- `RESPONSE_TOKEN_RATIO = 0.8` (80% of remaining for response)  
+- `MIN_RESPONSE_TOKENS = 4000` (minimum response tokens)
+- `STREAMING_THRESHOLD_TOKENS = 50000` (streaming trigger threshold)
+- `CHAT_HISTORY_TOKEN_RATIO` (history vs code context ratio)
+- `TOKEN_CACHE_SIZE = 200` (LRU cache size)
+- `AVG_CHARS_PER_TOKEN = 4` (fallback estimation ratio)
+
+**🎯 Provider System Integration (86+ max_tokens occurrences):**
+- `get_max_tokens()` - dynamic context window por modelo ativo
+- `get_max_output_tokens()` - dynamic max output por modelo ativo
+- Claude models: varying max_output_tokens (8K-64K depending on model)
+- Provider-specific token limits and configurations
+
+**🎯 Session & Logging System (56+ input/output token occurrences):**
+- `total_tokens`, `total_prompt_tokens`, `total_response_tokens` tracking
+- Token statistics per turn and session
+- Token metadata in context logging
+- Token relevance calculations for context quality
+
+**🎯 Streaming & Performance System:**
+- Token-based streaming decisions (`STREAMING_THRESHOLD_TOKENS`)
+- Performance diagnostics based on token thresholds  
+- Context window usage monitoring and warnings
+- Cache performance optimization for repeated token counting
+
+### **✅ ANÁLISE EXPANDIDA CONCLUÍDA:**
+- ✅ **Busca sistemática realizada** - 300+ casos identificados
+- ✅ **Patterns criativos mapeados** - input_tokens, output_tokens, max_tokens
+- ✅ **Edge cases descobertos** - constants, configs, session management
+- ✅ **Ecosystem completo documentado** - provider integration, performance system
 
 ---
 
@@ -78,22 +122,36 @@ FASE 1: Análise Completa → FASE 2: Criar TokenManager → FASE 3: Migrar Toke
 
 #### **📋 1.2.1 Busca Sistemática por Token Counting**
 
-**Buscar por patterns específicos:**
-- [ ] `count_tokens` (função direta)
-- [ ] `token_count` (variáveis/campos)
-- [ ] `tokens` (em contexto de counting)
-- [ ] `tiktoken` (library usage)
-- [ ] `anthropic.*token` (anthropic tokenizer)
-- [ ] `len.*encode` (encoding patterns)
-- [ ] `// 4` ou `/ 4` (estimation heuristics)
+**Patterns básicos (CONCLUÍDO):**
+- ✅ `count_tokens` (função direta) - 22 resultados encontrados
+- ✅ `token_count` (variáveis/campos) - múltiplas ocorrências
+- ✅ `tokens` (em contexto de counting) - 300+ resultados
+- ✅ `tiktoken` (library usage) - 4 resultados encontrados
+- ✅ `anthropic.*token` (anthropic tokenizer) - 0 resultados diretos
+- ✅ `len.*encode` (encoding patterns) - 2 resultados encontrados
+- ✅ `// 4` ou `/ 4` (estimation heuristics) - 4 resultados cada
+
+**Patterns avançados descobertos (CONCLUÍDO):**
+- ✅ `input_tokens|output_tokens` - 56 resultados críticos
+- ✅ `max_tokens` - 86 resultados críticos  
+- ✅ `_estimate_token_count` - 2 resultados específicos
+- ✅ `AVG_CHARS_PER_TOKEN` - 3 resultados com constante
+- ✅ `RESPONSE_TOKEN_RATIO|CONTEXT_TOKEN_RATIO|MIN_RESPONSE_TOKENS` - 15 resultados
+- ✅ `STREAMING_THRESHOLD_TOKENS` - 5 resultados para streaming decisions
 
 #### **📋 1.2.2 Busca por Imports e Dependencies**
 
-- [ ] `import tiktoken`
-- [ ] `from tiktoken import`
-- [ ] `import anthropic`
-- [ ] `from anthropic import`
-- [ ] Imports indiretos via other modules
+**Imports diretos (CONCLUÍDO):**
+- ✅ `import tiktoken` - Apenas em context_formatter.py
+- ✅ `from tiktoken import` - Não encontrado
+- ✅ `import anthropic` - Não encontrado (uso via try/except)
+- ✅ `from anthropic import` - Não encontrado
+- ✅ Imports indiretos via other modules - Identificados via registry system
+
+**Provider functions descobertas:**
+- ✅ `get_max_tokens()` - função crítica do provider registry
+- ✅ `get_max_output_tokens()` - função crítica do provider registry
+- ✅ Token limits integration via config system
 
 #### **📋 1.2.3 Análise Inteligente e Criativa**
 
@@ -105,14 +163,26 @@ FASE 1: Análise Completa → FASE 2: Criar TokenManager → FASE 3: Migrar Toke
 #### **📋 1.2.4 Documentar Achados Expandidos**
 
 ```
-📋 NOVOS CASOS ENCONTRADOS (atualizar durante busca):
+📋 CASOS DESCOBERTOS (ANÁLISE EXPANDIDA COMPLETA):
 
-✅ src/example/file.py - line X: pattern encontrado
-✅ src/another/module.py - line Y: uso indireto
-[ ... adicionar conforme descobrir ... ]
+✅ ESCOPO REAL DESCOBERTO: 300+ ocorrências (não 61+ como estimado)
+✅ src/services/ai_service.py - 25+ usos (TokenCalculator + display_token_stats + allocation logic)
+✅ src/core/formatting/context_formatter.py - 30+ usos (tiktoken + cache LRU)
+✅ src/utils/session_logger.py - 15+ usos (totals, statistics, metadata)
+✅ src/core/ai/claude_client.py - 10+ usos (streaming, usage logging)
+✅ src/config/constants/ai.py - 15+ constants (ratios, thresholds, limits)
+✅ src/config/providers/registry.py - get_max_tokens(), get_max_output_tokens()
+✅ src/config/providers/claude.py - max_output_tokens por modelo
+✅ src/config/providers/base.py - max_context_window, max_output_tokens
+✅ src/commands/config.py - token information display
+✅ src/config/models/ai.py - token limits integration
+✅ src/config/settings.py - token-related configurations
+✅ src/core/ai/prompt_builder.py - 5+ usos (logging, simple counting)
+✅ src/core/chunking/langchain_adapter.py - _estimate_token_count
+✅ src/services/embedding_service.py - context token statistics
+✅ src/config/constants/validation.py - token cache settings
 
-Se NENHUM novo caso:
-✅ CONFIRMADO: Análise base estava completa - 61 ocorrências mapeadas
+CONFIRMADO: Ecosystem de token management muito mais complexo que estimado inicialmente
 ```
 
 ---
@@ -121,12 +191,20 @@ Se NENHUM novo caso:
 
 #### **📋 1.3.1 APIs Públicas Obrigatórias**
 
-**Funções que DEVEM existir no TokenManager:**
+**Funções BÁSICAS que DEVEM existir no TokenManager:**
 - [ ] `count_tokens(text: str, provider: Optional[TokenProvider] = None) -> int`
 - [ ] `calculate_context_allocation(question: str, include_history: bool = False) -> Dict[str, int]`
 - [ ] `calculate_response_tokens(input_tokens: int, context_tokens: int) -> int`
-- [ ] `should_use_streaming(text: str) -> bool` (se existe em TokenCalculator)
+- [ ] `should_use_streaming(text: str) -> bool` (baseado em STREAMING_THRESHOLD_TOKENS)
 - [ ] `clear_cache() -> None` (para LRU cache management)
+
+**Funções AVANÇADAS descobertas durante análise expandida:**
+- [ ] `get_streaming_threshold() -> int` (retorna STREAMING_THRESHOLD_TOKENS)
+- [ ] `get_model_token_limits() -> Dict[str, int]` (max_input, max_output, max_context)
+- [ ] `estimate_tokens_from_chars(char_count: int) -> int` (usando AVG_CHARS_PER_TOKEN)
+- [ ] `validate_token_limits(input_tokens: int, output_tokens: int = 0) -> Dict[str, Any]`
+- [ ] `get_cache_info() -> Dict[str, Any]` (estatísticas LRU cache)
+- [ ] `get_performance_stats() -> Dict[str, Any]` (stats completas)
 
 #### **📋 1.3.2 Provider Support Necessário**
 
