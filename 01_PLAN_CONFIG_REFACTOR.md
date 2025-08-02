@@ -302,6 +302,341 @@ __all__ = [
 - [x] Validar que Pydantic models funcionam corretamente
 - [x] Testar comandos de configuração
 
+### **🔄 7.5 Melhorias Config Module - Separação de Responsabilidades**
+
+#### **📋 7.5.1 Análise de Inconsistências Identificadas**
+
+**🔍 PROBLEMA CRÍTICO: Responsabilidades Sobrepostas**
+
+##### **1️⃣ Duplicação EMBEDDINGS Management:**
+```python
+# ❌ INCONSISTÊNCIA: Duas fontes de verdade
+SettingsManager.get_available_embeddings()     # Lê JSON metadata files
+StorageManager.list_embeddings()               # Lê dados reais do ChromaDB
+
+SettingsManager.save_embedding_metadata()      # Salva JSON metadata  
+StorageManager.delete_embedding()              # Deleta dados reais
+
+# 🐛 PROBLEMA: Metadata pode ficar órfão dos dados reais
+```
+
+##### **2️⃣ TRIPLICAÇÃO CONFIGURATION Copy:**
+```python
+# ❌ INCONSISTÊNCIA: TRÊS locais copiando configs
+LanguagesManager._ensure_config_exists()       # Copia languages apenas
+GuidelinesManager._ensure_guidelines_exist()   # Copia guidelines apenas  
+SettingsManager._ensure_all_configs_exist()    # Copia languages + guidelines + prompts
+
+# 🐛 PROBLEMA: Configurações podem ser copiadas 3x, total inconsistência!
+```
+
+##### **3️⃣ CONSTANTS Duplicadas:**
+```python
+# ❌ INCONSISTÊNCIA: BYTES_PER_MB definido em 2 lugares
+src/config/constants/system.py:    BYTES_PER_MB = 1024 * 1024
+src/config/constants/storage.py:   BYTES_PER_MB = 1024 * 1024
+
+# 🐛 PROBLEMA: Duplicação de constantes, pode divergir
+```
+
+##### **4️⃣ PATH Construction Hardcoded:**
+```python
+# ❌ INCONSISTÊNCIA: Path construction em múltiplos locais
+LanguagesManager:   Path(DEFAULT_CONFIG_DIR).expanduser() / "config"
+GuidelinesManager:  Path(DEFAULT_CONFIG_DIR).expanduser() / "config" / "guidelines"  
+SettingsManager:    Path("~/.context-ai").expanduser()
+
+# 🐛 PROBLEMA: Múltiplas fontes de paths, sem centralização
+```
+
+##### **5️⃣ Sobreposição DIRECTORY Management:**
+```python
+# ❌ INCONSISTÊNCIA: Paths duplicados
+SettingsManager.embeddings_dir = config_dir / "embeddings"
+StorageManager.embeddings_dir = base_path / "embeddings"
+
+# 🐛 PROBLEMA: Múltiplas fontes de paths, pode divergir
+```
+
+#### **💡 7.5.2 Plano de Separação de Responsabilidades**
+
+##### **📋 CONFIG (SettingsManager) - Configurações da Aplicação**
+```python
+# ✅ RESPONSABILIDADES CORRETAS:
+- API keys, models, providers
+- Prompt modes, active embeddings  
+- Application configuration (config.json)
+- Centralized config copying (languages + guidelines + prompts)
+
+# ❌ MOVER PARA StorageManager:
+- get_available_embeddings()
+- save_embedding_metadata()  
+- delete_embedding_metadata()
+- embeddings_dir management
+```
+
+##### **💾 STORAGE (StorageManager) - Storage e Metadata**
+```python
+# ✅ ADICIONAR de SettingsManager:
++ get_available_embeddings()    # Gerencia metadata JSONs
++ save_embedding_metadata()     # Salva metadata
++ delete_embedding_metadata()   # Deleta metadata
++ Coordenação com dados reais   # Evita orphaned metadata
+
+# ✅ RESPONSABILIDADES CORRETAS:
+- Paths, directory structure
+- Analytics, cleanup operations
+- Storage coordination
+```
+
+##### **🌍 LANGUAGES (LanguagesManager) - Languages Logic Puro**
+```python
+# ❌ REMOVER (delegar para SettingsManager):
+- _ensure_config_exists()       # Copy individual removido
+
+# ✅ RESPONSABILIDADES CORRETAS:  
+- Languages.yaml processing
+- Guidelines integration
+- Language detection e management
+```
+
+#### **🔧 7.5.3 Implementação da Refatoração**
+
+##### **STEP 1: Mover Embeddings Management**
+- [ ] **MOVER** `SettingsManager.get_available_embeddings()` → `StorageManager`
+- [ ] **MOVER** `SettingsManager.save_embedding_metadata()` → `StorageManager`
+- [ ] **MOVER** `SettingsManager.delete_embedding_metadata()` → `StorageManager`
+- [ ] **ATUALIZAR** `StorageManager.delete_embedding()` para coordenar metadata + dados
+- [ ] **REMOVER** `SettingsManager.embeddings_dir` management
+
+##### **STEP 2: Eliminar TRIPLICAÇÃO de Configuration Copy**
+- [ ] **REMOVER** `LanguagesManager._ensure_config_exists()` método
+- [ ] **REMOVER** `GuidelinesManager._ensure_guidelines_exist()` método
+- [ ] **ATUALIZAR** `LanguagesManager._load_config()` para verificar via SettingsManager:
+```python
+def _load_config(self, force_reload: bool = False) -> LanguagesConfig:
+    if not self.languages_file.exists():
+        # Delegar para settings manager - garante TODAS as configs
+        from config.settings import get_settings_manager
+        get_settings_manager()  # Isso copia languages + guidelines + prompts
+    # Continue com load normal...
+```
+- [ ] **ATUALIZAR** `GuidelinesManager.get_guideline()` para verificar via SettingsManager:
+```python
+def get_guideline(self, language: str) -> Optional[str]:
+    # Ensure configs exist via centralized copy
+    from config.settings import get_settings_manager
+    get_settings_manager()  
+    # Continue with normal guideline loading...
+```
+
+##### **STEP 3: Consolidar Constants Duplicadas**
+- [ ] **REMOVER** `BYTES_PER_MB` de `src/config/constants/storage.py`
+- [ ] **ATUALIZAR** imports em `storage.py` para usar:
+```python
+from config.constants.system import BYTES_PER_MB
+```
+- [ ] **VERIFICAR** outros locais que possam usar esta constante
+
+##### **STEP 4: Centralizar Path Construction**
+- [ ] **ATUALIZAR** `LanguagesManager` para usar `get_settings_manager().config_dir`:
+```python
+def __init__(self, config_dir: Optional[Path] = None):
+    if config_dir is None:
+        from config.settings import get_settings_manager
+        settings_manager = get_settings_manager()
+        config_dir = settings_manager.config_dir / "config"
+    # Continue...
+```
+- [ ] **ATUALIZAR** `GuidelinesManager` similarmente
+- [ ] **ELIMINAR** todas as construções diretas de `Path(DEFAULT_CONFIG_DIR).expanduser()`
+
+##### **STEP 5: Consolidar Directory Management**  
+- [ ] **CENTRALIZAR** todos os paths via StorageManager
+- [ ] **REMOVER** construção duplicada de paths
+- [ ] **ATUALIZAR** SettingsManager para usar StorageManager paths quando apropriado
+
+##### **STEP 6: Mover Guidelines para Config Raiz**
+- [ ] **MOVER** `src/config/languages/guidelines.py` → `src/config/guidelines.py`
+- [ ] **ATUALIZAR** imports em todos os arquivos que usam guidelines:
+```python
+# ANTES:
+from config.languages.guidelines import get_guidelines_manager
+
+# DEPOIS:  
+from config.guidelines import get_guidelines_manager
+```
+- [ ] **ATUALIZAR** `src/config/__init__.py` para re-exportar guidelines
+- [ ] **REMOVER** guidelines exports do `src/config/languages/__init__.py`
+- [ ] **BUSCAR** por todos os imports no codebase e atualizar
+- [ ] **TESTAR** que GuidelinesManager continua funcionando no novo local
+
+##### **STEP 7: Extrair Utils Genéricos de Loading**
+- [ ] **CRIAR** `src/utils/yaml_loader.py` com classe genérica:
+```python
+class GenericYAMLLoader:
+    def load(self, file_path: Path) -> Dict[str, Any]:
+        # YAML loading com error handling genérico
+        # Sem lógica específica de configuração
+```
+- [ ] **CRIAR** `src/utils/file_operations.py` com operações genéricas:
+```python  
+class FileSystemOperations:
+    def copy_file(self, source: Path, target: Path) -> bool:
+    def list_files(self, directory: Path, pattern: str) -> List[Path]:
+    def ensure_directory_exists(self, directory: Path) -> None:
+    # File operations genéricas reutilizáveis
+```
+- [ ] **ATUALIZAR** `config/languages/loader.py` para usar utils genéricos:
+```python
+from utils.yaml_loader import GenericYAMLLoader
+from utils.file_operations import FileSystemOperations
+```
+- [ ] **MANTER** lógica específica de languages no loader (validação, models, etc.)
+- [ ] **ATUALIZAR** outros módulos para usar utils genéricos quando apropriado
+
+##### **STEP 8: Reorganizar Providers Structure**
+- [ ] **PROBLEMA IDENTIFICADO**: `src/config/providers/base.py` mistura responsabilidades:
+```python
+# ❌ MISTURA: Protocols + Models + Abstract Classes
+class ProviderCapabilities:        # → Deveria ser Pydantic model local
+class AIProviderProtocol(Protocol): # → OK como protocol  
+class BaseProvider(ABC):           # → Desnecessário se temos protocol
+```
+- [ ] **CRIAR** `src/config/providers/models.py` com modelos locais:
+```python
+class ProviderCapabilities(BaseModel):
+    supports_streaming: bool = False
+    supports_function_calling: bool = False
+    supports_vision: bool = False
+    max_context_window: int = 200000
+    max_output_tokens: int = 4000
+```
+- [ ] **RENOMEAR** `src/config/providers/base.py` → `src/config/providers/protocols.py`
+- [ ] **MANTER** apenas `AIProviderProtocol` no arquivo protocols
+- [ ] **REMOVER** `BaseProvider` (implementações usam protocol diretamente)
+- [ ] **ATUALIZAR** `src/config/providers/claude.py` para:
+```python
+from .protocols import AIProviderProtocol
+from .models import ProviderCapabilities
+```
+- [ ] **ATUALIZAR** imports em outros arquivos que usam providers
+
+#### **📋 7.5.4 Checklist Detalhado de Refatoração**
+
+##### **🔄 Refatorar SettingsManager**
+```python
+# ❌ REMOVER métodos (mover para StorageManager):
+- [ ] def get_available_embeddings() -> List[EmbeddingInfo]
+- [ ] def save_embedding_metadata(self, embedding_info: EmbeddingInfo) -> None  
+- [ ] def delete_embedding_metadata(self, embedding_name: str) -> None
+- [ ] self.embeddings_dir = self.config_dir / "embeddings"
+
+# ✅ MANTER métodos (config puro):
+- [x] def set_claude_api_key()
+- [x] def get_prompt_mode() / set_prompt_mode()
+- [x] def set_active_embeddings() # Apenas lista de nomes
+- [x] def _ensure_all_configs_exist() # Copy centralizado de TUDO
+
+# 🔄 ATUALIZAR métodos:
+- [ ] def set_active_embeddings() # Usar StorageManager para validar nomes
+```
+
+##### **🔄 Refatorar StorageManager**
+```python
+# ✅ ADICIONAR métodos (vindo de SettingsManager):
+- [ ] def get_available_embeddings() -> List[EmbeddingInfo]
+- [ ] def save_embedding_metadata(self, embedding_info: EmbeddingInfo) -> None
+- [ ] def delete_embedding_metadata(self, embedding_name: str) -> None
+
+# 🔄 MELHORAR métodos existentes:
+- [ ] def delete_embedding() # Coordenar: dados reais + metadata JSON
+- [ ] def list_embeddings() # Coordenar com metadata para info completa
+- [ ] def embedding_exists() # Verificar dados reais + metadata
+
+# ✅ MANTER métodos (storage puro):
+- [x] def get_storage_info() 
+- [x] def cleanup_* methods
+- [x] path management methods
+```
+
+##### **🔄 Refatorar LanguagesManager**
+```python
+# ❌ REMOVER métodos (copy delegado):
+- [ ] def _ensure_config_exists()
+
+# 🔄 ATUALIZAR métodos:
+- [ ] def _load_config() # Delegar copy para get_settings_manager()
+
+# ✅ MANTER métodos (languages puro):
+- [x] def get_all_languages()
+- [x] def get_supported_extensions()
+- [x] def get_guidelines_languages()  
+```
+
+#### **🧪 7.5.5 Atualizar Integrações**
+
+##### **Arquivos que usam get_available_embeddings:**
+- [ ] Buscar por `get_available_embeddings` no codebase
+- [ ] Atualizar imports: `from config.settings import` → `from config.storage import`
+- [ ] Testar que commands continuam funcionando
+
+##### **Arquivos que usam embedding metadata:**
+- [ ] Buscar por `save_embedding_metadata` no codebase
+- [ ] Buscar por `delete_embedding_metadata` no codebase
+- [ ] Atualizar todos os imports e calls
+
+#### **🧪 7.5.6 Validação da Separação**
+
+##### **Testes de Responsabilidades:**
+- [ ] **SettingsManager**: Só gerencia config.json, active.json, API keys
+- [ ] **StorageManager**: Só gerencia paths, metadata JSONs, cleanup
+- [ ] **LanguagesManager**: Só gerencia languages.yaml, guidelines logic
+
+##### **Testes de Integração:**
+- [ ] **Embeddings workflow**: Create → Save metadata → List → Delete (coordenado)
+- [ ] **Config workflow**: First run → Copy all configs → Load configs
+- [ ] **Commands workflow**: Todos os commands funcionam sem regression
+
+##### **Testes de Coordenação:**
+- [ ] Delete embedding: Remove dados reais + metadata (sem orphans)
+- [ ] List embeddings: Mostra metadata + status dos dados reais
+- [ ] Save embeddings: Metadata sempre consistente com dados
+
+#### **📊 7.5.7 Critérios de Sucesso**
+
+##### **✅ Separação Completa:**
+```
+CONFIG (SettingsManager):
+- Zero gerenciamento de metadata de embeddings  
+- Zero paths hardcoded
+- Apenas configurações da aplicação
+
+STORAGE (StorageManager):  
+- Embeddings metadata consolidado
+- Coordenação dados + metadata
+- Zero configurações da aplicação
+
+LANGUAGES (LanguagesManager):
+- Zero copy de configurações
+- Apenas lógica de languages
+```
+
+##### **✅ Zero Inconsistências:**
+```
+- Uma fonte de verdade para embeddings metadata
+- Uma fonte de verdade para config copying  
+- Uma fonte de verdade para directory paths
+- Coordenação perfeita entre dados reais e metadata
+```
+
+##### **✅ APIs Mantidas:**
+```
+- Todos os commands funcionam sem mudanças
+- Backwards compatibility 100%
+- Performance mantida ou melhorada
+```
+
 ---
 
 ## 🔄 FASE 8: CENTRALIZAR CONFIGURAÇÕES E STORAGE
