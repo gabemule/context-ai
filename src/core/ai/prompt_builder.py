@@ -245,11 +245,10 @@ class PromptBuilder:
         return storage_manager.path_manager.prompts_dir
     
     def _get_default_prompt_directory(self) -> Path:
-        """Get the default prompt templates directory (src/config/samples/prompts/)."""
-        # Get path to the samples/prompts/ directory in the source code
-        current_dir = Path(__file__).parent.parent.parent.parent  # Go up to project root
-        default_prompt_dir = current_dir / "src" / "config" / "samples" / "prompts"
-        return default_prompt_dir
+        """Get the default prompt templates directory via StorageManager (centralized)."""
+        from config.storage import get_storage_manager
+        storage_manager = get_storage_manager()
+        return storage_manager.path_manager.template_prompts_dir
     
     def _ensure_user_prompt_config(self):
         """Ensure user prompt config exists, copy defaults if needed."""
