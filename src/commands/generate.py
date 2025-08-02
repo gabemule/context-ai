@@ -193,7 +193,7 @@ def _is_valid_embedding_name(name: str) -> bool:
 def _embedding_exists(name: str, logger) -> bool:
     """Check if embedding already exists (SRP)."""
     try:
-        from utils.storage import get_storage_manager
+        from config.storage import get_storage_manager
         
         storage_manager = get_storage_manager()
         return storage_manager.embedding_exists(name)

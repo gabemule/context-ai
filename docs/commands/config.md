@@ -36,6 +36,21 @@ context-ai config test [OPTIONS]
 context-ai config validate [OPTIONS]
 ```
 
+#### `models` - List Available AI Models
+```bash
+context-ai config models [OPTIONS]
+```
+
+#### `guidelines` - Manage Coding Guidelines
+```bash
+context-ai config guidelines <subcommand> [OPTIONS]
+```
+
+#### `languages` - Manage Programming Languages
+```bash
+context-ai config languages <subcommand> [OPTIONS]
+```
+
 ## 🔧 Set Subcommand
 
 ### **Syntax**
@@ -150,6 +165,151 @@ context-ai config validate
 
 # Detailed validation with verbose
 context-ai config validate --verbose
+```
+
+## 🤖 Models Subcommand
+
+### **Syntax**
+```bash
+context-ai config models [OPTIONS]
+```
+
+### **Options**
+
+#### `--provider`
+- **Type**: String
+- **Required**: No
+- **Default**: Show all providers
+- **Description**: Show models for specific provider only
+- **Example**: `--provider claude`
+
+#### `--verbose` / `-v`
+- **Type**: Boolean flag
+- **Required**: No
+- **Default**: False
+- **Description**: Show detailed model information including descriptions, speeds, token limits, and capabilities
+
+### **Usage Examples**
+
+#### **List All Models**
+```bash
+# List models for all providers
+context-ai config models
+
+# List models with detailed information
+context-ai config models --verbose
+```
+
+#### **List Models for Specific Provider**
+```bash
+# List Claude models only
+context-ai config models --provider claude
+
+# List Claude models with details
+context-ai config models --provider claude --verbose
+```
+
+## 📝 Guidelines Subcommand
+
+### **Syntax**
+```bash
+context-ai config guidelines <action> [OPTIONS]
+```
+
+### **Actions**
+
+#### `list` - List Available Guidelines
+```bash
+context-ai config guidelines list
+```
+
+#### `show` - Display Guideline Content
+```bash
+context-ai config guidelines show <language>
+```
+
+#### `edit` - Edit Guidelines in Default Editor
+```bash
+context-ai config guidelines edit <language>
+```
+
+#### `reset` - Reset Guidelines to Default
+```bash
+context-ai config guidelines reset <language>
+```
+
+#### `path` - Show Guidelines Directory Path
+```bash
+context-ai config guidelines path
+```
+
+### **Usage Examples**
+
+#### **Guidelines Management**
+```bash
+# List all available guidelines
+context-ai config guidelines list
+
+# Show Python guidelines content
+context-ai config guidelines show python
+
+# Edit JavaScript guidelines
+context-ai config guidelines edit javascript
+
+# Reset TypeScript guidelines to default
+context-ai config guidelines reset typescript
+
+# Show guidelines directory path
+context-ai config guidelines path
+```
+
+## 🌍 Languages Subcommand
+
+### **Syntax**
+```bash
+context-ai config languages <action> [OPTIONS]
+```
+
+### **Actions**
+
+#### `list` - List All Configured Languages
+```bash
+context-ai config languages list
+```
+
+#### `show` - Show Language Configuration Details
+```bash
+context-ai config languages show <language>
+```
+
+#### `reset` - Reset Language Configuration
+```bash
+context-ai config languages reset <language>
+```
+
+#### `path` - Show Languages Configuration Path
+```bash
+context-ai config languages path
+```
+
+### **Usage Examples**
+
+#### **Languages Management**
+```bash
+# List all configured languages
+context-ai config languages list
+
+# Show Python language configuration
+context-ai config languages show python
+
+# Show Vue configuration (with inheritance)
+context-ai config languages show vue
+
+# Reset Python configuration to default
+context-ai config languages reset python
+
+# Show languages configuration file path
+context-ai config languages path
 ```
 
 ## 🚀 All Usage Examples

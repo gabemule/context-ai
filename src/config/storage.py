@@ -240,11 +240,12 @@ class LogAnalytics:
             if not self.path_manager.logs_dir.exists():
                 return self._empty_analytics()
 
-            log_files = list(self.path_manager.logs_dir.rglob("*.log"))
-            if not log_files:
+            # Session logs are stored in directories, not .log files
+            session_dirs = [d for d in self.path_manager.logs_dir.iterdir() if d.is_dir()]
+            if not session_dirs:
                 return self._empty_analytics()
 
-            return self._analyze_log_files(log_files)
+            return self._analyze_session_dirs(session_dirs)
 
         except Exception as e:
             self.logger.warning("Error getting log analytics: %s", e)
@@ -254,22 +255,41 @@ class LogAnalytics:
         """Return empty analytics structure."""
         return {"count": 0, "oldest": None, "types": {}}
     
-    def _analyze_log_files(self, log_files: List[Path]) -> Dict:
-        """Analyze log files."""
+    def _analyze_session_dirs(self, session_dirs: List[Path]) -> Dict:
+        """Analyze session directories."""
         # Sort by modification time
-        logs_by_time = sorted(log_files, key=lambda x: x.stat().st_mtime)
-        oldest_log = logs_by_time[0] if logs_by_time else None
+        sessions_by_time = sorted(session_dirs, key=lambda x: x.stat().st_mtime)
+        oldest_session = sessions_by_time[0] if sessions_by_time else None
 
-        # Count by type
-        types = self._count_log_types(log_files)
+        # Count by type based on directory names
+        types = self._count_session_types(session_dirs)
 
         return {
-            "count": len(log_files),
-            "oldest": oldest_log.name if oldest_log else None,
-            "oldest_date": self._format_file_time(oldest_log) if oldest_log else None,
+            "count": len(session_dirs),
+            "oldest": oldest_session.name if oldest_session else None,
+            "oldest_date": self._format_file_time(oldest_session) if oldest_session else None,
             "types": types,
-            "recent_sessions": [f.name for f in logs_by_time[-5:]] if logs_by_time else [],
+            "recent_sessions": [d.name for d in sessions_by_time[-5:]] if sessions_by_time else [],
         }
+    
+    def _count_session_types(self, session_dirs: List[Path]) -> Dict[str, int]:
+        """Count sessions by type based on directory name patterns."""
+        types = {log_type: 0 for log_type in LOG_TYPE_PATTERNS.keys()}
+        
+        for session_dir in session_dirs:
+            name = session_dir.name.lower()
+            categorized = False
+            
+            for log_type, pattern in LOG_TYPE_PATTERNS.items():
+                if pattern and pattern in name:
+                    types[log_type] += 1
+                    categorized = True
+                    break
+            
+            if not categorized:
+                types["general"] += 1
+        
+        return types
     
     def _count_log_types(self, log_files: List[Path]) -> Dict[str, int]:
         """Count logs by type based on filename patterns."""

@@ -223,13 +223,16 @@ class LanguageConfigurationCopier(ConfigurationCopier):
             List of filenames that constitute the language configuration
         """
         return [
-            "languages.yaml",  # Primary configuration file
-            "README.md"        # User documentation and guide
+            "languages.yaml",         # Primary configuration file
+            "languages-README.md"     # User documentation and guide
         ]
     
     def get_source_directory(self) -> Path:
         """Get the source directory containing language templates."""
-        return Path(__file__).parent
+        # Point to samples/ instead of current directory
+        current_file = Path(__file__)
+        config_dir = current_file.parent.parent  # Go up to src/config/
+        return config_dir / "samples"
 
 
 class YAMLConfigLoader:

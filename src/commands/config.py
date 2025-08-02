@@ -511,7 +511,7 @@ def _handle_config_models(args, settings_manager, logger) -> int:
 
 def _handle_config_guidelines(args, settings_manager, logger) -> int:
     """Handle guidelines management (SRP)."""
-    from config.guidelines.manager import get_guidelines_manager
+    from config.languages.guidelines import get_guidelines_manager
     guidelines_manager = get_guidelines_manager()
     
     action_handlers = {
@@ -623,7 +623,7 @@ def _validate_embeddings(settings_manager, issues: List[str], logger) -> None:
 def _validate_storage(issues: List[str], logger) -> None:
     """Validate storage configuration."""
     try:
-        from utils.storage import get_storage_manager
+        from config.storage import get_storage_manager
         storage_manager = get_storage_manager()
         storage_info = storage_manager.get_storage_info()
 
@@ -747,7 +747,7 @@ def _display_embeddings(config, settings_manager, logger, verbose: bool) -> None
 def _display_storage_stats(logger) -> None:
     """Display storage statistics."""
     try:
-        from utils.storage import get_storage_manager
+        from config.storage import get_storage_manager
         storage_manager = get_storage_manager()
         storage_info = storage_manager.get_storage_info()
         embeddings_count = storage_info.get("embeddings_count", 0)
@@ -911,7 +911,7 @@ def _guidelines_reset(language: str, guidelines_manager, logger) -> int:
 
 def _guidelines_path(guidelines_manager, logger) -> int:
     """Show guidelines directory path."""
-    from config.guidelines.manager import PathResolver
+    from config.languages.guidelines import PathResolver
     guidelines_dir = PathResolver.get_guidelines_directory()
     logger.info("📁 Guidelines directory: %s", guidelines_dir)
     

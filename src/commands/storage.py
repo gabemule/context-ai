@@ -173,7 +173,7 @@ def execute_storage_command(args: argparse.Namespace) -> int:
     logger = get_logger(__name__)
     logger.info("🚀 Initializing storage command...")
 
-    from utils.storage import get_storage_manager
+    from config.storage import get_storage_manager
     storage_manager = get_storage_manager()
 
     # Route to appropriate handler (Strategy Pattern)

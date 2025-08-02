@@ -48,9 +48,6 @@ class LanguagesManager:
         self._config: Optional[LanguagesConfig] = None
         self._resolved_languages: Optional[Dict[str, ResolvedLanguageConfig]] = None
         self._cache_valid = False
-        
-        # Initialize configuration
-        self._ensure_config_exists()
     
     def _ensure_config_exists(self) -> None:
         """Ensure configuration files exist, create defaults if missing."""
@@ -162,7 +159,7 @@ class LanguagesManager:
         # Use the GuidelinesManager to get available guidelines
         # This will trigger the copy process if needed
         try:
-            from config.guidelines.manager import get_guidelines_manager
+            from config.languages.guidelines import get_guidelines_manager
             guidelines_manager = get_guidelines_manager()
             return guidelines_manager.get_available_languages()
         except Exception as e:

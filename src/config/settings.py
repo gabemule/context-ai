@@ -253,6 +253,68 @@ class SettingsManager:
         except Exception as e:
             raise ConfigurationError(f"Failed to save active embeddings: {e}")
 
+    def _ensure_all_configs_exist(self) -> None:
+        """Ensure all configuration files exist (centralized lazy copy)."""
+        try:
+            import shutil
+            
+            config_dir = self.config_dir / "config"
+            config_dir.mkdir(parents=True, exist_ok=True)
+            
+            # 1. Ensure Languages configuration exists
+            self.logger.debug("🌍 Ensuring languages configuration...")
+            from config.languages.loader import DefaultConfigGenerator
+            
+            copy_result = DefaultConfigGenerator.copy_all_language_files(config_dir)
+            if copy_result.has_changes:
+                self.logger.info(f"Initialized {copy_result.files_copied} language configuration files")
+            
+            # 2. Ensure Guidelines exist - Direct copy
+            self.logger.debug("📝 Ensuring guidelines configuration...")
+            guidelines_dir = config_dir / "guidelines"
+            if not guidelines_dir.exists() or not list(guidelines_dir.glob("*.md")):
+                # Copy guidelines from samples
+                current_file = Path(__file__)
+                project_root = current_file.parent.parent.parent  # Go up to project root 
+                samples_guidelines = project_root / "src" / "config" / "samples" / "guidelines"
+                
+                if samples_guidelines.exists():
+                    guidelines_dir.mkdir(parents=True, exist_ok=True)
+                    
+                    copied_count = 0
+                    for guideline_file in samples_guidelines.glob("*.md"):
+                        target_file = guidelines_dir / guideline_file.name
+                        if not target_file.exists():
+                            shutil.copy2(guideline_file, target_file)
+                            copied_count += 1
+                            self.logger.debug(f"Copied guideline: {guideline_file.name}")
+                    
+                    if copied_count > 0:
+                        self.logger.info(f"Initialized {copied_count} guideline templates")
+            
+            # 3. Ensure Prompt templates exist - Direct copy  
+            self.logger.debug("🎯 Ensuring prompt configuration...")
+            prompts_dir = config_dir / "prompts"
+            if not prompts_dir.exists():
+                # Copy prompts from samples
+                current_file = Path(__file__)
+                project_root = current_file.parent.parent.parent  # Go up to project root
+                samples_prompts = project_root / "src" / "config" / "samples" / "prompts"
+                
+                if samples_prompts.exists():
+                    self.logger.info("Creating user prompt config by copying defaults...")
+                    self.logger.info(f"From: {samples_prompts}")
+                    self.logger.info(f"To: {prompts_dir}")
+                    
+                    shutil.copytree(samples_prompts, prompts_dir)
+                    self.logger.info("✅ User prompt configuration created successfully")
+            
+            self.logger.debug("✅ All configurations ensured")
+            
+        except Exception as e:
+            self.logger.warning(f"Error ensuring configurations: {e}")
+            # Don't raise - let the system continue with what's available
+
 
 # Global settings manager instance
 _settings_manager: Optional[SettingsManager] = None
@@ -263,5 +325,6 @@ def get_settings_manager() -> SettingsManager:
     global _settings_manager
     if _settings_manager is None:
         _settings_manager = SettingsManager()
+        _settings_manager._ensure_all_configs_exist()
         _settings_manager.initialize()
     return _settings_manager

@@ -237,23 +237,20 @@ class PromptBuilder:
         self.config_loader = PromptConfigLoader()
         self.file_loader = PromptFileLoader()
         self._prompt_base_dir = self._get_prompt_directory()
-        
-        # Ensure user directory exists and is populated
-        self._ensure_user_prompt_config()
     
     def _get_prompt_directory(self) -> Path:
-        """Get the user's prompt configuration directory (~/.context-ai/config/prompt/)."""
+        """Get the user's prompt configuration directory (~/.context-ai/config/prompts/)."""
         from config.constants import DEFAULT_CONFIG_DIR
         
         # Always use user config directory
-        user_prompt_dir = Path(DEFAULT_CONFIG_DIR).expanduser() / "config" / "prompt"
+        user_prompt_dir = Path(DEFAULT_CONFIG_DIR).expanduser() / "config" / "prompts"
         return user_prompt_dir
     
     def _get_default_prompt_directory(self) -> Path:
-        """Get the default prompt templates directory (src/config/prompt/)."""
-        # Get path to the defaults in the source code
+        """Get the default prompt templates directory (src/config/samples/prompts/)."""
+        # Get path to the samples/prompts/ directory in the source code
         current_dir = Path(__file__).parent.parent.parent.parent  # Go up to project root
-        default_prompt_dir = current_dir / "src" / "config" / "prompt"
+        default_prompt_dir = current_dir / "src" / "config" / "samples" / "prompts"
         return default_prompt_dir
     
     def _ensure_user_prompt_config(self):
@@ -475,7 +472,7 @@ class PromptBuilder:
                 
                 # Get guidelines for detected languages
                 try:
-                    from config.guidelines.manager import get_guidelines_manager
+                    from config.languages.guidelines import get_guidelines_manager
                     guidelines_manager = get_guidelines_manager()
                     guidelines_content = guidelines_manager.get_guidelines_for_languages(detected_languages)
                     
@@ -577,7 +574,7 @@ class PromptBuilder:
     def _filter_programming_languages(self, languages: List[str]) -> List[str]:
         """Filter to only include programming languages with guidelines."""
         try:
-            from config.guidelines.manager import get_guidelines_manager
+            from config.languages.guidelines import get_guidelines_manager
             guidelines_manager = get_guidelines_manager()
             available_guidelines = set(guidelines_manager.get_available_languages())
             

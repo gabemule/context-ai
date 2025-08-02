@@ -15,7 +15,7 @@ from sentence_transformers import SentenceTransformer
 
 from utils.exceptions import ConfigurationError
 from utils.logging import get_logger
-from utils.storage import get_storage_manager
+from config.storage import get_storage_manager
 
 # Model specifications
 AVAILABLE_MODELS = {

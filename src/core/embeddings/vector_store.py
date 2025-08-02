@@ -19,7 +19,7 @@ from config.constants import (
 )
 from utils.exceptions import ConfigurationError
 from utils.logging import get_logger
-from utils.storage import get_storage_manager
+from config.storage import get_storage_manager
 
 # Collection configuration
 COLLECTION_NAME = "context_ai_embeddings"
