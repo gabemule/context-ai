@@ -41,13 +41,17 @@ class EmbeddingManager:
             from core.embeddings.vector_store import get_vector_store
             self.vector_store = get_vector_store()
         
-        # Get metadata directory from StorageManager
-        if metadata_dir is not None:
-            self.metadata_dir = metadata_dir
-        else:
-            from .storage import get_storage_manager
+        # Lazy initialization for metadata directory to avoid circular dependency
+        self._metadata_dir = metadata_dir
+
+    @property
+    def metadata_dir(self) -> Path:
+        """Get metadata directory with lazy loading to avoid circular dependency."""
+        if self._metadata_dir is None:
+            from .storage import get_storage_manager  # Lazy import
             storage = get_storage_manager()
-            self.metadata_dir = storage.path_manager.embeddings_dir
+            self._metadata_dir = storage.path_manager.embeddings_dir
+        return self._metadata_dir
     
     def list_embeddings(self) -> List[str]:
         """List all available embedding names."""

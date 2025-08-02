@@ -19,7 +19,6 @@ from config.constants import (
 )
 from utils.exceptions import ConfigurationError
 from utils.logging import get_logger
-from config.storage import get_storage_manager
 
 # Collection configuration
 COLLECTION_NAME = "context_ai_embeddings"
@@ -45,27 +44,40 @@ class VectorStoreManager:
     with metadata filtering for multi-embedding queries.
     """
 
-    def __init__(self):
+    def __init__(self, storage_manager=None):
         """Initialize vector store manager."""
         self.logger = get_logger(__name__)
-        self.storage_manager = get_storage_manager()
+        self._storage_manager = storage_manager  # Lazy initialization to avoid circular dependency
         self._client: Optional[chromadb.ClientAPI] = None
         self._collection: Optional[chromadb.Collection] = None
+        self._db_path = None  # Lazy initialization
 
-        # Setup ChromaDB storage path
-        self._db_path = self.storage_manager.path_manager.chromadb_dir
-        self._db_path.mkdir(parents=True, exist_ok=True)
+    def _get_storage_manager(self):
+        """Get storage manager with lazy loading to avoid circular dependency."""
+        if self._storage_manager is None:
+            from config.storage import get_storage_manager  # Lazy import
+            self._storage_manager = get_storage_manager()
+        return self._storage_manager
+
+    def _get_db_path(self):
+        """Get database path with lazy initialization."""
+        if self._db_path is None:
+            storage_mgr = self._get_storage_manager()
+            self._db_path = storage_mgr.path_manager.chromadb_dir
+            self._db_path.mkdir(parents=True, exist_ok=True)
+        return self._db_path
 
     def _get_client(self) -> chromadb.ClientAPI:
         """Get or create ChromaDB client."""
         if self._client is None:
             try:
                 # Create persistent client with proper settings
+                db_path = self._get_db_path()
                 self._client = chromadb.PersistentClient(
-                    path=str(self._db_path),
+                    path=str(db_path),
                     settings=Settings(anonymized_telemetry=False, allow_reset=True),
                 )
-                self.logger.debug("ChromaDB client initialized at: %s", self._db_path)
+                self.logger.debug("ChromaDB client initialized at: %s", db_path)
 
             except Exception as e:
                 raise ConfigurationError(
@@ -377,7 +389,7 @@ class VectorStoreManager:
                     "total_documents": 0,
                     "total_embeddings": 0,
                     "collection_name": COLLECTION_NAME,
-                    "database_path": str(self._db_path),
+                    "database_path": str(self._get_db_path()),
                 }
 
             # Get all metadatas for detailed stats
@@ -407,7 +419,7 @@ class VectorStoreManager:
                 "languages": sorted(list(languages)),
                 "total_size_bytes": total_size,
                 "collection_name": COLLECTION_NAME,
-                "database_path": str(self._db_path),
+                "database_path": str(self._get_db_path()),
                 "embeddings": sorted(list(embedding_names)),
             }
 
@@ -416,7 +428,7 @@ class VectorStoreManager:
             return {
                 "error": str(e),
                 "collection_name": COLLECTION_NAME,
-                "database_path": str(self._db_path),
+                "database_path": str(self._get_db_path()),
             }
 
     def reset_collection(self) -> bool:
