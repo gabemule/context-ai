@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 from config.constants import CONTEXT_DEFAULT_CHUNKS
-from config.providers import get_max_tokens
+from config.providers.registry import get_provider_function
 from core.query.result_merger import QueryResult
 from utils.logging import get_logger
 
@@ -138,21 +138,24 @@ class ContextFormatter:
         """
         from config.constants import CONTEXT_TOKEN_RATIO
         
-        # If not provided, calculate dynamically from Claude limits
+        # If not provided, calculate dynamically from provider limits
         if max_tokens is None:
-            dynamic_limit = int(get_max_tokens() * CONTEXT_TOKEN_RATIO)
+            from config.providers.registry import get_provider_registry
+            registry = get_provider_registry()
+            dynamic_limit = int(registry.get_max_tokens() * CONTEXT_TOKEN_RATIO)
             self.logger.debug(
-                "🔧 Dynamic token limit: %dK (%d%% of %dK Claude max)",
+                "🔧 Dynamic token limit: %dK (%d%% of %dK provider max)",
                 dynamic_limit // 1000,
                 int(CONTEXT_TOKEN_RATIO * 100),
-                get_max_tokens() // 1000,
+                registry.get_max_tokens() // 1000,
             )
             return dynamic_limit
         
-        # If exceeds Claude limit, cap with warning
+        # If exceeds provider limit, cap with warning
+        get_max_tokens = get_provider_function("get_max_tokens")
         if max_tokens > get_max_tokens():
             self.logger.warning(
-                "⚠️  Token limit %dK exceeds Claude max %dK, capping at %dK",
+                "⚠️  Token limit %dK exceeds provider max %dK, capping at %dK",
                 max_tokens // 1000,
                 get_max_tokens() // 1000,
                 get_max_tokens() // 1000,
@@ -696,7 +699,8 @@ class ContextFormatter:
 
         Uses Claude's optimal token limit and formatting preferences.
         """
-        # Use Claude's token limit from constants
+        # Use provider's token limit from registry
+        get_max_tokens = get_provider_function("get_max_tokens")
         original_max = self.max_tokens
         self.max_tokens = min(
             self.max_tokens, get_max_tokens() // 4

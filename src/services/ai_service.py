@@ -41,7 +41,9 @@ class TokenCalculator:
     def calculate_context_allocation(question: str, include_history: bool) -> Dict[str, int]:
         """Calculate token allocation for context and history."""
         from config.constants import CHAT_HISTORY_TOKEN_RATIO, CONTEXT_TOKEN_RATIO
-        from config.providers import get_max_tokens
+        from config.providers.registry import get_provider_registry
+        registry = get_provider_registry()
+        get_max_tokens = registry.get_max_tokens
         
         question_tokens = count_tokens(question)
         total_context_tokens = int(get_max_tokens() * CONTEXT_TOKEN_RATIO)
@@ -64,7 +66,10 @@ class TokenCalculator:
     def calculate_response_tokens(input_tokens: int, context_tokens: int) -> int:
         """Calculate maximum response tokens."""
         from config.constants import MIN_RESPONSE_TOKENS, RESPONSE_TOKEN_RATIO
-        from config.providers import get_max_tokens, get_max_output_tokens
+        from config.providers.registry import get_provider_registry
+        registry = get_provider_registry()
+        get_max_tokens = registry.get_max_tokens
+        get_max_output_tokens = registry.get_max_output_tokens
         
         model_max_tokens = get_max_tokens()
         model_max_output = get_max_output_tokens()
@@ -162,7 +167,9 @@ class DisplayManager:
         from rich.console import Console
         from rich.panel import Panel
         from rich.text import Text
-        from config.providers import get_max_tokens
+        from config.providers.registry import get_provider_registry
+        registry = get_provider_registry()
+        get_max_tokens = registry.get_max_tokens
         
         actual_input = response.usage.get("input_tokens", input_tokens)
         actual_output = response.usage.get("output_tokens", 0)

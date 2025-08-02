@@ -501,7 +501,10 @@ def _handle_config_models(args, settings_manager, logger) -> int:
     """Handle models listing (SRP)."""
     logger.info("🤖 Available AI models:")
     
-    from config.providers import get_available_providers, get_available_models, CLAUDE_MODELS
+    from config.providers.registry import get_provider_function
+    get_available_providers = get_provider_function("get_available_providers")
+    get_available_models = get_provider_function("get_available_models")
+    from config.providers.claude import CLAUDE_MODELS
     
     if args.provider:
         return _show_provider_models(args.provider, args.verbose, logger)
@@ -538,7 +541,9 @@ def _set_provider(provider: str, model: str, settings_manager, logger) -> bool:
     """Set active provider with validation."""
     logger.info("🔄 Setting active provider...")
     
-    from config.providers import get_available_providers, get_available_models
+    from config.providers.registry import get_provider_function
+    get_available_providers = get_provider_function("get_available_providers")
+    get_available_models = get_provider_function("get_available_models")
     available_providers = get_available_providers()
     
     if provider not in available_providers:
@@ -566,7 +571,8 @@ def _set_model(model: str, settings_manager, logger) -> bool:
     config = settings_manager.get_config()
     active_provider = config.active_provider
     
-    from config.providers import get_available_models
+    from config.providers.registry import get_provider_function
+    get_available_models = get_provider_function("get_available_models")
     available_models = get_available_models(active_provider)
     
     if model not in available_models:
@@ -637,7 +643,11 @@ def _validate_storage(issues: List[str], logger) -> None:
 
 def _show_provider_models(provider: str, verbose: bool, logger) -> int:
     """Show models for specific provider."""
-    from config.providers import get_available_providers, get_available_models, CLAUDE_MODELS
+    from config.providers.registry import get_provider_registry
+    from config.providers.claude import CLAUDE_MODELS
+    registry = get_provider_registry()
+    get_available_providers = registry.get_available_providers
+    get_available_models = registry.get_available_models
     
     if provider not in get_available_providers():
         logger.error("❌ Invalid provider: %s", provider)
@@ -667,7 +677,9 @@ def _show_provider_models(provider: str, verbose: bool, logger) -> int:
 
 def _show_all_models(verbose: bool, logger) -> int:
     """Show all available models."""
-    from config.providers import get_available_providers, get_available_models
+    from config.providers.registry import get_provider_function
+    get_available_providers = get_provider_function("get_available_providers")
+    get_available_models = get_provider_function("get_available_models")
     
     for provider in get_available_providers():
         models = get_available_models(provider)

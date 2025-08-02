@@ -1,21 +1,11 @@
 """
 Configuration module for Context-AI.
 
-Central configuration management for the application.
+Clean, explicit imports only. No facades or re-exports.
+Use direct imports from specific modules.
+
+Examples:
+    from config.settings import get_settings_manager
+    from config.storage import get_storage_manager
+    from config.providers.claude import CLAUDE_MODELS
 """
-
-from .guidelines import get_guidelines_manager, GuidelinesManager
-from .languages.manager import get_languages_manager, LanguagesManager
-from .settings import get_settings_manager, SettingsManager
-from .storage import get_storage_manager, StorageManager
-
-__all__ = [
-    'get_guidelines_manager',
-    'GuidelinesManager',
-    'get_languages_manager',
-    'LanguagesManager',
-    'get_settings_manager',
-    'SettingsManager', 
-    'get_storage_manager',
-    'StorageManager',
-]

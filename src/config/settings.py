@@ -10,7 +10,7 @@ from typing import List, Optional
 from utils.exceptions import ConfigurationError
 from utils.logging import get_logger
 
-from .providers import DEFAULT_MODEL, get_max_tokens
+from .providers.registry import get_provider_registry
 from .models import ActiveEmbeddings, AIProviderConfig, ContextAIConfig, EmbeddingInfo
 from .interfaces import PathProvider, get_default_path_provider
 
@@ -96,12 +96,13 @@ class SettingsManager:
     def set_claude_api_key(self, api_key: str) -> None:
         """Set Claude API key."""
         config = self.get_config()
+        registry = get_provider_registry()
 
         # Create or update Claude provider config
         config.ai["claude"] = AIProviderConfig(
             api_key=api_key,
-            default_model=DEFAULT_MODEL,
-            max_tokens=get_max_tokens(),
+            default_model=registry.default_model,
+            max_tokens=registry.get_max_tokens(),
         )
 
         # Set as active provider
@@ -132,11 +133,11 @@ class SettingsManager:
             # Update Claude config with new model
             if "claude" not in config.ai:
                 # Create default Claude config if doesn't exist
-                from .providers import get_max_tokens
+                registry = get_provider_registry()
                 config.ai["claude"] = AIProviderConfig(
                     api_key="",  # Will need to be set separately
                     default_model=model,
-                    max_tokens=get_max_tokens(),
+                    max_tokens=registry.get_max_tokens(),
                 )
             else:
                 # Update existing config

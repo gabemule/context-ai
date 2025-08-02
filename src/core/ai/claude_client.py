@@ -14,7 +14,7 @@ from config.constants import (
     DEFAULT_RETRY_DELAY,
     DEFAULT_TIMEOUT,
 )
-from config.providers import (
+from config.providers.claude import (
     DEFAULT_MODEL,
     get_max_tokens,
     CLAUDE_MODELS,
@@ -119,7 +119,8 @@ class ClaudeClient(AIClientInterface):
         max_tokens = max_tokens or get_max_tokens()
         
         # Get API name dynamically from model config
-        from config.providers import get_model_config
+        from config.providers.registry import get_provider_function
+        get_model_config = get_provider_function("get_model_config")
         model_config = get_model_config(model)
         model_name = model_config.get("api_name", model) if model_config else model
         
