@@ -19,11 +19,18 @@ class ProviderRegistry:
     Centralized provider registry following the same pattern as other managers.
     
     Manages all AI provider configurations, models, and capabilities
-    in a single, consistent interface.
+    in a single, consistent interface. Uses ConfigCore to avoid circular dependencies.
     """
     
-    def __init__(self):
+    def __init__(self, config_core=None):
         """Initialize the provider registry."""
+        # Dependency injection for ConfigCore (eliminates circular dependency)
+        if config_core is not None:
+            self.config_core = config_core
+        else:
+            from config.core import get_config_core
+            self.config_core = get_config_core()
+        
         # Smart default selection - automatically picks first model from active provider
         self.providers = {
             "claude": CLAUDE_MODELS,
@@ -47,31 +54,48 @@ class ProviderRegistry:
         """Get the first key from any dictionary."""
         return next(iter(obj)) if obj else ""
     
+    def _get_current_provider_and_model(self) -> tuple[str, str]:
+        """Get current provider and model from user configuration via ConfigCore."""
+        try:
+            # Use ConfigCore to get current config (no circular dependency!)
+            active_provider = self.config_core.get_active_provider()
+            active_model = self.config_core.get_provider_model(active_provider)
+            return active_provider, active_model
+            
+        except Exception:
+            # Fallback to defaults if config unavailable
+            return self.default_provider, self.default_model
+    
     def get_model_config(self, model_key: str, provider: str = None) -> dict:
-        """Get configuration for a specific model."""
+        """Get configuration for a specific model (no hardcoding!)."""
         provider = provider or self.default_provider
         
-        if provider == "claude" and model_key in CLAUDE_MODELS:
-            return CLAUDE_MODELS[model_key]
-        # Future: elif provider == "openai" and model_key in OPENAI_MODELS:
-        #     return OPENAI_MODELS[model_key]
-        return {}
+        # Use centralized providers dict (eliminates hardcoded ifs)
+        provider_models = self.providers.get(provider, {})
+        return provider_models.get(model_key, {})
     
     def get_current_model_config(self) -> dict:
-        """Get config for currently selected default model."""
-        return self.get_model_config(self.default_model, self.default_provider)
+        """Get config for currently active model from user config."""
+        provider, model = self._get_current_provider_and_model()
+        return self.get_model_config(model, provider)
     
     def get_max_tokens(self) -> int:
-        """Get context window size for current model."""
-        return self.get_current_model_config().get("context_window", 200000)
+        """Get context window size for current active model from user config."""
+        provider, model = self._get_current_provider_and_model()
+        model_config = self.get_model_config(model, provider)
+        return model_config.get("context_window", 200000)
     
     def get_max_output_tokens(self) -> int:
-        """Get max output tokens for current model."""
-        return self.get_current_model_config().get("max_output_tokens", 12000)
+        """Get max output tokens for current active model from user config."""
+        provider, model = self._get_current_provider_and_model()
+        model_config = self.get_model_config(model, provider)
+        return model_config.get("max_output_tokens", 12000)
     
     def get_api_name(self) -> str:
-        """Get API name for current model."""
-        return self.get_current_model_config().get("api_name", self.default_model)
+        """Get API name for current active model from user config."""
+        provider, model = self._get_current_provider_and_model()
+        model_config = self.get_model_config(model, provider)
+        return model_config.get("api_name", model)
     
     def get_available_models(self, provider: str = None) -> List[str]:
         """Get available models for a provider."""

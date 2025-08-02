@@ -159,427 +159,85 @@ class StoragePathManager:
 
 
 # =============================================================================
-# ANALYTICS PROVIDERS (Single Responsibility Principle)
+# SIMPLIFIED CLEANUP OPERATIONS (Remove over-engineering)
 # =============================================================================
 
-class EmbeddingsAnalytics:
-    """Handles embeddings analytics (SRP)."""
+def _clean_temp_files(base_path: Path, older_than_hours: int = DEFAULT_TEMP_CLEANUP_HOURS) -> int:
+    """Simple temp files cleanup."""
+    temp_dir = base_path / "temp"
+    if not temp_dir.exists():
+        return 0
     
-    def __init__(self, path_manager: StoragePathManager):
-        self.path_manager = path_manager
-        self.logger = get_logger(__name__)
+    cutoff_time = datetime.now() - timedelta(hours=older_than_hours)
+    cleaned_count = 0
     
-    def get_analytics(self) -> Dict:
-        """Get detailed embeddings analytics."""
-        try:
-            from core.embeddings.vector_store import get_vector_store
-
-            vector_store = get_vector_store()
-            embeddings_info = vector_store.list_embeddings()
-
-            if not embeddings_info:
-                return self._empty_analytics()
-
-            return self._analyze_embeddings_info(embeddings_info)
-
-        except Exception as e:
-            self.logger.warning("Error getting embeddings analytics: %s", e)
-            return self._empty_analytics()
+    for temp_file in temp_dir.rglob("*"):
+        if temp_file.is_file():
+            file_time = datetime.fromtimestamp(temp_file.stat().st_mtime)
+            if file_time < cutoff_time:
+                try:
+                    temp_file.unlink()
+                    cleaned_count += 1
+                except Exception:
+                    pass  # Ignore cleanup errors
     
-    def _empty_analytics(self) -> Dict:
-        """Return empty analytics structure."""
-        return {"oldest": None, "newest": None, "sizes": {}}
-    
-    def _analyze_embeddings_info(self, embeddings_info: List[Dict]) -> Dict:
-        """Analyze embeddings information."""
-        # Sort by creation time (handle missing created field)
+    return cleaned_count
+
+
+def _get_embeddings_analytics(embeddings_list: List[str]) -> Dict:
+    """Get essential embeddings analytics for future sync feature."""
+    try:
+        from core.embeddings.vector_store import get_vector_store
+        
+        vector_store = get_vector_store()
+        embeddings_info = vector_store.list_embeddings()
+        
+        if not embeddings_info:
+            return {"oldest": None, "newest": None, "sizes": {}, "created_dates": {}}
+        
+        # Sort by creation time for sync decisions
         def get_created_time(x):
             created = x.get("created_at")
             if created:
                 try:
-                    from datetime import datetime
                     return datetime.fromisoformat(created.replace('Z', '+00:00')).timestamp()
                 except:
                     return 0
             return 0
         
         embeddings_by_time = sorted(embeddings_info, key=get_created_time)
-        
         oldest = embeddings_by_time[0] if embeddings_by_time else None
         newest = embeddings_by_time[-1] if embeddings_by_time else None
-
-        # Individual sizes (convert from bytes to MB)
+        
+        # Essential data for sync: sizes and creation dates
         sizes = {}
+        created_dates = {}
         for info in embeddings_info:
+            name = info["name"]
             size_bytes = info.get("total_size_bytes", 0)
-            size_mb = round(size_bytes / (1024 * 1024), 2) if size_bytes > 0 else 0
-            sizes[info["name"]] = size_mb
-
+            sizes[name] = round(size_bytes / (1024 * 1024), 2)  # MB
+            created_dates[name] = info.get("created_at", "unknown")
+        
         return {
             "oldest": oldest["name"] if oldest else None,
-            "oldest_date": self._format_created_at(oldest.get("created_at")) if oldest else None,
+            "oldest_date": oldest.get("created_at") if oldest else None,
             "newest": newest["name"] if newest else None,
-            "newest_date": self._format_created_at(newest.get("created_at")) if newest else None,
+            "newest_date": newest.get("created_at") if newest else None,
             "sizes": sizes,
+            "created_dates": created_dates,  # Critical for sync!
         }
-    
-    def _format_timestamp(self, timestamp: float) -> str:
-        """Format timestamp to readable date."""
-        return datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d")
-    
-    def _format_created_at(self, created_at: str) -> str:
-        """Format created_at string to readable date."""
-        if not created_at:
-            return "unknown"
-        try:
-            dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
-            return dt.strftime("%Y-%m-%d")
-        except:
-            return "unknown"
-
-
-class LogAnalytics:
-    """Handles log analytics (SRP)."""
-    
-    def __init__(self, path_manager: StoragePathManager):
-        self.path_manager = path_manager
-        self.logger = get_logger(__name__)
-    
-    def get_analytics(self) -> Dict:
-        """Get detailed log analytics."""
-        try:
-            if not self.path_manager.logs_dir.exists():
-                return self._empty_analytics()
-
-            # Session logs are stored in directories, not .log files
-            session_dirs = [d for d in self.path_manager.logs_dir.iterdir() if d.is_dir()]
-            if not session_dirs:
-                return self._empty_analytics()
-
-            return self._analyze_session_dirs(session_dirs)
-
-        except Exception as e:
-            self.logger.warning("Error getting log analytics: %s", e)
-            return self._empty_analytics()
-    
-    def _empty_analytics(self) -> Dict:
-        """Return empty analytics structure."""
-        return {"count": 0, "oldest": None, "types": {}}
-    
-    def _analyze_session_dirs(self, session_dirs: List[Path]) -> Dict:
-        """Analyze session directories."""
-        # Sort by modification time
-        sessions_by_time = sorted(session_dirs, key=lambda x: x.stat().st_mtime)
-        oldest_session = sessions_by_time[0] if sessions_by_time else None
-
-        # Count by type based on directory names
-        types = self._count_session_types(session_dirs)
-
-        return {
-            "count": len(session_dirs),
-            "oldest": oldest_session.name if oldest_session else None,
-            "oldest_date": self._format_file_time(oldest_session) if oldest_session else None,
-            "types": types,
-            "recent_sessions": [d.name for d in sessions_by_time[-5:]] if sessions_by_time else [],
-        }
-    
-    def _count_session_types(self, session_dirs: List[Path]) -> Dict[str, int]:
-        """Count sessions by type based on directory name patterns."""
-        types = {log_type: 0 for log_type in LOG_TYPE_PATTERNS.keys()}
         
-        for session_dir in session_dirs:
-            name = session_dir.name.lower()
-            categorized = False
-            
-            for log_type, pattern in LOG_TYPE_PATTERNS.items():
-                if pattern and pattern in name:
-                    types[log_type] += 1
-                    categorized = True
-                    break
-            
-            if not categorized:
-                types["general"] += 1
-        
-        return types
-    
-    def _count_log_types(self, log_files: List[Path]) -> Dict[str, int]:
-        """Count logs by type based on filename patterns."""
-        types = {log_type: 0 for log_type in LOG_TYPE_PATTERNS.keys()}
-        
-        for log_file in log_files:
-            name = log_file.name.lower()
-            categorized = False
-            
-            for log_type, pattern in LOG_TYPE_PATTERNS.items():
-                if pattern and pattern in name:
-                    types[log_type] += 1
-                    categorized = True
-                    break
-            
-            if not categorized:
-                types["general"] += 1
-        
-        return types
-    
-    def _format_file_time(self, file_path: Path) -> str:
-        """Format file modification time."""
-        return datetime.fromtimestamp(file_path.stat().st_mtime).strftime("%Y-%m-%d")
+    except Exception as e:
+        return {"oldest": None, "newest": None, "sizes": {}, "created_dates": {}}
 
 
-class ModelsAnalytics:
-    """Handles model cache analytics (SRP)."""
-    
-    def __init__(self, path_manager: StoragePathManager):
-        self.path_manager = path_manager
-        self.logger = get_logger(__name__)
-    
-    def get_analytics(self) -> Dict:
-        """Get detailed models analytics."""
-        try:
-            if not self.path_manager.models_dir.exists():
-                return self._empty_analytics()
-
-            model_dirs = [d for d in self.path_manager.models_dir.iterdir() if d.is_dir()]
-            if not model_dirs:
-                return self._empty_analytics()
-
-            return self._analyze_model_dirs(model_dirs)
-
-        except Exception as e:
-            self.logger.warning("Error getting models analytics: %s", e)
-            return self._empty_analytics()
-    
-    def _empty_analytics(self) -> Dict:
-        """Return empty analytics structure."""
-        return {"count": 0, "last_used": None, "cached_models": []}
-    
-    def _analyze_model_dirs(self, model_dirs: List[Path]) -> Dict:
-        """Analyze model directories."""
-        # Find most recently accessed
-        most_recent = max(model_dirs, key=lambda x: x.stat().st_atime)
-        last_used_time = datetime.fromtimestamp(most_recent.stat().st_atime)
-
-        # List cached models (convert back from safe names)
-        cached_models = [d.name.replace("_", "/") for d in model_dirs]
-
-        return {
-            "count": len(model_dirs),
-            "last_used": last_used_time.strftime("%Y-%m-%d %H:%M"),
-            "cached_models": cached_models[:5],  # Show first 5
-            "total_cached": len(cached_models),
-        }
-
-
-# =============================================================================
-# CLEANUP STRATEGIES (Strategy Pattern + SRP)
-# =============================================================================
-
-class BaseCleanupStrategy(ABC):
-    """Base cleanup strategy (OCP)."""
-    
-    def __init__(self, path_manager: StoragePathManager):
-        self.path_manager = path_manager
-        self.logger = get_logger(__name__)
-    
-    @abstractmethod
-    def clean_by_age(self, older_than_days: int) -> int:
-        """Clean items older than specified days."""
-        pass
-    
-    @abstractmethod
-    def clean_all(self) -> int:
-        """Clean all items."""
-        pass
-
-
-class EmbeddingsCleanupStrategy(BaseCleanupStrategy):
-    """Handles embeddings cleanup (SRP)."""
-    
-    def clean_by_age(self, older_than_days: int) -> int:
-        """Clean embeddings older than specified days."""
-        try:
-            from core.embeddings.vector_store import get_vector_store
-
-            vector_store = get_vector_store()
-            embeddings_info = vector_store.list_embeddings()
-            
-            cutoff_time = datetime.now() - timedelta(days=older_than_days)
-            cleaned_count = 0
-
-            for embedding_info in embeddings_info:
-                embedding_name = embedding_info["name"]
-                created_time = datetime.fromtimestamp(embedding_info.get("created", 0))
-                
-                if created_time < cutoff_time:
-                    if self._delete_embedding(embedding_name):
-                        cleaned_count += 1
-                        self.logger.info("Cleaned old embedding: %s (created %s)", 
-                                       embedding_name, created_time.strftime("%Y-%m-%d"))
-
-            return cleaned_count
-
-        except Exception as e:
-            self.logger.error("Error cleaning embeddings by age: %s", e)
-            return 0
-    
-    def clean_all(self) -> int:
-        """Clean all embeddings."""
-        try:
-            from core.embeddings.vector_store import get_vector_store
-
-            vector_store = get_vector_store()
-            embeddings_info = vector_store.list_embeddings()
-            cleaned_count = 0
-
-            for embedding_info in embeddings_info:
-                embedding_name = embedding_info["name"]
-                if self._delete_embedding(embedding_name):
-                    cleaned_count += 1
-
-            return cleaned_count
-
-        except Exception as e:
-            self.logger.error("Error cleaning all embeddings: %s", e)
-            return 0
-    
-    def _delete_embedding(self, embedding_name: str) -> bool:
-        """Delete a specific embedding."""
-        try:
-            from core.embeddings.vector_store import get_vector_store
-
-            vector_store = get_vector_store()
-            success = vector_store.delete_embedding(embedding_name)
-
-            if success:
-                self.logger.info("Deleted embedding '%s'", embedding_name)
-                return True
-            else:
-                self.logger.warning("Embedding '%s' not found", embedding_name)
-                return False
-
-        except Exception as e:
-            self.logger.error("Error deleting embedding '%s': %s", embedding_name, e)
-            return False
-
-
-class LogsCleanupStrategy(BaseCleanupStrategy):
-    """Handles logs cleanup (SRP)."""
-    
-    def clean_by_age(self, older_than_days: int) -> int:
-        """Clean log files older than specified days."""
-        if not self.path_manager.logs_dir.exists():
-            return 0
-
-        try:
-            cutoff_time = datetime.now() - timedelta(days=older_than_days)
-            cleaned_count = 0
-
-            for log_file in self.path_manager.logs_dir.rglob("*.log"):
-                if log_file.is_file():
-                    file_time = datetime.fromtimestamp(log_file.stat().st_mtime)
-                    if file_time < cutoff_time:
-                        try:
-                            log_file.unlink()
-                            cleaned_count += 1
-                            self.logger.info("Cleaned old log: %s", log_file.name)
-                        except Exception as e:
-                            self.logger.warning("Failed to delete log %s: %s", log_file, e)
-
-            return cleaned_count
-
-        except Exception as e:
-            self.logger.error("Error cleaning logs by age: %s", e)
-            return 0
-    
-    def clean_all(self) -> int:
-        """Clean all log files."""
-        return self.clean_by_age(0)  # Clean all regardless of age
-
-
-class ModelsCleanupStrategy(BaseCleanupStrategy):
-    """Handles model cache cleanup (SRP)."""
-    
-    def clean_by_age(self, older_than_days: int = DEFAULT_MODEL_UNUSED_DAYS) -> int:
-        """Clean unused model cache files."""
-        if not self.path_manager.models_dir.exists():
-            return 0
-
-        try:
-            cutoff_time = datetime.now() - timedelta(days=older_than_days)
-            cleaned_count = 0
-
-            for model_path in self.path_manager.models_dir.iterdir():
-                if model_path.is_dir():
-                    try:
-                        access_time = datetime.fromtimestamp(model_path.stat().st_atime)
-                        if access_time < cutoff_time:
-                            shutil.rmtree(model_path)
-                            cleaned_count += 1
-                            self.logger.info("Cleaned unused model cache: %s", model_path.name)
-                    except Exception as e:
-                        self.logger.warning("Failed to clean model cache %s: %s", model_path, e)
-
-            return cleaned_count
-
-        except Exception as e:
-            self.logger.error("Error cleaning unused models: %s", e)
-            return 0
-    
-    def clean_all(self) -> int:
-        """Clean all model cache files."""
-        if not self.path_manager.models_dir.exists():
-            return 0
-
-        try:
-            cleaned_count = 0
-            for model_path in self.path_manager.models_dir.iterdir():
-                if model_path.is_dir():
-                    try:
-                        shutil.rmtree(model_path)
-                        cleaned_count += 1
-                        self.logger.info("Cleaned model cache: %s", model_path.name)
-                    except Exception as e:
-                        self.logger.warning("Failed to clean model cache %s: %s", model_path, e)
-
-            return cleaned_count
-
-        except Exception as e:
-            self.logger.error("Error cleaning all models: %s", e)
-            return 0
-
-
-class TempCleanupStrategy(BaseCleanupStrategy):
-    """Handles temporary files cleanup (SRP)."""
-    
-    def clean_by_age(self, older_than_hours: int = DEFAULT_TEMP_CLEANUP_HOURS) -> int:
-        """Clean temp files older than specified hours."""
-        if not self.path_manager.temp_dir.exists():
-            return 0
-
-        try:
-            cutoff_time = datetime.now() - timedelta(hours=older_than_hours)
-            cleaned_count = 0
-
-            for temp_file in self.path_manager.temp_dir.rglob("*"):
-                if temp_file.is_file():
-                    file_time = datetime.fromtimestamp(temp_file.stat().st_mtime)
-                    if file_time < cutoff_time:
-                        try:
-                            temp_file.unlink()
-                            cleaned_count += 1
-                            self.logger.debug("Cleaned temp file: %s", temp_file.name)
-                        except Exception as e:
-                            self.logger.warning("Failed to delete temp file %s: %s", temp_file, e)
-
-            return cleaned_count
-
-        except Exception as e:
-            self.logger.error("Error during temp cleanup: %s", e)
-            return 0
-    
-    def clean_all(self) -> int:
-        """Clean all temporary files."""
-        return self.clean_by_age(0)  # Clean all regardless of age
+def _get_basic_analytics(embeddings_list: List[str]) -> Dict:
+    """Get basic analytics including essential embeddings metadata."""
+    return {
+        "embeddings_analytics": _get_embeddings_analytics(embeddings_list),
+        "log_analytics": {"count": 0, "types": {}},
+        "models_analytics": {"count": 0, "cached_models": []},
+    }
 
 
 # =============================================================================
@@ -588,57 +246,20 @@ class TempCleanupStrategy(BaseCleanupStrategy):
 
 class StorageManager:
     """
-    Main storage manager using composition pattern (Clean Architecture).
+    Simplified storage manager focused on paths and basic operations.
     
-    Acts as a facade for different storage operations while maintaining
-    single responsibility principle through composition.
+    Removed over-engineered analytics and strategy patterns for simplicity.
     """
 
     def __init__(self, base_path: Optional[str] = None):
         self.logger = get_logger(__name__)
-        
-        # Composition: Inject dependencies (Dependency Inversion Principle)
         self.path_manager = StoragePathManager(base_path)
-        self.embeddings_analytics = EmbeddingsAnalytics(self.path_manager)
-        self.log_analytics = LogAnalytics(self.path_manager)
-        self.models_analytics = ModelsAnalytics(self.path_manager)
-        
-        # Cleanup strategies (Strategy Pattern)
-        self.cleanup_strategies = {
-            "embeddings": EmbeddingsCleanupStrategy(self.path_manager),
-            "logs": LogsCleanupStrategy(self.path_manager),
-            "models": ModelsCleanupStrategy(self.path_manager),
-            "temp": TempCleanupStrategy(self.path_manager),
-        }
 
-    # =============================================================================
-    # PUBLIC API (Facade Pattern - Backward Compatibility)
-    # =============================================================================
-    
+    # Direct access to path manager - no facades
     @property
     def base_path(self) -> Path:
         """Get base storage path."""
         return self.path_manager.base_path
-    
-    def ensure_storage_structure(self) -> None:
-        """Ensure all storage directories exist."""
-        self.path_manager.ensure_storage_structure()
-    
-    def get_embedding_path(self, embedding_name: str) -> Path:
-        """Get path for embedding data."""
-        return self.path_manager.get_embedding_path(embedding_name)
-
-    def get_model_cache_path(self, model_name: str) -> Path:
-        """Get path for cached model."""
-        return self.path_manager.get_model_cache_path(model_name)
-
-    def get_log_file_path(self, log_name: str = "context-ai.log") -> Path:
-        """Get path for log file."""
-        return self.path_manager.get_log_file_path(log_name)
-
-    def get_temp_file_path(self, filename: str) -> Path:
-        """Get path for temporary file."""
-        return self.path_manager.get_temp_file_path(filename)
 
     def list_embeddings(self) -> List[str]:
         """List all available embedding names."""
@@ -684,7 +305,7 @@ class StorageManager:
             return 0
 
     def get_storage_info(self) -> Dict:
-        """Get comprehensive storage information."""
+        """Get basic storage information."""
         try:
             embeddings = self.list_embeddings()
             total_size = self.get_storage_size()
@@ -697,11 +318,7 @@ class StorageManager:
                 "embeddings_count": len(embeddings),
                 "embeddings": embeddings,
                 "directory_sizes": dir_sizes,
-                "created": self.path_manager.base_path.stat().st_ctime,
-                "last_modified": self.path_manager.base_path.stat().st_mtime,
-                "embeddings_analytics": self.embeddings_analytics.get_analytics(),
-                "log_analytics": self.log_analytics.get_analytics(),
-                "models_analytics": self.models_analytics.get_analytics(),
+                **_get_basic_analytics(embeddings, self.path_manager.base_path),
                 "last_cleanup": self._get_last_cleanup_time(),
             }
 
@@ -709,46 +326,11 @@ class StorageManager:
             self.logger.error("Error getting storage info: %s", e)
             return {"error": str(e)}
 
-    # =============================================================================
-    # CLEANUP OPERATIONS (Strategy Pattern)
-    # =============================================================================
-    
     def cleanup_temp_files(self, older_than_hours: int = DEFAULT_TEMP_CLEANUP_HOURS) -> int:
-        """Clean up temporary files (backward compatibility)."""
-        cleaned_count = self.cleanup_strategies["temp"].clean_by_age(older_than_hours)
+        """Clean up temporary files."""
+        cleaned_count = _clean_temp_files(self.path_manager.base_path, older_than_hours)
         self._update_cleanup_time()
         return cleaned_count
-
-    def clean_embeddings_by_age(self, older_than_days: int) -> int:
-        """Clean embeddings older than specified days."""
-        cleaned_count = self.cleanup_strategies["embeddings"].clean_by_age(older_than_days)
-        self._update_cleanup_time()
-        return cleaned_count
-
-    def clean_all_embeddings(self) -> int:
-        """Clean all embeddings data."""
-        cleaned_count = self.cleanup_strategies["embeddings"].clean_all()
-        self._update_cleanup_time()
-        return cleaned_count
-
-    def clean_logs_by_age(self, older_than_days: int) -> int:
-        """Clean log files older than specified days."""
-        cleaned_count = self.cleanup_strategies["logs"].clean_by_age(older_than_days)
-        self._update_cleanup_time()
-        return cleaned_count
-
-    def clean_unused_models(self) -> int:
-        """Clean unused model cache files."""
-        cleaned_count = self.cleanup_strategies["models"].clean_by_age()
-        self._update_cleanup_time()
-        return cleaned_count
-
-    def clean_all_models(self) -> int:
-        """Clean all model cache files."""
-        cleaned_count = self.cleanup_strategies["models"].clean_all()
-        self._update_cleanup_time()
-        return cleaned_count
-
 
     def reset_storage(self, confirm: bool = False) -> bool:
         """Reset all storage (DELETE EVERYTHING)."""
@@ -761,7 +343,7 @@ class StorageManager:
                 shutil.rmtree(self.path_manager.base_path)
                 self.logger.info("Storage reset: deleted %s", self.path_manager.base_path)
 
-            # Recreate basic structure
+            # Recreate basic structure  
             self.path_manager.ensure_storage_structure()
             self.logger.info("Storage reset complete")
             return True
