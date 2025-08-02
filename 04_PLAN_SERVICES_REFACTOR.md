@@ -1,4 +1,4 @@
-# 🎯 PLANO 03: SERVICES REFACTOR
+# 🎯 PLANO 04: SERVICES REFACTOR
 
 ## 📋 COMO USAR ESTE PLANO
 
@@ -23,11 +23,14 @@ PARTE A: Services Refactor → PARTE B: Validação Integrada
 - ✅ **AIService duplicado** removido
 - ✅ **Zero breaking changes** nas APIs existentes
 
-### **📋 PRÉ-REQUISITO:**
-⚠️ **Este plano assume que o 01_PLAN_TOKEN_MANAGER já foi executado com sucesso.**
-- TokenManager centralizado já está disponível em `core/ai/token_manager.py`
-- Todas as duplicações de token counting já foram eliminadas
-- Provider-aware counting (Anthropic + Tiktoken) já funciona
+### **📋 PRÉ-REQUISITOS:**
+⚠️ **Este plano assume que os planos anteriores já foram executados:**
+- **01_PLAN_CONFIG_REFACTOR:** Settings/Storage managers centralizados
+- **02_PLAN_TOKEN_MANAGER:** TokenManager centralizado disponível
+- **03_PLAN_CORE_REFACTOR:** Core modules refatorados e extensíveis
+  - TokenManager centralizado já está disponível em `core/ai/token_manager.py`
+  - Todas as duplicações de token counting já foram eliminadas
+  - Provider-aware counting (Anthropic + Tiktoken) já funciona
 
 ---
 

@@ -1,4 +1,4 @@
-# 🎯 PLANO: CORE MODULES REFACTOR
+# 🎯 PLANO 03: CORE MODULES REFACTOR
 
 ## 📋 COMO USAR ESTE PLANO
 
@@ -24,11 +24,13 @@ FASE 1: Chunking Refactor → FASE 2: Embeddings Extensibility → FASE 3: Query
 - ✅ **Zero duplicação** de código
 - ✅ **Backward compatibility** mantida
 
-### **📋 PRÉ-REQUISITO:**
-⚠️ **Este plano assume que o 01_PLAN_TOKEN_MANAGER já foi executado com sucesso.**
-- TokenManager centralizado já está disponível em `core/ai/token_manager.py`
-- Todas as duplicações de token counting já foram eliminadas
-- Provider-aware counting (Anthropic + Tiktoken) já funciona
+### **📋 PRÉ-REQUISITOS:**
+⚠️ **Este plano assume que os planos anteriores já foram executados:**
+- **01_PLAN_CONFIG_REFACTOR:** Settings/Storage managers centralizados
+- **02_PLAN_TOKEN_MANAGER:** TokenManager centralizado disponível
+  - TokenManager centralizado já está disponível em `core/ai/token_manager.py`
+  - Todas as duplicações de token counting já foram eliminadas
+  - Provider-aware counting (Anthropic + Tiktoken) já funciona
 
 ---
 
@@ -53,9 +55,9 @@ FASE 1: Chunking Refactor → FASE 2: Embeddings Extensibility → FASE 3: Query
 
 ## 🧩 FASE 1: CHUNKING MODULE REFACTOR
 
-### **🚀 FASE 2.1: SEPARAR PROTOCOL E MODELS**
+### **🚀 FASE 1.1: SEPARAR PROTOCOL E MODELS**
 
-#### **📦 2.1.1 Criar models.py**
+#### **📦 1.1.1 Criar models.py**
 
 - [ ] Criar arquivo `src/core/chunking/models.py`
 - [ ] Mover `TextChunk` de `protocol.py` para `models.py`
@@ -63,7 +65,7 @@ FASE 1: Chunking Refactor → FASE 2: Embeddings Extensibility → FASE 3: Query
 - [ ] Mover `ChunkingMetadata` de `protocol.py` para `models.py`
 - [ ] Adicionar `__all__` exports em `models.py`
 
-#### **📝 2.1.2 Estrutura do models.py**
+#### **📝 1.1.2 Estrutura do models.py**
 
 ```python
 """
@@ -197,7 +199,7 @@ __all__ = [
 ]
 ```
 
-#### **📦 2.1.3 Limpar protocol.py**
+#### **📦 1.1.3 Limpar protocol.py**
 
 - [ ] Abrir `core/chunking/protocol.py`
 - [ ] Remover classes `TextChunk`, `ChunkingStrategy`, `ChunkingMetadata` (agora em models.py)
@@ -205,13 +207,13 @@ __all__ = [
 - [ ] Manter só a classe `ChunkerProtocol` abstract
 - [ ] Verificar que protocol.py está limpo (só interfaces)
 
-#### **📦 2.1.4 Atualizar langchain_adapter.py**
+#### **📦 1.1.4 Atualizar langchain_adapter.py**
 
 - [ ] Abrir `core/chunking/langchain_adapter.py`
 - [ ] Adicionar import: `from .models import TextChunk, ChunkingMetadata, ChunkingStrategy`
 - [ ] Verificar que não há mais imports de protocol.py para data classes
 
-#### **📦 2.1.5 Atualizar __init__.py**
+#### **📦 1.1.5 Atualizar __init__.py**
 
 - [ ] Abrir `core/chunking/__init__.py`
 - [ ] Adicionar imports: `from .models import TextChunk, ChunkingStrategy, ChunkingMetadata`
@@ -219,9 +221,9 @@ __all__ = [
 
 ---
 
-### **🔧 FASE 2.2: MELHORAR LANGUAGE DETECTION**
+### **🔧 FASE 1.2: MELHORAR LANGUAGE DETECTION**
 
-#### **📦 2.2.1 Implementar Detection Robusta**
+#### **📦 1.2.1 Implementar Detection Robusta**
 
 - [ ] Abrir `core/chunking/langchain_adapter.py`
 - [ ] Localizar método `_detect_language_from_content()`
@@ -303,7 +305,7 @@ def _simple_language_detection(self, content: str) -> str:
         return "text"
 ```
 
-#### **🧪 2.2.2 Testar Language Detection**
+#### **🧪 1.2.2 Testar Language Detection**
 
 - [ ] Testar com código Python (deve detectar via "def ", "class ", etc.)
 - [ ] Testar com TypeScript (deve usar extends + additional_separators)
@@ -312,9 +314,9 @@ def _simple_language_detection(self, content: str) -> str:
 
 ---
 
-### **🧪 FASE 2.3: TESTES DA FASE 2**
+### **🧪 FASE 1.3: TESTES DA FASE 1**
 
-#### **🔍 2.3.1 Testes de Import e Estrutura**
+#### **🔍 1.3.1 Testes de Import e Estrutura**
 
 - [ ] Testar imports novos:
   - [ ] `from core.chunking import TextChunk, ChunkingStrategy, ChunkingMetadata`
@@ -323,7 +325,7 @@ def _simple_language_detection(self, content: str) -> str:
 - [ ] Verificar que não há circular imports
 - [ ] Verificar que `get_chunker()` funciona normalmente
 
-#### **🔍 2.3.2 Testes de Funcionalidade**
+#### **🔍 1.3.2 Testes de Funcionalidade**
 
 - [ ] Testar chunking de arquivo Python (deve usar detection melhorada)
 - [ ] Testar chunking de arquivo TypeScript (deve detectar corretamente)
@@ -332,11 +334,11 @@ def _simple_language_detection(self, content: str) -> str:
 
 ---
 
-## 🤖 FASE 3: EMBEDDINGS MODULE EXTENSIBILITY
+## 🤖 FASE 2: EMBEDDINGS MODULE EXTENSIBILITY
 
-### **🚀 FASE 3.1: CRIAR PROTOCOLS DE EXTENSIBILIDADE**
+### **🚀 FASE 2.1: CRIAR PROTOCOLS DE EXTENSIBILIDADE**
 
-#### **📦 3.1.1 Criar model_protocol.py**
+#### **📦 2.1.1 Criar model_protocol.py**
 
 - [ ] Criar arquivo `src/core/embeddings/model_protocol.py`
 - [ ] Implementar interface abstrata para model providers
@@ -417,7 +419,7 @@ __all__ = [
 ]
 ```
 
-#### **📦 3.1.2 Criar vector_protocol.py**
+#### **📦 2.1.2 Criar vector_protocol.py**
 
 - [ ] Criar arquivo `src/core/embeddings/vector_protocol.py`
 - [ ] Implementar interface para vector stores

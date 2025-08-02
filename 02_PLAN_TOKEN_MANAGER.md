@@ -1,4 +1,4 @@
-# 🎯 PLANO 01: TOKEN MANAGER CENTRALIZATION
+# 🎯 PLANO 02: TOKEN MANAGER CENTRALIZATION
 
 ## 📋 COMO USAR ESTE PLANO
 
@@ -23,7 +23,13 @@ FASE 1: Análise Completa → FASE 2: Criar TokenManager → FASE 3: Migrar Toke
 - ✅ **Cache LRU** para performance otimizada
 - ✅ **Zero duplicação** de código de token counting
 - ✅ **Migração completa** - sem backward compatibility
-- ✅ **Base limpa** para PLAN_02_CORE_REFACTOR e PLAN_03_SERVICES_REFACTOR
+- ✅ **Base limpa** para 03_PLAN_CORE_REFACTOR e 04_PLAN_SERVICES_REFACTOR
+
+### **📋 PRÉ-REQUISITO:**
+⚠️ **Este plano assume que o 01_PLAN_CONFIG_REFACTOR já foi executado com sucesso.**
+- Settings/Storage managers centralizados já estão disponíveis
+- Path hardcoding já foi eliminado
+- Config access já é centralizado via managers
 
 ---
 
@@ -810,8 +816,8 @@ Exemplo:
 Após conclusão deste plano:
 
 ### **📋 PLANOS DEPENDENTES PODEM EXECUTAR:**
-- **PLAN_02_CORE_REFACTOR**: Pode usar `get_token_manager()` sem se preocupar com token counting
-- **PLAN_03_SERVICES_REFACTOR**: Pode focar na extração do QueryService sem token management
+- **03_PLAN_CORE_REFACTOR**: Pode usar `get_token_manager()` sem se preocupar com token counting
+- **04_PLAN_SERVICES_REFACTOR**: Pode focar na extração do QueryService sem token management
 - **Outros planos**: Token management não será mais duplicação ou preocupação
 
 ### **🔧 MELHORIAS FUTURAS POSSÍVEIS:**
