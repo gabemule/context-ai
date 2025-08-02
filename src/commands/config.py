@@ -923,8 +923,8 @@ def _guidelines_reset(language: str, guidelines_manager, logger) -> int:
 
 def _guidelines_path(guidelines_manager, logger) -> int:
     """Show guidelines directory path."""
-    from config.guidelines import PathResolver
-    guidelines_dir = PathResolver.get_guidelines_directory()
+    # Use the guidelines manager method instead of PathResolver
+    guidelines_dir = guidelines_manager._get_user_guidelines_dir()
     logger.info("📁 Guidelines directory: %s", guidelines_dir)
     
     # Show file listing

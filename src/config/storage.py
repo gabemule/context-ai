@@ -108,6 +108,21 @@ class StoragePathManager:
         # Config files (centralized file path management)
         self.languages_file = self.config_dir / "languages.yaml"
         self.languages_readme_file = self.config_dir / "languages-README.md"
+        
+        # Source template paths (centralized template management)
+        self._setup_template_paths()
+    
+    def _setup_template_paths(self) -> None:
+        """Setup source template directory paths."""
+        # Get src/config/ directory (where this file is located)
+        current_file = Path(__file__)
+        src_config_dir = current_file.parent  # src/config/
+        
+        # Template directories in source code
+        self.samples_dir = src_config_dir / "samples"
+        self.template_guidelines_dir = self.samples_dir / "guidelines"
+        self.template_prompts_dir = self.samples_dir / "prompts" 
+        self.template_languages_file = self.samples_dir / "languages.yaml"
     
     def ensure_storage_structure(self) -> None:
         """Ensure all storage directories exist."""

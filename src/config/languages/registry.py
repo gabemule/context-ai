@@ -211,8 +211,10 @@ class LanguagesRegistry:
     def reset_language_to_default(self, language: str) -> bool:
         """Reset specific language configuration to default template."""
         try:
-            # Get the source template file
-            template_file = Path(__file__).parent / "languages.yaml"
+            # Get the source template file via StorageManager (centralized)
+            from config.storage import get_storage_manager
+            storage_manager = get_storage_manager()
+            template_file = storage_manager.path_manager.template_languages_file
             
             if not template_file.exists():
                 self.logger.error(f"Template file not found: {template_file}")

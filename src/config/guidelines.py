@@ -46,11 +46,10 @@ class GuidelinesManager:
         return storage_manager.path_manager.guidelines_dir
     
     def _get_template_guidelines_dir(self) -> Path:
-        """Get template guidelines directory."""
-        # Point to samples/guidelines/
-        current_file = Path(__file__)
-        config_dir = current_file.parent.parent  # Go up to src/config/
-        return config_dir / "samples" / "guidelines"
+        """Get template guidelines directory via StorageManager (centralized)."""
+        from config.storage import get_storage_manager
+        storage_manager = get_storage_manager()
+        return storage_manager.path_manager.template_guidelines_dir
     
     def get_guideline(self, language: str) -> Optional[str]:
         """Get guideline content for a specific language."""
@@ -66,8 +65,8 @@ class GuidelinesManager:
         if language in self._cache:
             return self._cache[language]
         
-        # Load from file
-        guideline_file = self._get_user_guidelines_dir() / f"{language}.md"
+        # Load from file using centralized path method
+        guideline_file = self.get_guideline_file_path(language)
         
         if not guideline_file.exists():
             self.logger.debug(f"No guidelines found for language: {language}")
@@ -126,6 +125,39 @@ class GuidelinesManager:
         separator = "\n\n---\n\n"
         return header + separator.join(guidelines)
     
+    def get_guideline_file_path(self, language: str) -> Path:
+        """Get the file path for a specific language guideline."""
+        return self._get_user_guidelines_dir() / f"{language}.md"
+    
+    def reset_to_default(self, language: str) -> bool:
+        """Reset a language guideline to default template."""
+        template_dir = self._get_template_guidelines_dir()
+        template_file = template_dir / f"{language}.md"
+        
+        if not template_file.exists():
+            self.logger.warning(f"No default template found for {language}")
+            return False
+        
+        # Ensure user directory exists
+        user_dir = self._get_user_guidelines_dir()
+        if not user_dir.exists():
+            from config.setup import get_setup_manager
+            setup_manager = get_setup_manager()
+            setup_manager.ensure_all_configs_exist()
+        
+        # Use centralized path method
+        user_file = self.get_guideline_file_path(language)
+        
+        try:
+            shutil.copy2(template_file, user_file)
+            # Clear cache for this language
+            self._cache.pop(language, None)
+            self.logger.info(f"Reset {language} guidelines to default")
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to reset {language} guidelines: {e}")
+            return False
+    
     def save_guideline(self, language: str, content: str) -> bool:
         """Save guideline content to file."""
         # Ensure configs exist via SetupManager
@@ -136,7 +168,8 @@ class GuidelinesManager:
             setup_manager = get_setup_manager()
             setup_manager.ensure_all_configs_exist()
         
-        guideline_file = self._get_user_guidelines_dir() / f"{language}.md"
+        # Use centralized path method
+        guideline_file = self.get_guideline_file_path(language)
         
         try:
             guideline_file.write_text(content, encoding='utf-8')

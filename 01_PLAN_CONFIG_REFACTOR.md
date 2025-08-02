@@ -261,10 +261,11 @@ __all__ = [
 
 ### **📊 6.5 Testes de Commands**
 
-- [ ] Testar `context-ai config` commands
-- [ ] Testar `context-ai storage` commands
-- [ ] Testar `context-ai select` (embeddings)
-- [ ] Verificar que todas as configurações funcionam
+- [x] Testar `context-ai config` commands
+- [x] Testar `context-ai storage` commands
+- [x] Testar `context-ai select` (embeddings)
+- [x] Testar `context-ai generate` (quick test)
+- [x] Verificar que todas as configurações funcionam
 
 ---
 
@@ -403,32 +404,17 @@ StorageManager.embeddings_dir = base_path / "embeddings"
 #### **🔧 7.5.3 Implementação da Refatoração**
 
 ##### **STEP 1: Mover Embeddings Management**
-- [ ] **MOVER** `SettingsManager.get_available_embeddings()` → `StorageManager`
-- [ ] **MOVER** `SettingsManager.save_embedding_metadata()` → `StorageManager`
-- [ ] **MOVER** `SettingsManager.delete_embedding_metadata()` → `StorageManager`
-- [ ] **ATUALIZAR** `StorageManager.delete_embedding()` para coordenar metadata + dados
-- [ ] **REMOVER** `SettingsManager.embeddings_dir` management
+- [x] **MOVER** `SettingsManager.get_available_embeddings()` → `EmbeddingManager` 
+- [x] **MOVER** `SettingsManager.save_embedding_metadata()` → `EmbeddingManager` 
+- [x] **MOVER** `SettingsManager.delete_embedding_metadata()` → `EmbeddingManager` 
+- [x] **ATUALIZAR** `StorageManager.delete_embedding()` para coordenar metadata + dados 
+- [x] **REMOVER** `SettingsManager.embeddings_dir` management 
 
 ##### **STEP 2: Eliminar TRIPLICAÇÃO de Configuration Copy**
-- [ ] **REMOVER** `LanguagesManager._ensure_config_exists()` método
-- [ ] **REMOVER** `GuidelinesManager._ensure_guidelines_exist()` método
-- [ ] **ATUALIZAR** `LanguagesManager._load_config()` para verificar via SettingsManager:
-```python
-def _load_config(self, force_reload: bool = False) -> LanguagesConfig:
-    if not self.languages_file.exists():
-        # Delegar para settings manager - garante TODAS as configs
-        from config.settings import get_settings_manager
-        get_settings_manager()  # Isso copia languages + guidelines + prompts
-    # Continue com load normal...
-```
-- [ ] **ATUALIZAR** `GuidelinesManager.get_guideline()` para verificar via SettingsManager:
-```python
-def get_guideline(self, language: str) -> Optional[str]:
-    # Ensure configs exist via centralized copy
-    from config.settings import get_settings_manager
-    get_settings_manager()  
-    # Continue with normal guideline loading...
-```
+- [x] **REMOVER** `LanguagesManager._ensure_config_exists()` método 
+- [x] **REMOVER** `GuidelinesManager._ensure_guidelines_exist()` método 
+- [x] **ATUALIZAR** `LanguagesManager._load_config()` para verificar via SetupManager 
+- [x] **ATUALIZAR** `GuidelinesManager.get_guideline()` para verificar via SetupManager 
 
 ##### **STEP 3: Consolidar Constants Duplicadas**
 - [x] **REMOVER** `BYTES_PER_MB` de `src/config/constants/storage.py`
@@ -562,7 +548,7 @@ def get_settings_manager() -> SettingsManager:
         _settings_manager.initialize()  # Only config.json/active.json
     return _settings_manager
 ```
-- [ ] **ATUALIZAR** Languages/Guidelines managers para usar SetupManager:
+- [x] **ATUALIZAR** Languages/Guidelines managers para usar SetupManager:
 ```python
 # Ao invés de chamar get_settings_manager()
 from config.setup import get_setup_manager
@@ -699,20 +685,20 @@ LANGUAGES (LanguagesManager):
 **Busca por violações já realizada. Principais violadores identificados:**
 
 #### **📋 8.1.1 Path Hardcoding Violators:**
-- [ ] `src/config/guidelines/manager.py` - path construction direto
-- [ ] `src/config/languages/manager.py` - path construction direto  
-- [ ] `src/core/ai/prompt_builder.py` - path management duplicado
-- [ ] `src/utils/session_logger.py` - session paths hardcoded
-- [ ] `src/services/ai_service.py` - file operations diretas
-- [ ] `src/services/embedding_service.py` - path operations diretas
-- [ ] `src/core/embeddings/model_manager.py` - directory creation direta
-- [ ] `src/core/embeddings/vector_store.py` - storage path direta
+- [x] `src/config/guidelines/manager.py` - removido (agora guidelines.py)
+- [x] `src/config/languages/registry.py` - path construction direto
+- [x] `src/core/ai/prompt_builder.py` - path management duplicado
+- [x] `src/utils/session_logger.py` - session paths hardcoded
+- [x] `src/services/ai_service.py` - file operations diretas
+- [x] `src/services/embedding_service.py` - path operations diretas
+- [x] `src/core/embeddings/model_manager.py` - directory creation direta
+- [x] `src/core/embeddings/vector_store.py` - storage path direta
 
 #### **📋 8.1.2 Configuration Access Violators:**
-- [ ] Imports diretos de `DEFAULT_CONFIG_DIR` em múltiplos arquivos
-- [ ] Construction de `config.json` / `active.json` paths duplicada
-- [ ] Directory creation sem usar storage manager
-- [ ] Path resolution sem usar settings manager
+- [x] Imports diretos de `DEFAULT_CONFIG_DIR` em múltiplos arquivos
+- [x] Construction de `config.json` / `active.json` paths duplicada
+- [x] Directory creation sem usar storage manager
+- [x] Path resolution sem usar settings manager
 
 ### **🔄 8.2 Refatorar Guidelines Manager**
 
@@ -935,9 +921,9 @@ Exemplo:
 - [x] **FASE 3:** Samples estrutura criada
 - [x] **FASE 4:** Guidelines consolidado em languages/
 - [x] **FASE 5:** Cleanup e reorganização
-- [x] **FASE 6:** Testes completos passando
+- [x] **FASE 6:** Testes completos passando ✅ **TODOS OS COMMANDS FUNCIONANDO**
 - [x] **FASE 7:** Config models consolidado
-- [x] **FASE 8:** Configurações e storage centralizados  
+- [x] **FASE 8:** Configurações e storage centralizados ✅ **TODOS OS PATHS CENTRALIZADOS**
 - [x] **FASE 9:** Validação final OK
 
 ### **🎯 ENTREGÁVEL FINAL:**
