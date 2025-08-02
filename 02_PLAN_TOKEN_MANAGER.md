@@ -320,8 +320,9 @@ class TokenManager:
     def _auto_detect_provider(self) -> None:
         """Auto-detect provider from active configuration."""
         try:
-            from config.providers.registry import get_active_provider_name
-            provider_name = get_active_provider_name()
+            from config.providers.registry import get_provider_registry
+            registry = get_provider_registry()
+            provider_name = registry.config_core.get_active_provider()  # ← API correta
             
             if provider_name == "claude":
                 self._active_provider = TokenProvider.CLAUDE
@@ -512,11 +513,18 @@ __all__ = [
 
 #### **📦 3.2.2 Substituir Uso do TokenCalculator**
 
+**⚠️ NOTA**: `ai_service.py` já importa `count_tokens` do context_formatter:
+```python
+from core.formatting.context_formatter import count_tokens  # ← será removido na FASE 4.1
+```
+
+**AÇÕES:**
 - [ ] Localizar todas as chamadas para `TokenCalculator` methods
 - [ ] Substituir por chamadas ao `get_token_manager()`:
   - [ ] `TokenCalculator.calculate_context_allocation()` → `get_token_manager().calculate_context_allocation()`
   - [ ] `TokenCalculator.calculate_response_tokens()` → `get_token_manager().calculate_response_tokens()`
   - [ ] Outras chamadas encontradas
+- [ ] **MANTER** temporariamente o import `count_tokens` (será removido na FASE 4.1)
 
 #### **🧪 3.2.3 Testar AI_Service Atualizado**
 
@@ -556,24 +564,19 @@ __all__ = [
 
 ---
 
-### **🧹 FASE 4.2: SUBSTITUIR EM PROMPT_BUILDER**
+### **🧹 FASE 4.2: ~~SUBSTITUIR EM PROMPT_BUILDER~~ (REMOVIDO - NÃO NECESSÁRIO)**
 
-#### **📦 4.2.1 Analisar e Remover**
+#### **❌ ATUALIZAÇÃO APÓS ANÁLISE DETALHADA:**
 
-- [ ] Abrir `core/ai/prompt_builder.py`
-- [ ] Localizar função `count_tokens()` simples
-- [ ] Remover implementação local completa
-- [ ] Remover imports relacionados
+- [x] **DESCOBERTA**: `prompt_builder.py` NÃO possui implementação de `count_tokens()`
+- [x] **CONFIRMADO**: Não há duplicação de token counting no prompt_builder
+- [x] **AÇÃO**: Esta fase é desnecessária e foi removida do fluxo
 
-#### **📦 4.2.2 Atualizar para TokenManager**
+#### **✅ RESULTADO:**
 
-- [ ] Adicionar import: `from core.ai.token_manager import get_token_manager`
-- [ ] Substituir chamadas por: `get_token_manager().count_tokens(text)`
-
-#### **🧪 4.2.3 Testar Prompt Builder**
-
-- [ ] Testar que prompt building funciona
-- [ ] Verificar que logs de token incluem contagem correta
+- [x] **Sem ação necessária** - prompt_builder não precisa ser alterado
+- [x] **Sem imports** para atualizar neste arquivo
+- [x] **Sem testes** específicos necessários
 
 ---
 
@@ -613,7 +616,10 @@ __all__ = [
 
 #### **📋 5.1.2 Verificar Arquivos Conhecidos**
 
-- [ ] `utils/session_logger.py` - atualizar usos de token counting
+- [ ] `utils/session_logger.py` - **CRÍTICO**: Validar que recebe token counts corretamente
+  - [ ] Verificar `log_prompt_built()` funciona com TokenManager
+  - [ ] Testar que token statistics continuam precisas
+  - [ ] Validar que session totals agregam corretamente
 - [ ] `core/ai/claude_client.py` - verificar usos para streaming
 - [ ] `services/embedding_service.py` - verificar estatísticas de contexto
 - [ ] Qualquer outro arquivo encontrado nas buscas
@@ -701,9 +707,9 @@ Se NENHUM uso restante:
 
 #### **⚡ 6.2.1 Benchmark de Cache LRU**
 
-- [ ] Testar token counting sem cache (simular)
-- [ ] Testar token counting com cache LRU
-- [ ] Medir hit rate do cache após uso normal
+- [ ] **Baseline**: Medir performance do cache hash atual (context_formatter)
+- [ ] **New system**: Testar token counting com cache LRU do TokenManager
+- [ ] **Comparison**: Comparar hit rates (hash cache vs LRU cache)
 - [ ] Verificar que performance é pelo menos igual ou melhor que antes
 
 #### **📈 6.2.2 Benchmark de Providers**
