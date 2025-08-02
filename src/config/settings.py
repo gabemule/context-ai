@@ -35,7 +35,6 @@ class SettingsManager:
         # Config file paths
         self.config_file = self.config_dir / "config.json"
         self.active_file = self.config_dir / "active.json"
-        self.embeddings_dir = self.config_dir / "embeddings"
 
         # In-memory config cache
         self._config: Optional[ContextAIConfig] = None
@@ -46,7 +45,6 @@ class SettingsManager:
         try:
             # Create config directory
             self.config_dir.mkdir(parents=True, exist_ok=True)
-            self.embeddings_dir.mkdir(parents=True, exist_ok=True)
 
             # Create default config if doesn't exist
             if not self.config_file.exists():
@@ -156,50 +154,22 @@ class SettingsManager:
         self.logger.info("Prompt mode set to: %s", mode)
 
     def set_active_embeddings(self, embedding_names: List[str]) -> None:
-        """Set active embeddings."""
-        active = ActiveEmbeddings(selected=embedding_names, last_updated=datetime.now())
+        """Set active embeddings (validates via StorageManager)."""
+        # Use StorageManager to validate embedding names exist
+        from config.storage import get_storage_manager
+        storage_manager = get_storage_manager()
+        
+        # Validate that all embeddings exist
+        valid_embeddings = []
+        for name in embedding_names:
+            if storage_manager.embedding_exists(name):
+                valid_embeddings.append(name)
+            else:
+                self.logger.warning("Embedding '%s' not found, skipping", name)
+        
+        active = ActiveEmbeddings(selected=valid_embeddings, last_updated=datetime.now())
         self.save_active_embeddings(active)
-        self.logger.info("Active embeddings set: %s", ", ".join(embedding_names))
-
-    def get_available_embeddings(self) -> List[EmbeddingInfo]:
-        """Get list of available embeddings."""
-        embeddings = []
-
-        if not self.embeddings_dir.exists():
-            return embeddings
-
-        try:
-            for embedding_file in self.embeddings_dir.glob("*.json"):
-                with open(embedding_file, "r") as f:
-                    data = json.load(f)
-                    embedding_info = EmbeddingInfo(**data)
-                    embeddings.append(embedding_info)
-        except Exception as e:
-            self.logger.warning("Error reading embeddings metadata: %s", e)
-
-        return sorted(embeddings, key=lambda x: x.created_at, reverse=True)
-
-    def save_embedding_metadata(self, embedding_info: EmbeddingInfo) -> None:
-        """Save embedding metadata."""
-        metadata_file = self.embeddings_dir / f"{embedding_info.name}.json"
-
-        try:
-            with open(metadata_file, "w") as f:
-                json.dump(embedding_info.dict(), f, indent=2, default=str)
-            self.logger.debug("Saved embedding metadata: %s", embedding_info.name)
-        except Exception as e:
-            raise ConfigurationError(f"Failed to save embedding metadata: {e}")
-
-    def delete_embedding_metadata(self, embedding_name: str) -> None:
-        """Delete embedding metadata."""
-        metadata_file = self.embeddings_dir / f"{embedding_name}.json"
-
-        try:
-            if metadata_file.exists():
-                metadata_file.unlink()
-                self.logger.debug("Deleted embedding metadata: %s", embedding_name)
-        except Exception as e:
-            self.logger.warning("Failed to delete embedding metadata: %s", e)
+        self.logger.info("Active embeddings set: %s", ", ".join(valid_embeddings))
 
     def _load_config(self) -> None:
         """Load configuration from file."""

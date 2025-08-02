@@ -739,13 +739,75 @@ class StorageManager:
         return cleaned_count
 
     def delete_embedding(self, embedding_name: str) -> bool:
-        """Delete a specific embedding."""
+        """Delete a specific embedding and its metadata."""
         try:
+            # Delete from vector store
             embeddings_strategy = self.cleanup_strategies["embeddings"]
-            return embeddings_strategy._delete_embedding(embedding_name)
+            vector_deleted = embeddings_strategy._delete_embedding(embedding_name)
+            
+            # Delete metadata file
+            self.delete_embedding_metadata(embedding_name)
+            
+            return vector_deleted
         except Exception as e:
             self.logger.error("Error deleting embedding '%s': %s", embedding_name, e)
             raise StorageError(f"Failed to delete embedding '{embedding_name}': {e}")
+
+    def get_available_embeddings(self) -> List:
+        """Get list of available embeddings with metadata."""
+        try:
+            import json
+            from config.models import EmbeddingInfo
+            
+            embeddings = []
+            embeddings_dir = self.path_manager.base_path / "embeddings"
+
+            if not embeddings_dir.exists():
+                return embeddings
+
+            for embedding_file in embeddings_dir.glob("*.json"):
+                try:
+                    with open(embedding_file, "r") as f:
+                        data = json.load(f)
+                        embedding_info = EmbeddingInfo(**data)
+                        embeddings.append(embedding_info)
+                except Exception as e:
+                    self.logger.warning("Error reading embedding metadata %s: %s", embedding_file.name, e)
+
+            return sorted(embeddings, key=lambda x: x.created_at, reverse=True)
+
+        except Exception as e:
+            self.logger.warning("Error getting available embeddings: %s", e)
+            return []
+
+    def save_embedding_metadata(self, embedding_info) -> None:
+        """Save embedding metadata."""
+        try:
+            import json
+            
+            embeddings_dir = self.path_manager.base_path / "embeddings"
+            embeddings_dir.mkdir(parents=True, exist_ok=True)
+            
+            metadata_file = embeddings_dir / f"{embedding_info.name}.json"
+
+            with open(metadata_file, "w") as f:
+                json.dump(embedding_info.dict(), f, indent=2, default=str)
+            self.logger.debug("Saved embedding metadata: %s", embedding_info.name)
+            
+        except Exception as e:
+            raise StorageError(f"Failed to save embedding metadata: {e}")
+
+    def delete_embedding_metadata(self, embedding_name: str) -> None:
+        """Delete embedding metadata."""
+        try:
+            embeddings_dir = self.path_manager.base_path / "embeddings"
+            metadata_file = embeddings_dir / f"{embedding_name}.json"
+
+            if metadata_file.exists():
+                metadata_file.unlink()
+                self.logger.debug("Deleted embedding metadata: %s", embedding_name)
+        except Exception as e:
+            self.logger.warning("Failed to delete embedding metadata: %s", e)
 
     def reset_storage(self, confirm: bool = False) -> bool:
         """Reset all storage (DELETE EVERYTHING)."""

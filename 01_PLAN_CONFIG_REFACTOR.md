@@ -522,6 +522,65 @@ from .models import ProviderCapabilities
 ```
 - [ ] **ATUALIZAR** imports em outros arquivos que usam providers
 
+##### **STEP 9: Criar Setup Manager (Separação Final de Responsabilidades)**
+- [ ] **PROBLEMA IDENTIFICADO**: `_ensure_all_configs_exist()` não deveria estar no SettingsManager:
+```python
+# ❌ VIOLAÇÃO SRP: SettingsManager fazendo file operations
+SettingsManager._ensure_all_configs_exist()
+├── shutil.copy2()        # File operations
+├── mkdir()               # Directory creation  
+├── file.glob()           # File system access
+└── project path logic   # Template resolution
+```
+- [ ] **CRIAR** `src/config/setup.py` com responsabilidade única de setup:
+```python
+class SetupManager:
+    """Handles initial setup and configuration file copying (SRP)."""
+    
+    def ensure_all_configs_exist(self) -> None:
+        """Central method for ensuring all config files exist."""
+        self._ensure_languages_config()
+        self._ensure_guidelines_config()  
+        self._ensure_prompts_config()
+        
+    def _ensure_languages_config(self) -> None:
+        """Copy languages.yaml from samples/ if missing."""
+        
+    def _ensure_guidelines_config(self) -> None:
+        """Copy guidelines/*.md from samples/ if missing."""
+        
+    def _ensure_prompts_config(self) -> None:
+        """Copy prompts/ structure from samples/ if missing."""
+
+def get_setup_manager() -> SetupManager:
+    """Get global setup manager instance."""
+```
+- [ ] **MOVER** `_ensure_all_configs_exist()` do Settings → Setup
+- [ ] **ATUALIZAR** `SettingsManager.get_settings_manager()` para:
+```python
+def get_settings_manager() -> SettingsManager:
+    if _settings_manager is None:
+        # Ensure setup is complete first
+        from config.setup import get_setup_manager
+        get_setup_manager().ensure_all_configs_exist()
+        
+        _settings_manager = SettingsManager()
+        _settings_manager.initialize()  # Only config.json/active.json
+    return _settings_manager
+```
+- [ ] **ATUALIZAR** Languages/Guidelines managers para usar SetupManager:
+```python
+# Ao invés de chamar get_settings_manager()
+from config.setup import get_setup_manager
+get_setup_manager().ensure_all_configs_exist()
+```
+- [ ] **RESULTADO**: Separação perfeita de responsabilidades:
+```python
+SetupManager    = Initial setup, file copying, templates
+SettingsManager = config.json, active.json, application config  
+StorageManager  = Storage operations, cleanup, analytics
+```
+
 #### **📋 7.5.4 Checklist Detalhado de Refatoração**
 
 ##### **🔄 Refatorar SettingsManager**

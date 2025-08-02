@@ -49,42 +49,15 @@ class LanguagesManager:
         self._resolved_languages: Optional[Dict[str, ResolvedLanguageConfig]] = None
         self._cache_valid = False
     
-    def _ensure_config_exists(self) -> None:
-        """Ensure configuration files exist, create defaults if missing."""
-        try:
-            # Use new SOLID architecture for comprehensive file copying
-            from .loader import DefaultConfigGenerator
-            
-            # Ensure the directory exists
-            self.config_dir.mkdir(parents=True, exist_ok=True)
-            
-            # Copy all language-related files (languages.yaml + README.md)
-            copy_result = DefaultConfigGenerator.copy_all_language_files(self.config_dir)
-            
-            if copy_result.has_changes:
-                self.logger.info(
-                    f"Initialized {copy_result.files_copied} language configuration files: "
-                    f"languages.yaml, README.md"
-                )
-            
-            if not copy_result.success and copy_result.errors:
-                error_details = "; ".join(copy_result.errors)
-                self.logger.warning(f"Configuration initialization completed with warnings: {error_details}")
-            
-            # Verify that at least the main configuration file exists
-            if not self.languages_file.exists():
-                raise ConfigurationError(f"Languages configuration file was not created: {self.languages_file}")
-                
-        except ConfigurationError as e:
-            self.logger.error(f"Failed to ensure configuration exists: {e}")
-            raise
-        except Exception as e:
-            self.logger.error(f"Unexpected error during configuration initialization: {e}")
-            raise ConfigurationError(f"Configuration initialization failed: {str(e)}")
-    
     def _load_config(self, force_reload: bool = False) -> LanguagesConfig:
         """Load configuration from file with caching."""
         if self._config is None or force_reload or not self._cache_valid:
+            # Ensure configs exist via centralized copy (SettingsManager)
+            if not self.languages_file.exists():
+                self.logger.debug("Languages config missing, ensuring via SettingsManager...")
+                from config.settings import get_settings_manager
+                get_settings_manager()  # This copies languages + guidelines + prompts
+            
             try:
                 self.logger.debug(f"Loading languages configuration from: {self.languages_file}")
                 self._config = load_languages_config(self.languages_file)

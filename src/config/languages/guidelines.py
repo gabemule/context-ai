@@ -25,22 +25,6 @@ class GuidelinesManager:
         self._guidelines_copied = False
         self._cache: Dict[str, str] = {}
     
-    def _ensure_guidelines_exist(self) -> None:
-        """Lazy copy - only copy guidelines if they don't exist."""
-        if self._guidelines_copied:
-            return
-            
-        user_guidelines_dir = self._get_user_guidelines_dir()
-        
-        # Check if guidelines directory exists and has files
-        if user_guidelines_dir.exists() and list(user_guidelines_dir.glob("*.md")):
-            self._guidelines_copied = True
-            return
-        
-        # Copy guidelines from templates
-        self._copy_default_guidelines()
-        self._guidelines_copied = True
-    
     def _get_user_guidelines_dir(self) -> Path:
         """Get user guidelines directory."""
         from config.constants.storage import DEFAULT_CONFIG_DIR
@@ -53,38 +37,14 @@ class GuidelinesManager:
         config_dir = current_file.parent.parent  # Go up to src/config/
         return config_dir / "samples" / "guidelines"
     
-    def _copy_default_guidelines(self) -> int:
-        """Copy default guidelines to user directory. Returns count of copied files."""
-        template_dir = self._get_template_guidelines_dir()
-        user_dir = self._get_user_guidelines_dir()
-        
-        if not template_dir.exists():
-            self.logger.warning(f"Template guidelines directory not found: {template_dir}")
-            return 0
-        
-        # Ensure user directory exists
-        user_dir.mkdir(parents=True, exist_ok=True)
-        
-        copied_count = 0
-        for template_file in template_dir.glob("*.md"):
-            target_file = user_dir / template_file.name
-            
-            if not target_file.exists():
-                try:
-                    shutil.copy2(template_file, target_file)
-                    copied_count += 1
-                    self.logger.debug(f"Copied guideline: {template_file.name}")
-                except Exception as e:
-                    self.logger.warning(f"Failed to copy {template_file.name}: {e}")
-        
-        if copied_count > 0:
-            self.logger.info(f"Initialized {copied_count} guideline templates")
-        
-        return copied_count
-    
     def get_guideline(self, language: str) -> Optional[str]:
         """Get guideline content for a specific language."""
-        self._ensure_guidelines_exist()  # Lazy copy
+        # Ensure configs exist via centralized copy (SettingsManager)
+        user_guidelines_dir = self._get_user_guidelines_dir()
+        if not user_guidelines_dir.exists() or not list(user_guidelines_dir.glob("*.md")):
+            self.logger.debug("Guidelines missing, ensuring via SettingsManager...")
+            from config.settings import get_settings_manager
+            get_settings_manager()  # This copies languages + guidelines + prompts
         
         # Check cache first
         if language in self._cache:
@@ -107,7 +67,12 @@ class GuidelinesManager:
     
     def get_available_languages(self) -> List[str]:
         """Get list of all available guideline languages."""
-        self._ensure_guidelines_exist()  # Lazy copy
+        # Ensure configs exist via centralized copy (SettingsManager)
+        user_dir = self._get_user_guidelines_dir()
+        if not user_dir.exists():
+            self.logger.debug("Guidelines directory missing, ensuring via SettingsManager...")
+            from config.settings import get_settings_manager
+            get_settings_manager()  # This copies languages + guidelines + prompts
         
         user_dir = self._get_user_guidelines_dir()
         if not user_dir.exists():
@@ -146,7 +111,12 @@ class GuidelinesManager:
     
     def save_guideline(self, language: str, content: str) -> bool:
         """Save guideline content to file."""
-        self._ensure_guidelines_exist()  # Lazy copy
+        # Ensure configs exist via centralized copy (SettingsManager)
+        user_guidelines_dir = self._get_user_guidelines_dir()
+        if not user_guidelines_dir.exists():
+            self.logger.debug("Guidelines directory missing, ensuring via SettingsManager...")
+            from config.settings import get_settings_manager
+            get_settings_manager()  # This copies languages + guidelines + prompts
         
         guideline_file = self._get_user_guidelines_dir() / f"{language}.md"
         
