@@ -105,23 +105,32 @@ def generation_context(request: GenerateRequest, logger):
 # =============================================================================
 
 def _initialize_services(logger) -> ServiceContainer:
-    """Initialize required services with loading indicator (SRP)."""
+    """Initialize required services with lazy loading optimization (SRP)."""
     from rich.console import Console
     
     console = Console()
     
-    # Load heavy imports with loading indicator
-    with console.status("[bold green]Loading embedding service...", spinner="dots"):
-        from services.embedding_service import EmbeddingService
-
-        embedding_service = EmbeddingService()
-        
-        logger.debug("Embedding service initialized")
+    # Fast initialization - no heavy imports upfront
+    logger.debug("Services container initialized (lazy loading enabled)")
 
     return ServiceContainer(
-        embedding_service=embedding_service,
+        embedding_service=None,  # Will be lazy loaded
         console=console
     )
+
+
+def _get_embedding_service(logger) -> Any:
+    """Lazy load embedding service only when needed (Performance Optimization)."""
+    if not hasattr(_get_embedding_service, '_service'):
+        from rich.console import Console
+        console = Console()
+        
+        with console.status("[bold green]Loading embedding service...", spinner="dots"):
+            from services.embedding_service import EmbeddingService
+            _get_embedding_service._service = EmbeddingService()
+            logger.debug("Embedding service lazy loaded")
+    
+    return _get_embedding_service._service
 
 
 # =============================================================================
@@ -140,8 +149,21 @@ def _create_generate_request(args: argparse.Namespace) -> GenerateRequest:
 
 
 def _validate_generate_request(request: GenerateRequest, logger) -> bool:
-    """Validate generate request parameters (SRP)."""
-    # Validate path exists
+    """
+    Validate generate request parameters with early exit optimization (SRP).
+    
+    Validates in order of speed: fastest checks first to fail fast.
+    """
+    # FAST VALIDATIONS FIRST (no file system or heavy operations)
+    
+    # 1. Validate embedding name format (regex - very fast)
+    if not _is_valid_embedding_name(request.name):
+        logger.error("❌ Invalid embedding name: '%s'", request.name)
+        logger.error("💡 Use only alphanumeric characters, hyphens, and underscores")
+        logger.error("💡 Examples: 'project-v1', 'backend_api', 'frontend-components'")
+        return False
+    
+    # 2. Validate path exists (filesystem check - medium speed)
     path_obj = Path(request.path)
     if not path_obj.exists():
         logger.error("❌ Path does not exist: %s", request.path)
@@ -151,21 +173,7 @@ def _validate_generate_request(request: GenerateRequest, logger) -> bool:
         logger.error("❌ Path is not a directory: %s", request.path)
         return False
     
-    # Validate embedding name format
-    if not _is_valid_embedding_name(request.name):
-        logger.error("❌ Invalid embedding name: '%s'", request.name)
-        logger.error("💡 Use only alphanumeric characters, hyphens, and underscores")
-        logger.error("💡 Examples: 'project-v1', 'backend_api', 'frontend-components'")
-        return False
-    
-    # Check if embedding already exists
-    if _embedding_exists(request.name, logger):
-        logger.error("❌ Embedding '%s' already exists", request.name)
-        logger.error("💡 Use a different name or delete the existing embedding first")
-        logger.error("💡 Run: context-ai storage delete %s", request.name)
-        return False
-    
-    # Validate ignore file if specified
+    # 3. Validate ignore file if specified (filesystem check - medium speed)
     if request.ignore_file:
         ignore_path = Path(request.ignore_file)
         if not ignore_path.exists():
@@ -175,6 +183,13 @@ def _validate_generate_request(request: GenerateRequest, logger) -> bool:
         if not ignore_path.is_file():
             logger.error("❌ Ignore file path is not a file: %s", request.ignore_file)
             return False
+    
+    # 4. SLOWEST VALIDATION LAST - Check if embedding exists (requires imports/DB access)
+    if _embedding_exists(request.name, logger):
+        logger.error("❌ Embedding '%s' already exists", request.name)
+        logger.error("💡 Use a different name or delete the existing embedding first")
+        logger.error("💡 Run: context-ai storage delete %s", request.name)
+        return False
     
     if request.verbose:
         logger.info("✅ Request validation passed")
@@ -204,9 +219,12 @@ def _embedding_exists(name: str, logger) -> bool:
 
 
 def _execute_generate_request(request: GenerateRequest, services: ServiceContainer, logger) -> None:
-    """Execute the embedding generation request (SRP)."""
+    """Execute the embedding generation request with lazy service loading (SRP)."""
     try:
-        services.embedding_service.generate_embedding(
+        # Lazy load embedding service only when actually needed
+        embedding_service = _get_embedding_service(logger)
+        
+        embedding_service.generate_embedding(
             path=request.path,
             name=request.name,
             ignore_file=request.ignore_file,

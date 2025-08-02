@@ -15,41 +15,81 @@ from utils.logging import get_logger
 
 
 class EmbeddingService:
-    """Service for embedding-related operations."""
+    """Service for embedding-related operations with lazy loading optimization."""
 
     def __init__(self):
-        import time
-        init_start_time = time.time()
-        
+        # ✅ Fast initialization - only lightweight components
         self.logger = get_logger(__name__)
-        verbose = self.logger.isEnabledFor(10)  # DEBUG level = 10
-        
-        # Settings Manager
         self.settings_manager = get_settings_manager()
         
-        # Model Manager (LAZY IMPORT - can be slow)
-        if verbose:
-            t2 = time.time()
-        from core.embeddings.model_manager import get_model_manager
-        self.model_manager = get_model_manager()
-        if verbose:
-            self.logger.info("⏱️  Model Manager: %.3fs", time.time() - t2)
+        # ✅ Lazy loading - components loaded only when needed
+        self._model_manager = None
+        self._vector_store = None
+        self._chunker = None
         
-        # Vector Store (LAZY IMPORT - ChromaDB connection)
+        verbose = self.logger.isEnabledFor(10)  # DEBUG level = 10
         if verbose:
-            t3 = time.time()
-        from core.embeddings.vector_store import get_vector_store
-        self.vector_store = get_vector_store()
-        if verbose:
-            self.logger.info("⏱️  Vector Store: %.3fs", time.time() - t3)
+            self.logger.debug("✅ EmbeddingService initialized (lazy loading enabled)")
+
+    @property
+    def model_manager(self):
+        """Lazy load model manager only when needed (Performance Optimization)."""
+        if self._model_manager is None:
+            import time
+            start_time = time.time()
+            verbose = self.logger.isEnabledFor(10)
+            
+            if verbose:
+                self.logger.debug("🔄 Loading Model Manager...")
+            
+            from core.embeddings.model_manager import get_model_manager
+            self._model_manager = get_model_manager()
+            
+            if verbose:
+                load_time = time.time() - start_time
+                self.logger.info("⏱️  Model Manager loaded in %.3fs", load_time)
         
-        # Chunker (LAZY IMPORT)
-        from core.chunking import get_chunker
-        self.chunker = get_chunker()
+        return self._model_manager
+
+    @property
+    def vector_store(self):
+        """Lazy load vector store only when needed (Performance Optimization)."""
+        if self._vector_store is None:
+            import time
+            start_time = time.time()
+            verbose = self.logger.isEnabledFor(10)
+            
+            if verbose:
+                self.logger.debug("🔄 Loading Vector Store...")
+            
+            from core.embeddings.vector_store import get_vector_store
+            self._vector_store = get_vector_store()
+            
+            if verbose:
+                load_time = time.time() - start_time
+                self.logger.info("⏱️  Vector Store loaded in %.3fs", load_time)
         
-        if verbose:
-            total_time = time.time() - init_start_time
-            self.logger.info("✅ EmbeddingService ready in %.3fs", total_time)
+        return self._vector_store
+
+    @property
+    def chunker(self):
+        """Lazy load chunker only when needed (Performance Optimization)."""
+        if self._chunker is None:
+            import time
+            start_time = time.time()
+            verbose = self.logger.isEnabledFor(10)
+            
+            if verbose:
+                self.logger.debug("🔄 Loading Chunker...")
+            
+            from core.chunking import get_chunker
+            self._chunker = get_chunker()
+            
+            if verbose:
+                load_time = time.time() - start_time
+                self.logger.info("⏱️  Chunker loaded in %.3fs", load_time)
+        
+        return self._chunker
 
     def generate_embedding(
         self, path: str, name: str, ignore_file: str = None, show_progress: bool = True
@@ -308,38 +348,102 @@ class EmbeddingService:
 
 
 class QueryService:
-    """Service for query operations."""
+    """Service for query operations with lazy loading optimization."""
 
     def __init__(self):
-        import time
-        init_start_time = time.time()
-        
+        # ✅ Fast initialization - only lightweight components
         self.logger = get_logger(__name__)
-        verbose = self.logger.isEnabledFor(10)  # DEBUG level = 10
-        
-        # Settings Manager
         self.settings_manager = get_settings_manager()
         
-        # Vector Store (LAZY IMPORT - ChromaDB connection can be slow)
-        if verbose:
-            t2 = time.time()
-        from core.embeddings.vector_store import get_vector_store
-        self.vector_store = get_vector_store()
-        if verbose:
-            self.logger.info("⏱️  Vector Store: %.3fs", time.time() - t2)
+        # ✅ Lazy loading - components loaded only when needed
+        self._vector_store = None
+        self._result_merger = None
+        self._query_preprocessor = None
+        self._context_formatter = None
         
-        # Result Merger, Query Preprocessor, Context Formatter (LAZY IMPORTS)
-        from core.query.result_merger import get_result_merger
-        from core.query.preprocessor import get_query_preprocessor
-        from core.formatting.context_formatter import get_context_formatter
-        
-        self.result_merger = get_result_merger()
-        self.query_preprocessor = get_query_preprocessor()
-        self.context_formatter = get_context_formatter()
-        
+        verbose = self.logger.isEnabledFor(10)  # DEBUG level = 10
         if verbose:
-            total_time = time.time() - init_start_time
-            self.logger.info("✅ QueryService ready in %.3fs", total_time)
+            self.logger.debug("✅ QueryService initialized (lazy loading enabled)")
+
+    @property
+    def vector_store(self):
+        """Lazy load vector store only when needed (Performance Optimization)."""
+        if self._vector_store is None:
+            import time
+            start_time = time.time()
+            verbose = self.logger.isEnabledFor(10)
+            
+            if verbose:
+                self.logger.debug("🔄 Loading Vector Store...")
+            
+            from core.embeddings.vector_store import get_vector_store
+            self._vector_store = get_vector_store()
+            
+            if verbose:
+                load_time = time.time() - start_time
+                self.logger.info("⏱️  Vector Store loaded in %.3fs", load_time)
+        
+        return self._vector_store
+
+    @property
+    def result_merger(self):
+        """Lazy load result merger only when needed (Performance Optimization)."""
+        if self._result_merger is None:
+            import time
+            start_time = time.time()
+            verbose = self.logger.isEnabledFor(10)
+            
+            if verbose:
+                self.logger.debug("🔄 Loading Result Merger...")
+            
+            from core.query.result_merger import get_result_merger
+            self._result_merger = get_result_merger()
+            
+            if verbose:
+                load_time = time.time() - start_time
+                self.logger.info("⏱️  Result Merger loaded in %.3fs", load_time)
+        
+        return self._result_merger
+
+    @property
+    def query_preprocessor(self):
+        """Lazy load query preprocessor only when needed (Performance Optimization)."""
+        if self._query_preprocessor is None:
+            import time
+            start_time = time.time()
+            verbose = self.logger.isEnabledFor(10)
+            
+            if verbose:
+                self.logger.debug("🔄 Loading Query Preprocessor...")
+            
+            from core.query.preprocessor import get_query_preprocessor
+            self._query_preprocessor = get_query_preprocessor()
+            
+            if verbose:
+                load_time = time.time() - start_time
+                self.logger.info("⏱️  Query Preprocessor loaded in %.3fs", load_time)
+        
+        return self._query_preprocessor
+
+    @property
+    def context_formatter(self):
+        """Lazy load context formatter only when needed (Performance Optimization)."""
+        if self._context_formatter is None:
+            import time
+            start_time = time.time()
+            verbose = self.logger.isEnabledFor(10)
+            
+            if verbose:
+                self.logger.debug("🔄 Loading Context Formatter...")
+            
+            from core.formatting.context_formatter import get_context_formatter
+            self._context_formatter = get_context_formatter()
+            
+            if verbose:
+                load_time = time.time() - start_time
+                self.logger.info("⏱️  Context Formatter loaded in %.3fs", load_time)
+        
+        return self._context_formatter
 
     def query_context(
         self,
