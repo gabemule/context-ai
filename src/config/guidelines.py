@@ -26,9 +26,10 @@ class GuidelinesManager:
         self._cache: Dict[str, str] = {}
     
     def _get_user_guidelines_dir(self) -> Path:
-        """Get user guidelines directory."""
-        from config.constants.storage import DEFAULT_CONFIG_DIR
-        return Path(DEFAULT_CONFIG_DIR).expanduser() / "config" / "guidelines"
+        """Get user guidelines directory via StorageManager (centralized)."""
+        from config.storage import get_storage_manager
+        storage_manager = get_storage_manager()
+        return storage_manager.path_manager.guidelines_dir
     
     def _get_template_guidelines_dir(self) -> Path:
         """Get template guidelines directory."""

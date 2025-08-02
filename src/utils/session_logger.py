@@ -166,8 +166,9 @@ class CommandSession:
         
         # Create session directory
         from config.constants import DEFAULT_CONFIG_DIR
-        config_dir = Path(DEFAULT_CONFIG_DIR).expanduser()
-        self.session_dir = config_dir / "logs" / self.session_id
+        from config.storage import get_storage_manager
+        storage_manager = get_storage_manager()
+        self.session_dir = storage_manager.path_manager.logs_dir / self.session_id
         self.session_dir.mkdir(parents=True, exist_ok=True)
         
         # Initialize components (Dependency Injection)

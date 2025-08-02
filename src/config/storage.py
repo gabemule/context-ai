@@ -90,11 +90,18 @@ class StoragePathManager:
         """Setup directory path attributes."""
         self.config_file = self.base_path / "config.json"
         self.active_file = self.base_path / "active.json"
+        
+        # Storage directories
         self.embeddings_dir = self.base_path / "embeddings"
         self.chromadb_dir = self.embeddings_dir / "chromadb"
         self.models_dir = self.base_path / "models"
         self.logs_dir = self.base_path / "logs"
         self.temp_dir = self.base_path / "temp"
+        
+        # Config directories (centralized path management)
+        self.config_dir = self.base_path / "config"
+        self.guidelines_dir = self.config_dir / "guidelines"
+        self.prompts_dir = self.config_dir / "prompts"
     
     def ensure_storage_structure(self) -> None:
         """Ensure all storage directories exist."""

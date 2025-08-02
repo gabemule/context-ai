@@ -5,13 +5,14 @@ This module contains all constants related to storage, file management,
 ignore patterns, and file system operations.
 """
 
+from .system import BYTES_PER_MB
+
 __all__ = [
     'DEFAULT_CONFIG_DIR',
     'DEFAULT_MAX_EMBEDDINGS',
     'DEFAULT_CLEANUP_AFTER_DAYS',
     'MAX_FILE_SIZE_MB',
     'MAX_FILE_SIZE_BYTES',
-    'BYTES_PER_MB',
     'DEFAULT_IGNORE_PATTERNS',
     'CONTEXTIGNORE_FILENAME',
     'GITIGNORE_FILENAME',
@@ -24,7 +25,6 @@ DEFAULT_MAX_EMBEDDINGS = 50
 DEFAULT_CLEANUP_AFTER_DAYS = 30
 
 # File size constants
-BYTES_PER_MB = 1024 * 1024
 MAX_FILE_SIZE_MB = 10
 MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * BYTES_PER_MB
 

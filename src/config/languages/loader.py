@@ -2,16 +2,17 @@
 YAML Configuration Loader for Context-AI Languages.
 
 Handles loading and parsing of language configuration files with SOLID architecture.
+Uses generic utils for file operations and YAML loading (DRY principle).
 """
 
-import shutil
-import yaml
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Protocol
 
 from .models import LanguagesConfig, LanguageConfig, GlobalSettings, ChunkingPriority
+from utils.file_operations import get_file_operations, FileSystemOperations as GenericFileSystemOperations
+from utils.yaml_loader import get_yaml_loader
 from utils.logging import get_logger
 
 __all__ = [
@@ -77,51 +78,31 @@ class FileOperations(Protocol):
 
 
 class FileSystemOperations:
-    """Concrete implementation of file operations (SRP)."""
+    """Adapter for generic file operations (Adapter Pattern)."""
     
     def __init__(self, logger: Optional[Any] = None):
         self.logger = logger or get_logger(__name__)
+        self.generic_ops = get_file_operations()
     
     def copy_file(self, source: Path, target: Path) -> bool:
-        """Copy file with comprehensive error handling."""
-        try:
-            if not source.exists():
-                self.logger.warning(f"Source file does not exist: {source}")
-                return False
-            
-            if target.exists():
-                self.logger.debug(f"Target file already exists, skipping: {target.name}")
-                return False
-            
-            shutil.copy2(source, target)
-            self.logger.info(f"Successfully copied: {source.name} -> {target}")
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"Failed to copy {source.name}: {e}")
+        """Copy file using generic file operations."""
+        if target.exists():
+            self.logger.debug(f"Target file already exists, skipping: {target.name}")
             return False
+        
+        success = self.generic_ops.copy_file(source, target)
+        if success:
+            self.logger.info(f"Successfully copied: {source.name} -> {target}")
+        return success
     
     def list_files(self, directory: Path, pattern: str) -> List[Path]:
-        """List files in directory matching pattern."""
-        try:
-            if not directory.exists():
-                self.logger.warning(f"Directory does not exist: {directory}")
-                return []
-            
-            return list(directory.glob(pattern))
-            
-        except Exception as e:
-            self.logger.error(f"Failed to list files in {directory}: {e}")
-            return []
+        """List files using generic file operations."""
+        return self.generic_ops.list_files(directory, pattern)
     
     def ensure_directory_exists(self, directory: Path) -> None:
-        """Ensure directory exists with proper error handling."""
-        try:
-            directory.mkdir(parents=True, exist_ok=True)
-            self.logger.debug(f"Ensured directory exists: {directory}")
-            
-        except Exception as e:
-            self.logger.error(f"Failed to create directory {directory}: {e}")
+        """Ensure directory exists using generic file operations."""
+        success = self.generic_ops.ensure_directory_exists(directory)
+        if not success:
             raise ConfigurationError(f"Could not create directory: {directory}")
 
 
@@ -236,34 +217,27 @@ class LanguageConfigurationCopier(ConfigurationCopier):
 
 
 class YAMLConfigLoader:
-    """YAML configuration loader with error handling (SRP)."""
+    """YAML configuration loader using generic YAML utilities (Adapter Pattern)."""
     
     def __init__(self):
         self.logger = get_logger(__name__)
+        self.generic_yaml = get_yaml_loader()
     
     def load(self, file_path: Path) -> Dict[str, Any]:
-        """Load and parse YAML configuration file."""
-        try:
-            if not file_path.exists():
-                raise ConfigurationError(f"Configuration file not found: {file_path}", file_path=file_path)
-            
-            with file_path.open('r', encoding='utf-8') as f:
-                config_data = yaml.safe_load(f)
-            
-            if config_data is None:
-                self.logger.warning(f"Empty configuration file: {file_path}")
-                return {}
-            
-            if not isinstance(config_data, dict):
-                raise ConfigurationError(f"Configuration must be a YAML dictionary", file_path=file_path)
-            
-            self.logger.debug(f"Successfully loaded configuration from: {file_path}")
-            return config_data
-            
-        except yaml.YAMLError as e:
-            raise ConfigurationError(f"Invalid YAML syntax: {str(e)}", file_path=file_path, cause=e)
-        except (IOError, OSError) as e:
-            raise ConfigurationError(f"Failed to read file: {str(e)}", file_path=file_path, cause=e)
+        """Load and parse YAML configuration file using generic loader."""
+        if not file_path.exists():
+            raise ConfigurationError(f"Configuration file not found: {file_path}", file_path=file_path)
+        
+        config_data = self.generic_yaml.load(file_path)
+        
+        if config_data is None:
+            raise ConfigurationError(f"Failed to load YAML configuration", file_path=file_path)
+        
+        if not isinstance(config_data, dict):
+            raise ConfigurationError(f"Configuration must be a YAML dictionary", file_path=file_path)
+        
+        self.logger.debug(f"Successfully loaded configuration from: {file_path}")
+        return config_data
 
 
 class DefaultConfigGenerator:
@@ -290,11 +264,12 @@ class DefaultConfigGenerator:
             if not template_path.exists():
                 raise ConfigurationError(f"Default template not found: {template_path}")
             
-            # Ensure target directory exists
-            target_path.parent.mkdir(parents=True, exist_ok=True)
+            # Use generic file operations
+            file_ops = get_file_operations()
+            success = file_ops.copy_file(template_path, target_path)
             
-            # Copy template to target
-            shutil.copy2(template_path, target_path)
+            if not success:
+                raise ConfigurationError(f"Failed to copy template file")
             
             logger = get_logger(__name__)
             logger.info(f"Copied default configuration from {template_path} to {target_path}")

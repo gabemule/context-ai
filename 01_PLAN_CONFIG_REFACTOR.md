@@ -431,34 +431,29 @@ def get_guideline(self, language: str) -> Optional[str]:
 ```
 
 ##### **STEP 3: Consolidar Constants Duplicadas**
-- [ ] **REMOVER** `BYTES_PER_MB` de `src/config/constants/storage.py`
-- [ ] **ATUALIZAR** imports em `storage.py` para usar:
+- [x] **REMOVER** `BYTES_PER_MB` de `src/config/constants/storage.py`
+- [x] **ATUALIZAR** imports em `storage.py` para usar:
 ```python
 from config.constants.system import BYTES_PER_MB
 ```
-- [ ] **VERIFICAR** outros locais que possam usar esta constante
+- [x] **VERIFICAR** outros locais que possam usar esta constante
 
 ##### **STEP 4: Centralizar Path Construction**
-- [ ] **ATUALIZAR** `LanguagesManager` para usar `get_settings_manager().config_dir`:
-```python
-def __init__(self, config_dir: Optional[Path] = None):
-    if config_dir is None:
-        from config.settings import get_settings_manager
-        settings_manager = get_settings_manager()
-        config_dir = settings_manager.config_dir / "config"
-    # Continue...
-```
-- [ ] **ATUALIZAR** `GuidelinesManager` similarmente
-- [ ] **ELIMINAR** todas as construções diretas de `Path(DEFAULT_CONFIG_DIR).expanduser()`
+- [x] **ATUALIZAR** `LanguagesManager` para usar `StorageManager.path_manager.config_dir`
+- [x] **ATUALIZAR** `GuidelinesManager` para usar `StorageManager.path_manager.guidelines_dir`
+- [x] **ATUALIZAR** `PromptBuilder` para usar `StorageManager.path_manager.prompts_dir`
+- [x] **ATUALIZAR** `SessionLogger` para usar `StorageManager.path_manager.logs_dir`
+- [x] **ELIMINAR** todas as construções diretas de `Path(DEFAULT_CONFIG_DIR).expanduser()`
 
 ##### **STEP 5: Consolidar Directory Management**  
-- [ ] **CENTRALIZAR** todos os paths via StorageManager
-- [ ] **REMOVER** construção duplicada de paths
-- [ ] **ATUALIZAR** SettingsManager para usar StorageManager paths quando apropriado
+- [x] **CENTRALIZAR** todos os paths via StorageManager
+- [x] **ADICIONAR** `config_dir`, `guidelines_dir`, `prompts_dir` ao StorageManager
+- [x] **REMOVER** construção duplicada de paths
+- [x] **ATUALIZAR** todos os módulos para usar StorageManager paths centralizados
 
 ##### **STEP 6: Mover Guidelines para Config Raiz**
-- [ ] **MOVER** `src/config/languages/guidelines.py` → `src/config/guidelines.py`
-- [ ] **ATUALIZAR** imports em todos os arquivos que usam guidelines:
+- [x] **MOVER** `src/config/languages/guidelines.py` → `src/config/guidelines.py`
+- [x] **ATUALIZAR** imports em todos os arquivos que usam guidelines:
 ```python
 # ANTES:
 from config.languages.guidelines import get_guidelines_manager
@@ -466,20 +461,22 @@ from config.languages.guidelines import get_guidelines_manager
 # DEPOIS:  
 from config.guidelines import get_guidelines_manager
 ```
-- [ ] **ATUALIZAR** `src/config/__init__.py` para re-exportar guidelines
-- [ ] **REMOVER** guidelines exports do `src/config/languages/__init__.py`
-- [ ] **BUSCAR** por todos os imports no codebase e atualizar
-- [ ] **TESTAR** que GuidelinesManager continua funcionando no novo local
+- [x] **ATUALIZAR** `src/config/__init__.py` para re-exportar guidelines
+- [x] **BUSCAR** por todos os imports no codebase e atualizar:
+  - [x] `src/commands/config.py` (2 locais)
+  - [x] `src/config/languages/manager.py`
+  - [x] `src/core/ai/prompt_builder.py` (2 locais)
+- [x] **TESTAR** que GuidelinesManager continua funcionando no novo local
 
 ##### **STEP 7: Extrair Utils Genéricos de Loading**
-- [ ] **CRIAR** `src/utils/yaml_loader.py` com classe genérica:
+- [x] **CRIAR** `src/utils/yaml_loader.py` com classe genérica:
 ```python
 class GenericYAMLLoader:
     def load(self, file_path: Path) -> Dict[str, Any]:
         # YAML loading com error handling genérico
         # Sem lógica específica de configuração
 ```
-- [ ] **CRIAR** `src/utils/file_operations.py` com operações genéricas:
+- [x] **CRIAR** `src/utils/file_operations.py` com operações genéricas:
 ```python  
 class FileSystemOperations:
     def copy_file(self, source: Path, target: Path) -> bool:
@@ -487,13 +484,13 @@ class FileSystemOperations:
     def ensure_directory_exists(self, directory: Path) -> None:
     # File operations genéricas reutilizáveis
 ```
-- [ ] **ATUALIZAR** `config/languages/loader.py` para usar utils genéricos:
+- [x] **ATUALIZAR** `config/languages/loader.py` para usar utils genéricos:
 ```python
-from utils.yaml_loader import GenericYAMLLoader
-from utils.file_operations import FileSystemOperations
+from utils.yaml_loader import get_yaml_loader
+from utils.file_operations import get_file_operations
 ```
-- [ ] **MANTER** lógica específica de languages no loader (validação, models, etc.)
-- [ ] **ATUALIZAR** outros módulos para usar utils genéricos quando apropriado
+- [x] **MANTER** lógica específica de languages no loader (validação, models, etc.)
+- [x] **IMPLEMENTAR** Adapter Pattern para seamless integration
 
 ##### **STEP 8: Reorganizar Providers Structure**
 - [ ] **PROBLEMA IDENTIFICADO**: `src/config/providers/base.py` mistura responsabilidades:

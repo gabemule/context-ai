@@ -239,12 +239,10 @@ class PromptBuilder:
         self._prompt_base_dir = self._get_prompt_directory()
     
     def _get_prompt_directory(self) -> Path:
-        """Get the user's prompt configuration directory (~/.context-ai/config/prompts/)."""
-        from config.constants import DEFAULT_CONFIG_DIR
-        
-        # Always use user config directory
-        user_prompt_dir = Path(DEFAULT_CONFIG_DIR).expanduser() / "config" / "prompts"
-        return user_prompt_dir
+        """Get the user's prompt configuration directory via StorageManager (centralized)."""
+        from config.storage import get_storage_manager
+        storage_manager = get_storage_manager()
+        return storage_manager.path_manager.prompts_dir
     
     def _get_default_prompt_directory(self) -> Path:
         """Get the default prompt templates directory (src/config/samples/prompts/)."""
@@ -472,7 +470,7 @@ class PromptBuilder:
                 
                 # Get guidelines for detected languages
                 try:
-                    from config.languages.guidelines import get_guidelines_manager
+                    from config.guidelines import get_guidelines_manager
                     guidelines_manager = get_guidelines_manager()
                     guidelines_content = guidelines_manager.get_guidelines_for_languages(detected_languages)
                     
@@ -574,7 +572,7 @@ class PromptBuilder:
     def _filter_programming_languages(self, languages: List[str]) -> List[str]:
         """Filter to only include programming languages with guidelines."""
         try:
-            from config.languages.guidelines import get_guidelines_manager
+            from config.guidelines import get_guidelines_manager
             guidelines_manager = get_guidelines_manager()
             available_guidelines = set(guidelines_manager.get_available_languages())
             

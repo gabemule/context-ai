@@ -511,7 +511,7 @@ def _handle_config_models(args, settings_manager, logger) -> int:
 
 def _handle_config_guidelines(args, settings_manager, logger) -> int:
     """Handle guidelines management (SRP)."""
-    from config.languages.guidelines import get_guidelines_manager
+    from config.guidelines import get_guidelines_manager
     guidelines_manager = get_guidelines_manager()
     
     action_handlers = {
@@ -911,7 +911,7 @@ def _guidelines_reset(language: str, guidelines_manager, logger) -> int:
 
 def _guidelines_path(guidelines_manager, logger) -> int:
     """Show guidelines directory path."""
-    from config.languages.guidelines import PathResolver
+    from config.guidelines import PathResolver
     guidelines_dir = PathResolver.get_guidelines_directory()
     logger.info("📁 Guidelines directory: %s", guidelines_dir)
     

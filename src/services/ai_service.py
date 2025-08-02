@@ -462,10 +462,10 @@ class ChatCommandHandler:
         try:
             from pathlib import Path
             import yaml
-            from config.constants import DEFAULT_CONFIG_DIR
+            from config.storage import get_storage_manager
             
-            config_dir = Path(DEFAULT_CONFIG_DIR).expanduser()
-            mode_file = config_dir / "config" / "prompt" / mode / "mode.yaml"
+            storage_manager = get_storage_manager()
+            mode_file = storage_manager.path_manager.prompts_dir / mode / "mode.yaml"
             
             if mode_file.exists():
                 with open(mode_file, 'r', encoding='utf-8') as f:

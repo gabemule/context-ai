@@ -36,10 +36,11 @@ class LanguagesManager:
         """
         self.logger = get_logger(__name__)
         
-        # Set up configuration paths
+        # Set up configuration paths via StorageManager (centralized)
         if config_dir is None:
-            from config.constants.storage import DEFAULT_CONFIG_DIR
-            config_dir = Path(DEFAULT_CONFIG_DIR).expanduser() / "config"
+            from config.storage import get_storage_manager
+            storage_manager = get_storage_manager()
+            config_dir = storage_manager.path_manager.config_dir
         
         self.config_dir = Path(config_dir)
         self.languages_file = self.config_dir / "languages.yaml"
@@ -132,7 +133,7 @@ class LanguagesManager:
         # Use the GuidelinesManager to get available guidelines
         # This will trigger the copy process if needed
         try:
-            from config.languages.guidelines import get_guidelines_manager
+            from config.guidelines import get_guidelines_manager
             guidelines_manager = get_guidelines_manager()
             return guidelines_manager.get_available_languages()
         except Exception as e:
