@@ -12,6 +12,7 @@ from .claude import CLAUDE_MODELS
 __all__ = [
     'ProviderRegistry',
     'get_provider_registry',
+    'get_provider_function',
 ]
 
 
@@ -118,6 +119,32 @@ class ProviderRegistry:
         """Get human-readable display name for a provider."""
         provider = provider or self.default_provider
         return self.provider_names.get(provider, f"{provider.title()} AI")
+    
+    def get_provider_function(self, function_name: str, provider: str = None):
+        """Get a specific function from a provider module."""
+        provider = provider or self.default_provider
+        
+        try:
+            if provider == "claude":
+                from .claude import get_claude_model_config, get_claude_available_models, get_max_tokens, DEFAULT_MODEL
+                
+                functions = {
+                    "get_model_config": get_claude_model_config,
+                    "get_available_models": get_claude_available_models,
+                    "get_max_tokens": get_max_tokens,
+                    "get_default_model": lambda: DEFAULT_MODEL,
+                }
+                return functions.get(function_name)
+            
+            # Future providers can be added here
+            # elif provider == "openai":
+            #     from .openai import get_openai_model_config, get_openai_available_models
+            #     functions = {...}
+            
+            return None
+            
+        except ImportError:
+            return None
 
 
 # Global provider registry instance
@@ -130,3 +157,9 @@ def get_provider_registry() -> ProviderRegistry:
     if _provider_registry is None:
         _provider_registry = ProviderRegistry()
     return _provider_registry
+
+
+def get_provider_function(function_name: str, provider: str = None):
+    """Get a specific function from a provider module (standalone function)."""
+    registry = get_provider_registry()
+    return registry.get_provider_function(function_name, provider)

@@ -11,9 +11,11 @@ from .models import ProviderCapabilities
 
 __all__ = [
     'CLAUDE_MODELS',
+    'DEFAULT_MODEL',
     'ClaudeProvider',
     'get_claude_model_config',
     'get_claude_available_models',
+    'get_max_tokens',
 ]
 
 
@@ -73,6 +75,9 @@ CLAUDE_MODELS = {
     },
 }
 
+# Default model API name (first model in the dict)
+DEFAULT_MODEL = list(CLAUDE_MODELS.values())[0]["api_name"]
+
 
 class ClaudeProvider:
     """Claude provider implementation using Protocol."""
@@ -115,3 +120,13 @@ def get_claude_model_config(model_key: str) -> Dict[str, Any]:
 def get_claude_available_models() -> List[str]:
     """Get list of available Claude models."""
     return list(CLAUDE_MODELS.keys())
+
+
+def get_max_tokens(model_key: str = None) -> int:
+    """Get max output tokens for a Claude model."""
+    if model_key is None:
+        # Use default model
+        model_key = list(CLAUDE_MODELS.keys())[0]
+    
+    model_config = CLAUDE_MODELS.get(model_key, {})
+    return model_config.get("max_output_tokens", 8192)  # Default fallback
