@@ -1,8 +1,9 @@
 """
 Provider Protocols for Context-AI.
 
-Protocol definitions for AI provider implementations.
-Following Interface Segregation Principle (ISP).
+Defines the interface contracts that all AI provider implementations must follow.
+Ensures consistent behavior across different providers while allowing flexibility
+in implementation details.
 """
 
 from typing import Protocol, Dict, Any, List

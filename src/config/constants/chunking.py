@@ -2,7 +2,7 @@
 Text Processing & Chunking Constants for Context-AI.
 
 This module contains constants related to text chunking configuration only.
-Language-specific data is now handled by the LanguagesManager system.
+Language-specific data is now handled by the LanguagesRegistry system.
 """
 
 __all__ = [

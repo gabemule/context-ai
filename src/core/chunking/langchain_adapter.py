@@ -16,7 +16,7 @@ from langchain_text_splitters import (
     RecursiveCharacterTextSplitter,
 )
 
-from config.languages.manager import get_languages_manager
+from config.languages.registry import get_languages_registry
 from utils.logging import get_logger
 
 from .protocol import ChunkerProtocol, ChunkingMetadata, ChunkingStrategy, TextChunk
@@ -39,7 +39,7 @@ class LangChainChunker(ChunkerProtocol):
         """
         self.logger = get_logger(__name__)
         self.strategy = strategy or ChunkingStrategy()
-        self.languages_manager = get_languages_manager()
+        self.languages_registry = get_languages_registry()
 
     def chunk_text(self, text: str, file_path: str) -> List[TextChunk]:
         """
@@ -55,7 +55,7 @@ class LangChainChunker(ChunkerProtocol):
         try:
             # Detect language from file extension
             file_ext = Path(file_path).suffix.lower()
-            language = self.languages_manager.detect_language_from_extension(file_ext)
+            language = self.languages_registry.detect_language_from_extension(file_ext)
 
             # Get appropriate splitter
             splitter = self._get_splitter_for_language(language)
@@ -137,7 +137,7 @@ class LangChainChunker(ChunkerProtocol):
         Returns:
             True if extension is supported
         """
-        return extension.lower() in self.languages_manager.get_supported_extensions()
+        return extension.lower() in self.languages_registry.get_supported_extensions()
 
     def get_supported_extensions(self) -> Set[str]:
         """
@@ -146,7 +146,7 @@ class LangChainChunker(ChunkerProtocol):
         Returns:
             Set of supported extensions
         """
-        return self.languages_manager.get_supported_extensions()
+        return self.languages_registry.get_supported_extensions()
 
     def get_chunker_name(self) -> str:
         """
@@ -192,7 +192,7 @@ class LangChainChunker(ChunkerProtocol):
                 )
             else:
                 # Use recursive splitter with language-appropriate separators
-                separators = self.languages_manager.get_language_separators(language or "default")
+                separators = self.languages_registry.get_language_separators(language or "default")
                 return RecursiveCharacterTextSplitter(
                     chunk_size=chunk_size,
                     chunk_overlap=chunk_overlap,

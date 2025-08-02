@@ -1,8 +1,9 @@
 """
-Provider Registry & Management for Context-AI.
+Provider Registry for Context-AI.
 
-This module provides a centralized registry for managing AI providers
-following the same class-based pattern as other managers.
+Manages all available AI providers and their configurations in a dynamic, extensible way.
+Eliminates hardcoded provider logic and makes it easy to add new AI providers
+without modifying existing code.
 """
 
 from typing import Dict, List, Optional
@@ -16,10 +17,17 @@ __all__ = [
 
 class ProviderRegistry:
     """
-    Centralized provider registry following the same pattern as other managers.
+    Dynamic registry for all AI providers and their capabilities.
     
-    Manages all AI provider configurations, models, and capabilities
-    in a single, consistent interface. Uses ConfigCore to avoid circular dependencies.
+    Purpose: Eliminates hardcoded provider logic throughout the system.
+    Instead of having if/else chains for different providers, this registry
+    provides a unified interface for accessing any provider's configuration.
+    
+    Benefits:
+    - Easy to add new AI providers without touching existing code
+    - Centralizes all provider-specific configuration and capabilities  
+    - Eliminates hardcoded model names and limits throughout codebase
+    - Provides fallback behavior when user config is incomplete
     """
     
     def __init__(self, config_core=None):

@@ -1,7 +1,9 @@
 """
-Settings management for Context-AI.
+Settings Manager for Context-AI.
 
-Business logic layer for configuration management using ConfigCore.
+High-level interface for user configuration operations. Coordinates complex
+configuration changes that involve multiple managers while providing a 
+simple, consistent API for end users.
 """
 
 import json
@@ -19,10 +21,17 @@ from .interfaces import PathProvider, get_default_path_provider
 
 class SettingsManager:
     """
-    Manages Context-AI configuration and settings using ConfigCore.
+    User-facing interface for configuration management.
     
-    This is the business logic layer that uses ConfigCore for data operations
-    and provides higher-level configuration management.
+    Purpose: Provides a simple, consistent API for users to configure the system
+    without needing to understand the underlying architecture. Coordinates 
+    complex operations across multiple managers.
+    
+    Benefits:
+    - Single interface for all user configuration needs
+    - Handles complex multi-step configuration changes automatically
+    - Validates configuration changes before applying them
+    - Abstracts away implementation details from users
     """
 
     def __init__(self, config_core=None, embedding_manager=None, path_provider: Optional[PathProvider] = None):

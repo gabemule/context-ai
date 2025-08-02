@@ -1,8 +1,9 @@
 """
-YAML Configuration Loader for Context-AI Languages.
+Languages Configuration Loader for Context-AI.
 
-Handles loading and parsing of language configuration files with SOLID architecture.
-Uses generic utils for file operations and YAML loading (DRY principle).
+Handles loading, parsing, and copying of language configuration files.
+Provides robust file operations with error handling and supports both
+loading existing configurations and setting up default templates.
 """
 
 from abc import ABC, abstractmethod

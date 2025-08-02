@@ -1,8 +1,9 @@
 """
-Languages Manager for Context-AI.
+Languages Registry for Context-AI.
 
-Central manager for language configurations, providing dynamic language detection
-and configuration management with caching and hot reload capabilities.
+Registry for programming language configurations, similar to ProviderRegistry but for languages.
+Manages file extensions, text separators, and chunking priorities with advanced features
+like inheritance resolution, caching, and hot reload capabilities.
 """
 
 from pathlib import Path
@@ -14,17 +15,25 @@ from .loader import load_languages_config, ensure_default_config_exists, Configu
 from utils.logging import get_logger
 
 __all__ = [
-    'LanguagesManager',
-    'get_languages_manager',
+    'LanguagesRegistry',
+    'get_languages_registry',
 ]
 
 
-class LanguagesManager:
+class LanguagesRegistry:
     """
-    Central manager for language configurations.
+    Registry for programming language configurations and capabilities.
     
-    Provides dynamic language detection, configuration loading, caching,
-    and APIs for accessing language-specific data.
+    Purpose: Similar to ProviderRegistry but for programming languages. Manages
+    language-specific settings like file extensions, text separators, and chunking
+    priorities with advanced features like inheritance and caching.
+    
+    Benefits:
+    - Centralized language configuration management
+    - Inheritance support for reducing configuration duplication
+    - Performance optimized with intelligent caching
+    - Hot reload capability for development
+    - Dynamic extension detection and language mapping
     """
     
     def __init__(self, config_dir: Optional[Path] = None):
@@ -243,28 +252,28 @@ class LanguagesManager:
 
 
 # Global instance management
-_languages_manager: Optional[LanguagesManager] = None
+_languages_registry: Optional[LanguagesRegistry] = None
 
 
-def get_languages_manager(config_dir: Optional[Path] = None) -> LanguagesManager:
+def get_languages_registry(config_dir: Optional[Path] = None) -> LanguagesRegistry:
     """
-    Get the global LanguagesManager instance.
+    Get the global LanguagesRegistry instance.
     
     Args:
         config_dir: Optional config directory (only used on first call)
         
     Returns:
-        Global LanguagesManager instance
+        Global LanguagesRegistry instance
     """
-    global _languages_manager
+    global _languages_registry
     
-    if _languages_manager is None:
-        _languages_manager = LanguagesManager(config_dir=config_dir)
+    if _languages_registry is None:
+        _languages_registry = LanguagesRegistry(config_dir=config_dir)
     
-    return _languages_manager
+    return _languages_registry
 
 
-def reset_languages_manager() -> None:
-    """Reset the global LanguagesManager instance (for testing)."""
-    global _languages_manager
-    _languages_manager = None
+def reset_languages_registry() -> None:
+    """Reset the global LanguagesRegistry instance (for testing)."""
+    global _languages_registry
+    _languages_registry = None

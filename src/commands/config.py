@@ -944,14 +944,14 @@ def _guidelines_path(guidelines_manager, logger) -> int:
 
 def _handle_config_languages(args, settings_manager, logger) -> int:
     """Handle languages management (SRP)."""
-    from config.languages.manager import get_languages_manager
-    languages_manager = get_languages_manager()
+    from config.languages.registry import get_languages_registry
+    languages_registry = get_languages_registry()
     
     action_handlers = {
-        "list": lambda: _languages_list(languages_manager, logger),
-        "show": lambda: _languages_show(args.language, languages_manager, logger),
-        "reset": lambda: _languages_reset(args.language, languages_manager, logger),
-        "path": lambda: _languages_path(languages_manager, logger)
+        "list": lambda: _languages_list(languages_registry, logger),
+        "show": lambda: _languages_show(args.language, languages_registry, logger),
+        "reset": lambda: _languages_reset(args.language, languages_registry, logger),
+        "path": lambda: _languages_path(languages_registry, logger)
     }
     
     handler = action_handlers.get(args.languages_action)

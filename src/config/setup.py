@@ -1,8 +1,9 @@
 """
 Setup Manager for Context-AI.
 
-Handles initial setup and configuration file copying with Single Responsibility Principle (SRP).
-This manager is responsible only for ensuring configuration files exist by copying from templates.
+Ensures the system has all necessary configuration files by copying templates when needed.
+Provides "out of the box" functionality so users don't encounter missing file errors
+when first using the system.
 """
 
 from pathlib import Path
@@ -14,10 +15,16 @@ from utils.logging import get_logger
 
 class SetupManager:
     """
-    Handles initial setup and configuration file copying.
+    Ensures the system works "out of the box" by providing all needed config files.
     
-    This manager has a single responsibility: ensure all configuration 
-    files exist by copying them from templates when needed.
+    Purpose: Eliminates "file not found" errors when users first run the system.
+    Automatically copies template files to user's config directory when they're missing.
+    
+    Benefits:
+    - Zero-configuration startup experience for new users
+    - Prevents crashes from missing configuration files
+    - Maintains user customizations while filling in gaps
+    - Handles complex directory structure setup automatically
     """
     
     def __init__(self):

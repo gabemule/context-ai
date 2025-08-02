@@ -1,8 +1,9 @@
 """
 Configuration Core for Context-AI.
 
-Pure CRUD operations for configuration data, zero business logic.
-This eliminates circular dependencies between managers.
+Centralized configuration access that eliminates inconsistencies and circular dependencies.
+Provides a single point of access to config.json, ensuring all system components
+read and write configurations consistently.
 """
 
 import json
@@ -15,13 +16,17 @@ from utils.logging import get_logger
 
 class ConfigCore:
     """
-    Pure CRUD operations for configuration data.
+    Centralized configuration access point for the entire system.
     
-    Responsibilities:
-    - Load/save config.json
-    - Provide specific getters/setters for common operations  
-    - Zero business logic or validation
-    - Zero dependencies on other managers
+    What it solves: Before this, each manager had its own way of reading/writing
+    config.json, causing inconsistencies and conflicts when multiple components
+    tried to update configuration simultaneously.
+    
+    Benefits:
+    - Single source of truth for all configuration data
+    - Automatic consistency across all system components
+    - Eliminates config-related bugs from concurrent access
+    - Makes testing easier with centralized mocking point
     """
     
     def __init__(self, config_path: Optional[Path] = None):

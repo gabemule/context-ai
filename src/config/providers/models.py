@@ -1,8 +1,9 @@
 """
 Provider Models for Context-AI.
 
-Pydantic models for provider capabilities and configurations.
-Following Single Responsibility Principle (SRP).
+Defines data structures for AI provider capabilities and configurations.
+Ensures type safety and validation for provider-specific settings,
+making it easy to extend support for new providers.
 """
 
 from pydantic import BaseModel, Field

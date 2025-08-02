@@ -1,8 +1,9 @@
 """
 Configuration Interfaces for Context-AI.
 
-Protocols and interfaces for dependency injection and clean architecture.
-Following Interface Segregation Principle (ISP).
+Defines protocols and adapters that enable dependency injection throughout the system.
+These interfaces allow components to depend on abstractions rather than concrete
+implementations, making the system more testable and flexible.
 """
 
 from abc import ABC, abstractmethod

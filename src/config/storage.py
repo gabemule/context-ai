@@ -1,7 +1,9 @@
 """
-Storage management utilities for Context-AI.
+Storage Manager for Context-AI.
 
-Clean Architecture approach with separated responsibilities.
+Provides organized file and directory management for the entire system.
+Ensures consistent storage structure and handles path resolution for
+all configuration and data files.
 """
 
 import os
@@ -276,9 +278,17 @@ def _get_models_analytics(base_path: Path) -> Dict:
 
 class StorageManager:
     """
-    Simplified storage manager focused on paths and basic operations.
+    Central organizer for all file and directory operations in the system.
     
-    Removed over-engineered analytics and strategy patterns for simplicity.
+    Purpose: Ensures consistent storage structure across the entire application.
+    All components use this manager to get file paths, preventing hardcoded
+    paths and ensuring easy relocation of storage directories.
+    
+    Benefits:
+    - Standardized directory structure for all data and config files
+    - Easy to change storage location without touching other code
+    - Centralized cleanup and maintenance operations
+    - Consistent path resolution throughout the system
     """
 
     def __init__(self, base_path: Optional[str] = None, embedding_manager=None):

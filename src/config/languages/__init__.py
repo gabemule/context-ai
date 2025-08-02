@@ -5,12 +5,12 @@ This module provides dynamic language detection, configuration loading,
 and management for programming languages, guidelines, and chunking separators.
 """
 
-from .manager import LanguagesManager, get_languages_manager
+from .registry import LanguagesRegistry, get_languages_registry
 from .models import LanguageConfig, LanguagesConfig
 
 __all__ = [
-    'LanguagesManager',
-    'get_languages_manager',
+    'LanguagesRegistry',
+    'get_languages_registry',
     'LanguageConfig', 
     'LanguagesConfig',
 ]

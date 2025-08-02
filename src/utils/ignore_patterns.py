@@ -17,7 +17,7 @@ from config.constants import (
     MAX_FILE_SIZE_BYTES,
     SAMPLE_CONTEXTIGNORE_CONTENT,
 )
-from config.languages.manager import get_languages_manager
+from config.languages.registry import get_languages_registry
 from utils.logging import get_logger
 
 
@@ -305,9 +305,9 @@ class FileFilter:
         resolver = IgnoreFileResolver(project_path)
         self.ignore_matcher = resolver.resolve_ignore_patterns(custom_ignore_file)
 
-        # Get supported extensions dynamically from LanguagesManager
-        self.languages_manager = get_languages_manager()
-        self.supported_extensions = self.languages_manager.get_supported_extensions()
+        # Get supported extensions dynamically from LanguagesRegistry
+        self.languages_registry = get_languages_registry()
+        self.supported_extensions = self.languages_registry.get_supported_extensions()
 
         self.logger.debug("FileFilter initialized for %s", self.project_path)
 

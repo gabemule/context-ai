@@ -1,8 +1,9 @@
 """
 Embedding Manager for Context-AI.
 
-Centralized manager for embedding operations, responsible for all embedding
-business logic including creation, deletion, listing, and metadata management.
+Provides centralized, consistent management of embedding operations throughout the system.
+Handles the complete embedding lifecycle including creation, validation, deletion,
+and metadata management with a clean, testable interface.
 """
 
 import json
@@ -16,13 +17,17 @@ from utils.logging import get_logger
 
 class EmbeddingManager:
     """
-    Centralized manager for embedding operations.
+    Centralized hub for all embedding operations in the system.
     
-    Responsibilities:
-    - List/create/delete embeddings via VectorStore
-    - Manage embedding metadata files 
-    - Validate embedding operations
-    - Coordinate between VectorStore and metadata
+    Purpose: Provides a single, consistent interface for managing embeddings
+    throughout the entire application. Handles the complete embedding lifecycle
+    from creation to deletion.
+    
+    Benefits:
+    - Single place to manage all embedding operations  
+    - Consistent behavior across the entire system
+    - Centralizes validation and error handling
+    - Simplifies testing with dependency injection
     """
     
     def __init__(self, vector_store=None, metadata_dir: Optional[Path] = None):

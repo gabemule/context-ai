@@ -1,7 +1,9 @@
 """
 Guidelines Manager for Context-AI.
 
-Handles loading, caching and serving of language-specific coding guidelines with lazy copy.
+Provides fast access to coding guidelines for different programming languages.
+Uses intelligent caching and lazy loading to optimize performance while ensuring
+guidelines are always available when needed.
 """
 
 from abc import ABC, abstractmethod
@@ -18,7 +20,19 @@ __all__ = [
 
 
 class GuidelinesManager:
-    """Central coordinator for guideline operations with lazy copy."""
+    """
+    Fast access to coding guidelines with intelligent caching.
+    
+    Purpose: Provides instant access to language-specific coding guidelines
+    without repeatedly reading files from disk. Automatically ensures
+    guidelines are available when needed.
+    
+    Benefits:
+    - Performance optimized with in-memory caching
+    - Lazy loading - only loads guidelines when actually needed
+    - Automatic template provisioning for missing guidelines
+    - Supports multiple languages and combined guidelines
+    """
     
     def __init__(self):
         self.logger = get_logger(__name__)

@@ -1,8 +1,9 @@
 """
-Consolidated Models for Context-AI Configuration.
+Configuration Data Models for Context-AI.
 
-This module contains all Pydantic models used for configuration management,
-consolidating base models, AI configuration, storage configuration, and chunking configuration.
+Defines the structure and validation for all configuration data in the system.
+These models ensure type safety, data validation, and consistent structure
+across all configuration operations.
 """
 
 from datetime import datetime
@@ -165,9 +166,9 @@ class ActiveEmbeddings(TimestampedModel):
 # =============================================================================
 
 def _get_supported_extensions() -> set:
-    """Get supported extensions dynamically from LanguagesManager."""
-    from .languages.manager import get_languages_manager
-    return get_languages_manager().get_supported_extensions()
+    """Get supported extensions dynamically from LanguagesRegistry."""
+    from .languages.registry import get_languages_registry
+    return get_languages_registry().get_supported_extensions()
 
 
 class ChunkingConfig(ConfigurableModel):

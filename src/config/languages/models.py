@@ -1,7 +1,9 @@
 """
 Language Configuration Models for Context-AI.
 
-Pydantic models for language configuration with inheritance support.
+Defines data structures for programming language configurations including
+inheritance, validation, and merging logic. Provides type-safe, validated
+models that support complex configuration scenarios.
 """
 
 from abc import ABC, abstractmethod
