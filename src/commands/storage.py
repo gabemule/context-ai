@@ -272,11 +272,15 @@ def _handle_storage_delete(args, storage_manager, logger) -> int:
     embedding_name = args.embedding_name
     logger.info("🗑️  Deleting embedding: %s", embedding_name)
 
+    # Use SettingsManager for embedding operations (corrected responsibility)
+    from config.settings import get_settings_manager
+    settings_manager = get_settings_manager()
+
     if not storage_manager.embedding_exists(embedding_name):
         logger.error("❌ Embedding '%s' does not exist", embedding_name)
         return 1
 
-    success = storage_manager.delete_embedding(embedding_name)
+    success = settings_manager.delete_embedding(embedding_name)
     if success:
         logger.info("✅ Embedding '%s' deleted successfully", embedding_name)
         return 0

@@ -12,29 +12,37 @@ from utils.logging import get_logger
 
 from .providers import DEFAULT_MODEL, get_max_tokens
 from .models import ActiveEmbeddings, AIProviderConfig, ContextAIConfig, EmbeddingInfo
+from .interfaces import PathProvider, get_default_path_provider
 
 
 class SettingsManager:
     """Manages Context-AI configuration and settings."""
 
-    def __init__(self, config_dir: Optional[str] = None):
+    def __init__(self, config_dir: Optional[str] = None, path_provider: Optional[PathProvider] = None):
         """
         Initialize settings manager.
 
         Args:
-            config_dir: Optional custom config directory path
+            config_dir: Optional custom config directory path (legacy)
+            path_provider: Optional path provider for dependency injection
         """
         self.logger = get_logger(__name__)
 
-        # Determine config directory
+        # Use dependency injection for paths (eliminates hardcoding)
+        if path_provider is not None:
+            self.path_provider = path_provider
+        else:
+            self.path_provider = get_default_path_provider()
+
+        # Determine config directory via PathProvider
         if config_dir:
             self.config_dir = Path(config_dir).expanduser()
         else:
-            self.config_dir = Path("~/.context-ai").expanduser()
+            self.config_dir = self.path_provider.get_base_path()
 
         # Config file paths
-        self.config_file = self.config_dir / "config.json"
-        self.active_file = self.config_dir / "active.json"
+        self.config_file = self.path_provider.get_config_file_path("config.json")
+        self.active_file = self.path_provider.get_config_file_path("active.json")
 
         # In-memory config cache
         self._config: Optional[ContextAIConfig] = None
@@ -154,15 +162,14 @@ class SettingsManager:
         self.logger.info("Prompt mode set to: %s", mode)
 
     def set_active_embeddings(self, embedding_names: List[str]) -> None:
-        """Set active embeddings (validates via StorageManager)."""
-        # Use StorageManager to validate embedding names exist
-        from config.storage import get_storage_manager
-        storage_manager = get_storage_manager()
+        """Set active embeddings (validates via vector store)."""
+        # Validate that all embeddings exist via vector store directly
+        from core.embeddings.vector_store import get_vector_store
+        vector_store = get_vector_store()
         
-        # Validate that all embeddings exist
         valid_embeddings = []
         for name in embedding_names:
-            if storage_manager.embedding_exists(name):
+            if vector_store.get_embedding_info(name) is not None:
                 valid_embeddings.append(name)
             else:
                 self.logger.warning("Embedding '%s' not found, skipping", name)
@@ -170,6 +177,76 @@ class SettingsManager:
         active = ActiveEmbeddings(selected=valid_embeddings, last_updated=datetime.now())
         self.save_active_embeddings(active)
         self.logger.info("Active embeddings set: %s", ", ".join(valid_embeddings))
+
+    def get_available_embeddings(self) -> List[EmbeddingInfo]:
+        """Get list of available embeddings with metadata."""
+        try:
+            embeddings = []
+            embeddings_dir = self.path_provider.get_embeddings_metadata_dir()
+
+            if not embeddings_dir.exists():
+                return embeddings
+
+            for embedding_file in embeddings_dir.glob("*.json"):
+                try:
+                    with open(embedding_file, "r") as f:
+                        data = json.load(f)
+                        embedding_info = EmbeddingInfo(**data)
+                        embeddings.append(embedding_info)
+                except Exception as e:
+                    self.logger.warning("Error reading embedding metadata %s: %s", embedding_file.name, e)
+
+            return sorted(embeddings, key=lambda x: x.created_at, reverse=True)
+
+        except Exception as e:
+            self.logger.warning("Error getting available embeddings: %s", e)
+            return []
+
+    def save_embedding_metadata(self, embedding_info: EmbeddingInfo) -> None:
+        """Save embedding metadata."""
+        try:
+            embeddings_dir = self.path_provider.get_embeddings_metadata_dir()
+            embeddings_dir.mkdir(parents=True, exist_ok=True)
+            
+            metadata_file = embeddings_dir / f"{embedding_info.name}.json"
+
+            with open(metadata_file, "w") as f:
+                json.dump(embedding_info.dict(), f, indent=2, default=str)
+            self.logger.debug("Saved embedding metadata: %s", embedding_info.name)
+            
+        except Exception as e:
+            raise ConfigurationError(f"Failed to save embedding metadata: {e}")
+
+    def delete_embedding_metadata(self, embedding_name: str) -> None:
+        """Delete embedding metadata."""
+        try:
+            embeddings_dir = self.path_provider.get_embeddings_metadata_dir()
+            metadata_file = embeddings_dir / f"{embedding_name}.json"
+
+            if metadata_file.exists():
+                metadata_file.unlink()
+                self.logger.debug("Deleted embedding metadata: %s", embedding_name)
+        except Exception as e:
+            self.logger.warning("Failed to delete embedding metadata: %s", e)
+
+    def delete_embedding(self, embedding_name: str) -> bool:
+        """Delete embedding and its metadata (coordinated operation)."""
+        try:
+            # Delete actual data from vector store
+            from core.embeddings.vector_store import get_vector_store
+            vector_store = get_vector_store()
+            vector_deleted = vector_store.delete_embedding(embedding_name)
+            
+            # Delete metadata JSON (Settings responsibility)
+            self.delete_embedding_metadata(embedding_name)
+            
+            if vector_deleted:
+                self.logger.info("Deleted embedding '%s' and metadata", embedding_name)
+            
+            return vector_deleted
+        except Exception as e:
+            self.logger.error("Error deleting embedding '%s': %s", embedding_name, e)
+            raise ConfigurationError(f"Failed to delete embedding '{embedding_name}': {e}")
 
     def _load_config(self) -> None:
         """Load configuration from file."""
@@ -223,67 +300,6 @@ class SettingsManager:
         except Exception as e:
             raise ConfigurationError(f"Failed to save active embeddings: {e}")
 
-    def _ensure_all_configs_exist(self) -> None:
-        """Ensure all configuration files exist (centralized lazy copy)."""
-        try:
-            import shutil
-            
-            config_dir = self.config_dir / "config"
-            config_dir.mkdir(parents=True, exist_ok=True)
-            
-            # 1. Ensure Languages configuration exists
-            self.logger.debug("🌍 Ensuring languages configuration...")
-            from config.languages.loader import DefaultConfigGenerator
-            
-            copy_result = DefaultConfigGenerator.copy_all_language_files(config_dir)
-            if copy_result.has_changes:
-                self.logger.info(f"Initialized {copy_result.files_copied} language configuration files")
-            
-            # 2. Ensure Guidelines exist - Direct copy
-            self.logger.debug("📝 Ensuring guidelines configuration...")
-            guidelines_dir = config_dir / "guidelines"
-            if not guidelines_dir.exists() or not list(guidelines_dir.glob("*.md")):
-                # Copy guidelines from samples
-                current_file = Path(__file__)
-                project_root = current_file.parent.parent.parent  # Go up to project root 
-                samples_guidelines = project_root / "src" / "config" / "samples" / "guidelines"
-                
-                if samples_guidelines.exists():
-                    guidelines_dir.mkdir(parents=True, exist_ok=True)
-                    
-                    copied_count = 0
-                    for guideline_file in samples_guidelines.glob("*.md"):
-                        target_file = guidelines_dir / guideline_file.name
-                        if not target_file.exists():
-                            shutil.copy2(guideline_file, target_file)
-                            copied_count += 1
-                            self.logger.debug(f"Copied guideline: {guideline_file.name}")
-                    
-                    if copied_count > 0:
-                        self.logger.info(f"Initialized {copied_count} guideline templates")
-            
-            # 3. Ensure Prompt templates exist - Direct copy  
-            self.logger.debug("🎯 Ensuring prompt configuration...")
-            prompts_dir = config_dir / "prompts"
-            if not prompts_dir.exists():
-                # Copy prompts from samples
-                current_file = Path(__file__)
-                project_root = current_file.parent.parent.parent  # Go up to project root
-                samples_prompts = project_root / "src" / "config" / "samples" / "prompts"
-                
-                if samples_prompts.exists():
-                    self.logger.info("Creating user prompt config by copying defaults...")
-                    self.logger.info(f"From: {samples_prompts}")
-                    self.logger.info(f"To: {prompts_dir}")
-                    
-                    shutil.copytree(samples_prompts, prompts_dir)
-                    self.logger.info("✅ User prompt configuration created successfully")
-            
-            self.logger.debug("✅ All configurations ensured")
-            
-        except Exception as e:
-            self.logger.warning(f"Error ensuring configurations: {e}")
-            # Don't raise - let the system continue with what's available
 
 
 # Global settings manager instance
@@ -294,7 +310,11 @@ def get_settings_manager() -> SettingsManager:
     """Get global settings manager instance."""
     global _settings_manager
     if _settings_manager is None:
+        # Ensure setup is complete first using dedicated SetupManager
+        from config.setup import get_setup_manager
+        setup_manager = get_setup_manager()
+        setup_manager.ensure_all_configs_exist()
+        
         _settings_manager = SettingsManager()
-        _settings_manager._ensure_all_configs_exist()
-        _settings_manager.initialize()
+        _settings_manager.initialize()  # Only handles config.json/active.json
     return _settings_manager

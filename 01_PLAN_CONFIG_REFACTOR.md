@@ -517,7 +517,7 @@ class ProviderCapabilities(BaseModel):
 - [x] **REMOVER** `src/config/providers/base.py` (obsoleto)
 
 ##### **STEP 9: Criar Setup Manager (Separação Final de Responsabilidades)**
-- [ ] **PROBLEMA IDENTIFICADO**: `_ensure_all_configs_exist()` não deveria estar no SettingsManager:
+- [x] **PROBLEMA IDENTIFICADO**: `_ensure_all_configs_exist()` não deveria estar no SettingsManager:
 ```python
 # ❌ VIOLAÇÃO SRP: SettingsManager fazendo file operations
 SettingsManager._ensure_all_configs_exist()
@@ -526,7 +526,7 @@ SettingsManager._ensure_all_configs_exist()
 ├── file.glob()           # File system access
 └── project path logic   # Template resolution
 ```
-- [ ] **CRIAR** `src/config/setup.py` com responsabilidade única de setup:
+- [x] **CRIAR** `src/config/setup.py` com responsabilidade única de setup:
 ```python
 class SetupManager:
     """Handles initial setup and configuration file copying (SRP)."""
@@ -549,8 +549,8 @@ class SetupManager:
 def get_setup_manager() -> SetupManager:
     """Get global setup manager instance."""
 ```
-- [ ] **MOVER** `_ensure_all_configs_exist()` do Settings → Setup
-- [ ] **ATUALIZAR** `SettingsManager.get_settings_manager()` para:
+- [x] **MOVER** `_ensure_all_configs_exist()` do Settings → Setup (método removido)
+- [x] **ATUALIZAR** `SettingsManager.get_settings_manager()` para usar SetupManager:
 ```python
 def get_settings_manager() -> SettingsManager:
     if _settings_manager is None:
@@ -568,7 +568,7 @@ def get_settings_manager() -> SettingsManager:
 from config.setup import get_setup_manager
 get_setup_manager().ensure_all_configs_exist()
 ```
-- [ ] **RESULTADO**: Separação perfeita de responsabilidades:
+- [x] **RESULTADO**: Separação perfeita de responsabilidades:
 ```python
 SetupManager    = Initial setup, file copying, templates
 SettingsManager = config.json, active.json, application config  
