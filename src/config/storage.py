@@ -204,40 +204,60 @@ def _get_complete_analytics(embeddings_list: List[str], base_path: Path, embeddi
 
 
 def _get_log_analytics(base_path: Path) -> Dict:
-    """Get log file analytics."""
+    """Get session log analytics (sessions are directories, not .log files)."""
     try:
         logs_dir = base_path / "logs"
         if not logs_dir.exists():
-            return {"count": 0, "types": {}, "total_size_mb": 0}
+            return {"count": 0, "types": {}, "total_size_mb": 0, "oldest_date": "Not available", "recent_sessions": []}
         
-        log_files = list(logs_dir.glob("*.log"))
+        # Sessions are directories starting with "session_"
+        session_dirs = [d for d in logs_dir.iterdir() if d.is_dir() and d.name.startswith("session_")]
         log_types = {}
         total_size = 0
+        recent_sessions = []
+        oldest_date = None
         
-        for log_file in log_files:
+        for session_dir in session_dirs:
             try:
-                size = log_file.stat().st_size
+                # Calculate directory size
+                size = sum(f.stat().st_size for f in session_dir.rglob("*") if f.is_file())
                 total_size += size
                 
-                # Categorize by filename pattern
-                for log_type, pattern in LOG_TYPE_PATTERNS.items():
-                    if pattern and pattern in log_file.name:
-                        log_types[log_type] = log_types.get(log_type, 0) + 1
-                        break
+                # Extract session type from directory name (e.g., "session_ask_2025-02-08_05-27-05")
+                name_parts = session_dir.name.split("_")
+                if len(name_parts) >= 2:
+                    session_type = name_parts[1]  # ask, chat, query, etc.
+                    log_types[session_type] = log_types.get(session_type, 0) + 1
                 else:
                     log_types["general"] = log_types.get("general", 0) + 1
-                    
+                
+                # Track recent sessions and oldest
+                session_info = {
+                    "name": session_dir.name,
+                    "timestamp": session_dir.stat().st_mtime
+                }
+                recent_sessions.append(session_info)
+                
             except Exception:
                 continue
         
+        # Sort recent sessions by timestamp and get oldest
+        if recent_sessions:
+            recent_sessions.sort(key=lambda x: x["timestamp"], reverse=True)
+            oldest_timestamp = min(s["timestamp"] for s in recent_sessions)
+            oldest_date = datetime.fromtimestamp(oldest_timestamp).strftime("%Y-%m-%d")
+            recent_sessions = [s["name"] for s in recent_sessions[:10]]  # Keep top 10
+        
         return {
-            "count": len(log_files),
+            "count": len(session_dirs),
             "types": log_types,
             "total_size_mb": round(total_size / (1024 * 1024), 2),
+            "oldest_date": oldest_date or "Not available",
+            "recent_sessions": recent_sessions,
         }
         
-    except Exception:
-        return {"count": 0, "types": {}, "total_size_mb": 0}
+    except Exception as e:
+        return {"count": 0, "types": {}, "total_size_mb": 0, "oldest_date": "Error", "recent_sessions": []}
 
 
 def _get_models_analytics(base_path: Path) -> Dict:

@@ -350,7 +350,10 @@ class PromptBuilder:
                 return
             
             # Ensure target directory exists
-            target_file.parent.mkdir(parents=True, exist_ok=True)
+            # Ensure target directory exists via file operations
+            from utils.file_operations import get_file_operations
+            file_ops = get_file_operations()
+            file_ops.ensure_directory_exists(target_file.parent)
             
             # Copy from source
             shutil.copy2(source_file, target_file)

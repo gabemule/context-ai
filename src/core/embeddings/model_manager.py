@@ -156,7 +156,9 @@ class ModelCache(ModelCacheInterface):
         self._memory_cache: Dict[str, SentenceTransformer] = {}
         
         # Ensure cache directory exists
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        from utils.file_operations import get_file_operations
+        file_ops = get_file_operations()
+        file_ops.ensure_directory_exists(self.cache_dir)
     
     def is_cached(self, model_name: str) -> bool:
         """Check if model is cached in memory or disk."""

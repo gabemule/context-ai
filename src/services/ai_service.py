@@ -203,7 +203,10 @@ class DisplayManager:
         try:
             from pathlib import Path
             output_file = Path(file_path)
-            output_file.parent.mkdir(parents=True, exist_ok=True)
+            # Ensure output directory exists via file operations
+            from utils.file_operations import get_file_operations
+            file_ops = get_file_operations()
+            file_ops.ensure_directory_exists(output_file.parent)
             
             with open(output_file, "w", encoding="utf-8") as f:
                 f.write(content)

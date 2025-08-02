@@ -202,7 +202,10 @@ def _validate_query_request(request: QueryRequest, logger) -> bool:
         try:
             output_path = Path(request.output)
             # Test if we can create the parent directory
-            output_path.parent.mkdir(parents=True, exist_ok=True)
+            # Ensure output directory exists via file operations
+            from utils.file_operations import get_file_operations
+            file_ops = get_file_operations()
+            file_ops.ensure_directory_exists(output_path.parent)
         except Exception as e:
             logger.error("❌ Invalid output path: %s", str(e))
             return False

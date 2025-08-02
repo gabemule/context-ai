@@ -64,7 +64,10 @@ class VectorStoreManager:
         if self._db_path is None:
             storage_mgr = self._get_storage_manager()
             self._db_path = storage_mgr.path_manager.chromadb_dir
-            self._db_path.mkdir(parents=True, exist_ok=True)
+            # Ensure database directory exists via file operations
+            from utils.file_operations import get_file_operations
+            file_ops = get_file_operations()
+            file_ops.ensure_directory_exists(self._db_path)
         return self._db_path
 
     def _get_client(self) -> chromadb.ClientAPI:
