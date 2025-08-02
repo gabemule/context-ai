@@ -187,8 +187,19 @@ class EmbeddingService:
                 self.logger.info(
                     "🔄 Generating embeddings for %d chunks...", len(all_documents)
                 )
-                embeddings = self.model_manager.generate_embeddings(
-                    all_documents, show_progress=show_progress
+                
+                # Loading bridge - only for model loading, not embedding generation
+                from rich.console import Console
+                console = Console()
+                
+                # Pre-load model with spinner feedback
+                with console.status("🤖 Preparing embedding model...", spinner="dots"):
+                    # This will trigger lazy loading of the model if needed
+                    model = self.model_manager.load_model(show_progress=show_progress)
+                
+                # Generate embeddings without spinner (has its own progress bar)
+                embeddings = self.model_manager.generator.generate_embeddings(
+                    model, all_documents, show_progress=show_progress
                 )
 
                 # Store in vector database

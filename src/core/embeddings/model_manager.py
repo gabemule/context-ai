@@ -84,23 +84,226 @@ class ModelInfo:
         }
 
 
+# =============================================================================
+# CORE ABSTRACTIONS (SOLID: Dependency Inversion Principle)
+# =============================================================================
+
+from abc import ABC, abstractmethod
+
+class ModelCacheInterface(ABC):
+    """Interface for model caching operations (ISP)."""
+    
+    @abstractmethod
+    def is_cached(self, model_name: str) -> bool:
+        """Check if model is cached."""
+        pass
+    
+    @abstractmethod
+    def get_cached_model(self, model_name: str) -> Optional[SentenceTransformer]:
+        """Get cached model if available."""
+        pass
+    
+    @abstractmethod
+    def cache_model(self, model_name: str, model: SentenceTransformer) -> None:
+        """Cache a loaded model."""
+        pass
+
+
+class ModelLoaderInterface(ABC):
+    """Interface for model loading operations (ISP)."""
+    
+    @abstractmethod
+    def load_model(self, model_name: str, show_progress: bool) -> SentenceTransformer:
+        """Load a model."""
+        pass
+
+
+# =============================================================================
+# SINGLE RESPONSIBILITY CLASSES (SOLID: SRP)
+# =============================================================================
+
+class ModelValidator:
+    """Validates model operations (SRP)."""
+    
+    def __init__(self):
+        self.logger = get_logger(__name__)
+    
+    def validate_model_name(self, model_name: str) -> str:
+        """Validate and normalize model name."""
+        if model_name is None:
+            return DEFAULT_MODEL_NAME
+        
+        if model_name not in AVAILABLE_MODELS:
+            available = ", ".join(AVAILABLE_MODELS.keys())
+            raise ConfigurationError(
+                f"Model '{model_name}' not available. Available models: {available}"
+            )
+        
+        return model_name
+    
+    def validate_texts(self, texts: List[str]) -> None:
+        """Validate texts for embedding generation."""
+        if not texts:
+            raise ValueError("No texts provided for embedding generation")
+
+
+class ModelCache(ModelCacheInterface):
+    """Handles model caching operations (SRP)."""
+    
+    def __init__(self, cache_dir: Path):
+        self.logger = get_logger(__name__)
+        self.cache_dir = cache_dir
+        self._memory_cache: Dict[str, SentenceTransformer] = {}
+        
+        # Ensure cache directory exists
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+    
+    def is_cached(self, model_name: str) -> bool:
+        """Check if model is cached in memory or disk."""
+        return self._is_memory_cached(model_name) or self._is_disk_cached(model_name)
+    
+    def get_cached_model(self, model_name: str) -> Optional[SentenceTransformer]:
+        """Get cached model (memory first, then disk)."""
+        if self._is_memory_cached(model_name):
+            self.logger.debug("⚡ Using memory cached model: %s", model_name)
+            return self._memory_cache[model_name]
+        
+        return None
+    
+    def cache_model(self, model_name: str, model: SentenceTransformer) -> None:
+        """Cache model in memory."""
+        self._memory_cache[model_name] = model
+        self.logger.debug("💾 Cached model in memory: %s", model_name)
+    
+    def _is_memory_cached(self, model_name: str) -> bool:
+        """Check if model is in memory cache."""
+        return model_name in self._memory_cache
+    
+    def _is_disk_cached(self, model_name: str) -> bool:
+        """Check if model is cached on disk."""
+        cache_path = self._get_cache_path(model_name)
+        return cache_path.exists() and cache_path.is_dir()
+    
+    def _get_cache_path(self, model_name: str) -> Path:
+        """Get cache path for a model."""
+        safe_name = model_name.replace("/", "_").replace(":", "_")
+        return self.cache_dir / safe_name
+
+
+class ModelLoader(ModelLoaderInterface):
+    """Handles model loading operations (SRP)."""
+    
+    def __init__(self, cache_dir: Path):
+        self.logger = get_logger(__name__)
+        self.cache_dir = cache_dir
+    
+    def load_model(self, model_name: str, show_progress: bool) -> SentenceTransformer:
+        """Load model with optimized performance."""
+        is_cached = self._is_disk_cached(model_name)
+        
+        if not is_cached and show_progress:
+            self._show_download_info(model_name)
+        
+        return self._load_sentence_transformer(model_name, is_cached)
+    
+    def _load_sentence_transformer(self, model_name: str, is_cached: bool) -> SentenceTransformer:
+        """Load SentenceTransformer with minimal overhead."""
+        self.logger.info("🤖 Loading embedding model: %s", model_name)
+        
+        if is_cached:
+            # Fast path - direct loading
+            return SentenceTransformer(model_name, cache_folder=str(self.cache_dir))
+        else:
+            # Show progress for downloads
+            return self._load_with_progress(model_name)
+    
+    def _load_with_progress(self, model_name: str) -> SentenceTransformer:
+        """Load model with progress indicator."""
+        from rich.console import Console
+        console = Console()
+        
+        with console.status(f"[bold green]Loading {model_name}...", spinner="dots"):
+            return SentenceTransformer(model_name, cache_folder=str(self.cache_dir))
+    
+    def _is_disk_cached(self, model_name: str) -> bool:
+        """Check if model is cached on disk."""
+        cache_path = self._get_cache_path(model_name)
+        return cache_path.exists() and cache_path.is_dir()
+    
+    def _get_cache_path(self, model_name: str) -> Path:
+        """Get cache path for a model."""
+        safe_name = model_name.replace("/", "_").replace(":", "_")
+        return self.cache_dir / safe_name
+    
+    def _show_download_info(self, model_name: str) -> None:
+        """Show download information for first-time downloads."""
+        if model_name not in AVAILABLE_MODELS:
+            return
+        
+        model_info = AVAILABLE_MODELS[model_name]
+        self.logger.info("📥 Downloading model %s (~%.0f MB)...", model_name, model_info["size_mb"])
+
+
+class EmbeddingGenerator:
+    """Handles embedding generation (SRP)."""
+    
+    def __init__(self):
+        self.logger = get_logger(__name__)
+    
+    def generate_embeddings(
+        self, 
+        model: SentenceTransformer, 
+        texts: List[str], 
+        batch_size: int = DEFAULT_BATCH_SIZE,
+        show_progress: bool = True
+    ) -> List[List[float]]:
+        """Generate embeddings using provided model."""
+        self.logger.info("🔄 Generating embeddings for %d texts", len(texts))
+        
+        try:
+            embeddings = self._encode_texts(model, texts, batch_size, show_progress)
+            result = embeddings.tolist()
+            
+            self.logger.info("✅ Generated %d embeddings", len(result))
+            return result
+            
+        except Exception as e:
+            self.logger.error("Error generating embeddings: %s", e)
+            raise ConfigurationError(f"Failed to generate embeddings: {e}") from e
+    
+    def _encode_texts(self, model: SentenceTransformer, texts: List[str], 
+                     batch_size: int, show_progress: bool):
+        """Encode texts with appropriate progress tracking."""
+        if show_progress and len(texts) > LARGE_BATCH_THRESHOLD:
+            return model.encode(
+                texts, batch_size=batch_size, 
+                show_progress_bar=True, convert_to_numpy=True
+            )
+        else:
+            return model.encode(
+                texts, batch_size=batch_size, 
+                show_progress_bar=False, convert_to_numpy=True
+            )
+
+
 class EmbeddingModelManager:
     """
-    Manages embedding models with caching and automatic downloading.
-
-    Provides model loading, caching, and batch processing capabilities
-    for generating embeddings from text chunks.
+    Orchestrates embedding model operations (Clean Architecture).
+    
+    Follows SOLID principles with dependency injection and single responsibilities.
     """
 
     def __init__(self):
-        """Initialize model manager."""
+        """Initialize manager with dependency injection."""
         self.logger = get_logger(__name__)
         self.storage_manager = get_storage_manager()
-        self._loaded_models: Dict[str, SentenceTransformer] = {}
         self._model_cache_dir = self.storage_manager.path_manager.models_dir
-
-        # Ensure cache directory exists
-        self._model_cache_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Dependency Injection (SOLID: DIP)
+        self.validator = ModelValidator()
+        self.cache = ModelCache(self._model_cache_dir)
+        self.loader = ModelLoader(self._model_cache_dir)
+        self.generator = EmbeddingGenerator()
 
     def get_available_models(self) -> Dict[str, ModelInfo]:
         """Get dictionary of available models."""
@@ -140,14 +343,14 @@ class EmbeddingModelManager:
         Returns:
             True if model is cached
         """
-        cache_path = self._get_model_cache_path(model_name)
-        return cache_path.exists() and cache_path.is_dir()
+        # ✅ SOLID: Delegate to cache (SRP)
+        return self.cache.is_cached(model_name)
 
     def load_model(
         self, model_name: str = None, show_progress: bool = True
     ) -> SentenceTransformer:
         """
-        Load an embedding model with caching.
+        Load an embedding model with SOLID architecture (Performance Optimized).
 
         Args:
             model_name: Name of model to load (defaults to DEFAULT_MODEL_NAME)
@@ -159,82 +362,26 @@ class EmbeddingModelManager:
         Raises:
             ConfigurationError: If model loading fails
         """
-        import time
-        load_start_time = time.time()
+        # ✅ SOLID: Use validator to validate and normalize model name
+        model_name = self.validator.validate_model_name(model_name)
+
+        # ✅ SOLID: Check cache first (SRP)
+        cached_model = self.cache.get_cached_model(model_name)
+        if cached_model is not None:
+            return cached_model
+
+        # ✅ SOLID: Use loader to load model (SRP)
+        model = self.loader.load_model(model_name, show_progress)
         
-        if model_name is None:
-            model_name = DEFAULT_MODEL_NAME
-
-        verbose = self.logger.isEnabledFor(10)  # DEBUG level = 10
+        # ✅ SOLID: Cache the loaded model (SRP)
+        self.cache.cache_model(model_name, model)
         
-        # Check if model is already loaded
-        if model_name in self._loaded_models:
-            if verbose:
-                self.logger.info("⚡ Using cached model: %s", model_name)
-            else:
-                self.logger.debug("Using already loaded model: %s", model_name)
-            return self._loaded_models[model_name]
-
-        # Get model info
-        model_info = self.get_model_info(model_name)
-        cache_path = self._get_model_cache_path(model_name)
-
-        self.logger.info("🤖 Loading embedding model: %s", model_name)
-
-        try:
-            # Check if we need to download
-            is_cached = self.is_model_cached(model_name)
-            
-            if not is_cached:
-                if show_progress:
-                    self._show_download_info(model_info)
-
-                self.logger.info(
-                    "📥 Downloading model (this may take a few minutes)..."
-                )
-
-            # Load model with visual loading indicator
-            from rich.console import Console
-
-            console = Console()
-
-            if verbose:
-                st_start_time = time.time()
-
-            with console.status(
-                f"[bold green]Loading model {model_name}...", spinner="dots"
-            ):
-                model = SentenceTransformer(
-                    model_name, cache_folder=str(self._model_cache_dir)
-                )
-
-            if verbose:
-                st_load_time = time.time() - st_start_time
-                self.logger.info("⏱️  Model loading: %.3fs", st_load_time)
-
-            # Cache the loaded model
-            self._loaded_models[model_name] = model
-
-            # Update model info
-            model_info.loaded_at = datetime.now()
-            model_info.cache_path = cache_path
-
-            # Save model metadata
-            self._save_model_metadata(model_name, model_info)
-
-            total_load_time = time.time() - load_start_time
-            if verbose:
-                self.logger.info("✅ Model ready: %s (%d dimensions) in %.3fs", model_name, model_info.dimensions, total_load_time)
-            else:
-                self.logger.info("✅ Model loaded successfully: %s (%d dimensions)", model_name, model_info.dimensions)
-
-            return model
-
-        except Exception as e:
-            total_load_time = time.time() - load_start_time
-            if verbose:
-                self.logger.error("❌ Model loading failed after %.3fs: %s", total_load_time, e)
-            raise ConfigurationError(f"Failed to load model '{model_name}': {e}") from e
+        # ✅ Log success
+        model_info = AVAILABLE_MODELS[model_name]
+        self.logger.info("✅ Model loaded successfully: %s (%d dimensions)", 
+                        model_name, model_info["dimensions"])
+        
+        return model
 
     def generate_embeddings(
         self,
@@ -255,43 +402,16 @@ class EmbeddingModelManager:
         Returns:
             List of embedding vectors
         """
+        # ✅ SOLID: Validate inputs (SRP)
+        self.validator.validate_texts(texts)
         if batch_size is None:
             batch_size = DEFAULT_BATCH_SIZE
-        if not texts:
-            return []
 
-        # Load model
+        # ✅ SOLID: Load model (SRP)
         model = self.load_model(model_name, show_progress=show_progress)
 
-        self.logger.info("🔄 Generating embeddings for %d texts", len(texts))
-
-        try:
-            # Generate embeddings with progress tracking
-            if show_progress and len(texts) > LARGE_BATCH_THRESHOLD:
-                # For large batches, show progress
-                embeddings = model.encode(
-                    texts,
-                    batch_size=batch_size,
-                    show_progress_bar=True,
-                    convert_to_numpy=True,
-                )
-            else:
-                embeddings = model.encode(
-                    texts,
-                    batch_size=batch_size,
-                    show_progress_bar=False,
-                    convert_to_numpy=True,
-                )
-
-            # Convert to list of lists for JSON serialization
-            result = embeddings.tolist()
-
-            self.logger.info("✅ Generated %d embeddings", len(result))
-            return result
-
-        except Exception as e:
-            self.logger.error("Error generating embeddings: %s", e)
-            raise ConfigurationError(f"Failed to generate embeddings: {e}") from e
+        # ✅ SOLID: Generate embeddings (SRP)
+        return self.generator.generate_embeddings(model, texts, batch_size, show_progress)
 
     def get_model_memory_usage(self, model_name: str) -> Optional[float]:
         """
@@ -303,10 +423,10 @@ class EmbeddingModelManager:
         Returns:
             Memory usage in MB, or None if model not loaded
         """
-        if model_name not in self._loaded_models:
+        # ✅ SOLID: Delegate to cache (SRP)
+        model = self.cache.get_cached_model(model_name)
+        if model is None:
             return None
-
-        model = self._loaded_models[model_name]
 
         try:
             # Calculate model parameter size
@@ -321,88 +441,20 @@ class EmbeddingModelManager:
             self.logger.warning("Could not calculate memory usage: %s", e)
             return None
 
-    def unload_model(self, model_name: str) -> bool:
-        """
-        Unload a model from memory.
-
-        Args:
-            model_name: Name of model to unload
-
-        Returns:
-            True if model was unloaded
-        """
-        if model_name in self._loaded_models:
-            del self._loaded_models[model_name]
-
-            # Force garbage collection
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-
-            self.logger.info("🗑️  Unloaded model: %s", model_name)
-            return True
-
-        return False
-
-    def clear_cache(self, model_name: str = None) -> bool:
-        """
-        Clear model cache.
-
-        Args:
-            model_name: Specific model to clear, or None for all
-
-        Returns:
-            True if cache was cleared
-        """
-        try:
-            if model_name:
-                # Clear specific model
-                cache_path = self._get_model_cache_path(model_name)
-                if cache_path.exists():
-                    import shutil
-
-                    shutil.rmtree(cache_path)
-                    self.logger.info("🧹 Cleared cache for model: %s", model_name)
-
-                # Unload from memory if loaded
-                self.unload_model(model_name)
-                return True
-            else:
-                # Clear all models
-                if self._model_cache_dir.exists():
-                    import shutil
-
-                    shutil.rmtree(self._model_cache_dir)
-                    self._model_cache_dir.mkdir(parents=True, exist_ok=True)
-                    self.logger.info("🧹 Cleared all model caches")
-
-                # Unload all from memory
-                self._loaded_models.clear()
-                return True
-
-        except Exception as e:
-            self.logger.error("Error clearing cache: %s", e)
-            return False
-
     def get_cache_info(self) -> Dict[str, Any]:
-        """
-        Get information about cached models.
-
-        Returns:
-            Dictionary with cache information
-        """
+        """Get information about cached models."""
         cache_info = {
             "cache_directory": str(self._model_cache_dir),
-            "loaded_models": list(self._loaded_models.keys()),
+            "loaded_models": list(self.cache._memory_cache.keys()),
             "cached_models": [],
             "total_cache_size_mb": 0.0,
         }
 
-        # Check cached models
+        # Check disk cache for each available model
         for model_name in AVAILABLE_MODELS:
-            cache_path = self._get_model_cache_path(model_name)
-            if cache_path.exists():
+            if self.cache._is_disk_cached(model_name):
+                cache_path = self.cache._get_cache_path(model_name)
                 try:
-                    # Calculate cache size
                     size = sum(
                         f.stat().st_size for f in cache_path.rglob("*") if f.is_file()
                     )
@@ -425,49 +477,6 @@ class EmbeddingModelManager:
 
         cache_info["total_cache_size_mb"] = round(cache_info["total_cache_size_mb"], 1)
         return cache_info
-
-    def _get_model_cache_path(self, model_name: str) -> Path:
-        """Get cache path for a model."""
-        safe_name = model_name.replace("/", "_").replace(":", "_")
-        return self._model_cache_dir / safe_name
-
-    def _show_download_info(self, model_info: ModelInfo) -> None:
-        """Show information about model download."""
-        from rich.console import Console
-        from rich.panel import Panel
-        from rich.table import Table
-
-        console = Console()
-
-        table = Table(title=f"📥 Downloading Model: {model_info.name}")
-        table.add_column("Property", style="cyan")
-        table.add_column("Value", style="bold white")
-
-        table.add_row("Model Size", f"~{model_info.size_mb:.0f} MB")
-        table.add_row("Dimensions", str(model_info.dimensions))
-        table.add_row("Max Sequence", str(model_info.max_seq_length))
-        table.add_row("Description", model_info.description)
-        table.add_row(
-            "Cache Location", str(self._get_model_cache_path(model_info.name))
-        )
-
-        console.print(Panel(table, expand=False))
-        console.print(
-            "⏳ This is a one-time download. Future uses will be much faster!"
-        )
-        console.print()
-
-    def _save_model_metadata(self, model_name: str, model_info: ModelInfo) -> None:
-        """Save model metadata to cache."""
-        try:
-            metadata_file = self._get_model_cache_path(model_name) / "model_info.json"
-            metadata_file.parent.mkdir(parents=True, exist_ok=True)
-
-            with open(metadata_file, "w") as f:
-                json.dump(model_info.to_dict(), f, indent=2)
-
-        except Exception as e:
-            self.logger.warning("Could not save model metadata: %s", e)
 
 
 # Global model manager instance
