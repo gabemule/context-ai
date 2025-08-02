@@ -184,57 +184,18 @@ def _clean_temp_files(base_path: Path, older_than_hours: int = DEFAULT_TEMP_CLEA
     return cleaned_count
 
 
-def _get_embeddings_analytics(embeddings_list: List[str]) -> Dict:
-    """Get essential embeddings analytics for future sync feature."""
-    try:
-        from core.embeddings.vector_store import get_vector_store
-        
-        vector_store = get_vector_store()
-        embeddings_info = vector_store.list_embeddings()
-        
-        if not embeddings_info:
-            return {"oldest": None, "newest": None, "sizes": {}, "created_dates": {}}
-        
-        # Sort by creation time for sync decisions
-        def get_created_time(x):
-            created = x.get("created_at")
-            if created:
-                try:
-                    return datetime.fromisoformat(created.replace('Z', '+00:00')).timestamp()
-                except:
-                    return 0
-            return 0
-        
-        embeddings_by_time = sorted(embeddings_info, key=get_created_time)
-        oldest = embeddings_by_time[0] if embeddings_by_time else None
-        newest = embeddings_by_time[-1] if embeddings_by_time else None
-        
-        # Essential data for sync: sizes and creation dates
-        sizes = {}
-        created_dates = {}
-        for info in embeddings_info:
-            name = info["name"]
-            size_bytes = info.get("total_size_bytes", 0)
-            sizes[name] = round(size_bytes / (1024 * 1024), 2)  # MB
-            created_dates[name] = info.get("created_at", "unknown")
-        
-        return {
-            "oldest": oldest["name"] if oldest else None,
-            "oldest_date": oldest.get("created_at") if oldest else None,
-            "newest": newest["name"] if newest else None,
-            "newest_date": newest.get("created_at") if newest else None,
-            "sizes": sizes,
-            "created_dates": created_dates,  # Critical for sync!
-        }
-        
-    except Exception as e:
-        return {"oldest": None, "newest": None, "sizes": {}, "created_dates": {}}
-
-
-def _get_complete_analytics(embeddings_list: List[str], base_path: Path) -> Dict:
+def _get_complete_analytics(embeddings_list: List[str], base_path: Path, embedding_manager=None) -> Dict:
     """Get complete analytics including embeddings, logs, and models."""
+    # Use EmbeddingManager for embeddings analytics (SRP compliance)
+    if embedding_manager is not None:
+        embeddings_analytics = embedding_manager.get_embeddings_analytics()
+    else:
+        from config.embeddings import get_embedding_manager
+        manager = get_embedding_manager()
+        embeddings_analytics = manager.get_embeddings_analytics()
+    
     return {
-        "embeddings_analytics": _get_embeddings_analytics(embeddings_list),
+        "embeddings_analytics": embeddings_analytics,
         "log_analytics": _get_log_analytics(base_path),
         "models_analytics": _get_models_analytics(base_path),
     }
@@ -320,9 +281,16 @@ class StorageManager:
     Removed over-engineered analytics and strategy patterns for simplicity.
     """
 
-    def __init__(self, base_path: Optional[str] = None):
+    def __init__(self, base_path: Optional[str] = None, embedding_manager=None):
         self.logger = get_logger(__name__)
         self.path_manager = StoragePathManager(base_path)
+        
+        # Dependency injection for EmbeddingManager (eliminates SRP violations)
+        if embedding_manager is not None:
+            self.embedding_manager = embedding_manager
+        else:
+            from config.embeddings import get_embedding_manager
+            self.embedding_manager = get_embedding_manager()
 
     # Direct access to path manager - no facades
     @property
@@ -331,30 +299,14 @@ class StorageManager:
         return self.path_manager.base_path
 
     def list_embeddings(self) -> List[str]:
-        """List all available embedding names."""
-        try:
-            from core.embeddings.vector_store import get_vector_store
-
-            vector_store = get_vector_store()
-            embeddings_info = vector_store.list_embeddings()
-            return sorted([info["name"] for info in embeddings_info])
-
-        except Exception as e:
-            self.logger.warning("Error listing embeddings from vector store: %s", e)
-            return []
+        """List all available embedding names via EmbeddingManager."""
+        # Use EmbeddingManager for embedding operations (SRP compliance)
+        return self.embedding_manager.list_embeddings()
 
     def embedding_exists(self, embedding_name: str) -> bool:
-        """Check if embedding exists."""
-        try:
-            from core.embeddings.vector_store import get_vector_store
-
-            vector_store = get_vector_store()
-            info = vector_store.get_embedding_info(embedding_name)
-            return info is not None
-
-        except Exception as e:
-            self.logger.warning("Error checking embedding existence: %s", e)
-            return False
+        """Check if embedding exists via EmbeddingManager."""
+        # Use EmbeddingManager for embedding operations (SRP compliance)
+        return self.embedding_manager.embedding_exists(embedding_name)
 
     def get_storage_size(self) -> int:
         """Get total storage size in bytes."""
@@ -387,7 +339,7 @@ class StorageManager:
                 "embeddings_count": len(embeddings),
                 "embeddings": embeddings,
                 "directory_sizes": dir_sizes,
-                **_get_complete_analytics(embeddings, self.path_manager.base_path),
+                **_get_complete_analytics(embeddings, self.path_manager.base_path, self.embedding_manager),
                 "last_cleanup": self._get_last_cleanup_time(),
             }
 
@@ -460,5 +412,5 @@ def get_storage_manager() -> StorageManager:
     global _storage_manager
     if _storage_manager is None:
         _storage_manager = StorageManager()
-        _storage_manager.ensure_storage_structure()
+        _storage_manager.path_manager.ensure_storage_structure()
     return _storage_manager

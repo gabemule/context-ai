@@ -6,7 +6,7 @@ consolidating base models, AI configuration, storage configuration, and chunking
 """
 
 from datetime import datetime
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 
 from pydantic import BaseModel, Field, validator
 
@@ -24,7 +24,6 @@ from .constants.chunking import (
     DEFAULT_MIN_CHUNK_SIZE,
     DEFAULT_PRIORITIZE_CROSS_PROJECT,
 )
-from .providers import get_max_tokens
 
 __all__ = [
     # Base Models
@@ -77,7 +76,7 @@ class AIProviderConfig(ConfigurableModel):
 
     api_key: str = Field(..., description="API key for the provider")
     default_model: str = Field(..., description="Default model to use")
-    max_tokens: int = Field(get_max_tokens(), description="Maximum tokens per request")
+    max_tokens: Optional[int] = Field(None, description="Maximum tokens per request (resolved by business logic)")
 
 
 class ContextAIConfig(BaseModel):

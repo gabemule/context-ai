@@ -53,11 +53,12 @@ class LanguagesManager:
     def _load_config(self, force_reload: bool = False) -> LanguagesConfig:
         """Load configuration from file with caching."""
         if self._config is None or force_reload or not self._cache_valid:
-            # Ensure configs exist via centralized copy (SettingsManager)
+            # Ensure configs exist via SetupManager (direct, no intermediate dependency)
             if not self.languages_file.exists():
-                self.logger.debug("Languages config missing, ensuring via SettingsManager...")
-                from config.settings import get_settings_manager
-                get_settings_manager()  # This copies languages + guidelines + prompts
+                self.logger.debug("Languages config missing, ensuring via SetupManager...")
+                from config.setup import get_setup_manager
+                setup_manager = get_setup_manager()
+                setup_manager.ensure_all_configs_exist()  # Direct setup, clean flow
             
             try:
                 self.logger.debug(f"Loading languages configuration from: {self.languages_file}")

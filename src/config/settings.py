@@ -25,12 +25,13 @@ class SettingsManager:
     and provides higher-level configuration management.
     """
 
-    def __init__(self, config_core=None, path_provider: Optional[PathProvider] = None):
+    def __init__(self, config_core=None, embedding_manager=None, path_provider: Optional[PathProvider] = None):
         """
         Initialize settings manager.
 
         Args:
             config_core: Optional ConfigCore instance for dependency injection
+            embedding_manager: Optional EmbeddingManager instance for dependency injection
             path_provider: Optional path provider for dependency injection
         """
         self.logger = get_logger(__name__)
@@ -40,6 +41,13 @@ class SettingsManager:
             self.config_core = config_core
         else:
             self.config_core = get_config_core()
+
+        # Use dependency injection for EmbeddingManager (eliminates SRP violations)
+        if embedding_manager is not None:
+            self.embedding_manager = embedding_manager
+        else:
+            from .embeddings import get_embedding_manager
+            self.embedding_manager = get_embedding_manager()
 
         # Use dependency injection for paths (eliminates hardcoding)
         if path_provider is not None:
@@ -136,91 +144,44 @@ class SettingsManager:
         self.logger.info("Prompt mode set to: %s", mode)
 
     def set_active_embeddings(self, embedding_names: List[str]) -> None:
-        """Set active embeddings (validates via vector store)."""
-        # Validate that all embeddings exist via vector store directly
-        from core.embeddings.vector_store import get_vector_store
-        vector_store = get_vector_store()
-        
-        valid_embeddings = []
-        for name in embedding_names:
-            if vector_store.get_embedding_info(name) is not None:
-                valid_embeddings.append(name)
-            else:
-                self.logger.warning("Embedding '%s' not found, skipping", name)
+        """Set active embeddings (validates via EmbeddingManager)."""
+        # Use EmbeddingManager for validation (SRP compliance)
+        valid_embeddings = self.embedding_manager.validate_embeddings(embedding_names)
         
         active = ActiveEmbeddings(selected=valid_embeddings, last_updated=datetime.now())
         self.save_active_embeddings(active)
         self.logger.info("Active embeddings set: %s", ", ".join(valid_embeddings))
 
     def get_available_embeddings(self) -> List[EmbeddingInfo]:
-        """Get list of available embeddings with metadata."""
-        try:
-            embeddings = []
-            embeddings_dir = self.path_provider.get_embeddings_metadata_dir()
-
-            if not embeddings_dir.exists():
-                return embeddings
-
-            for embedding_file in embeddings_dir.glob("*.json"):
-                try:
-                    with open(embedding_file, "r") as f:
-                        data = json.load(f)
-                        embedding_info = EmbeddingInfo(**data)
-                        embeddings.append(embedding_info)
-                except Exception as e:
-                    self.logger.warning("Error reading embedding metadata %s: %s", embedding_file.name, e)
-
-            return sorted(embeddings, key=lambda x: x.created_at, reverse=True)
-
-        except Exception as e:
-            self.logger.warning("Error getting available embeddings: %s", e)
-            return []
+        """Get list of available embeddings with metadata via EmbeddingManager."""
+        # Use EmbeddingManager for metadata operations (SRP compliance)
+        metadata_list = self.embedding_manager.get_available_embeddings_metadata()
+        
+        # Convert to EmbeddingInfo objects
+        embeddings = []
+        for data in metadata_list:
+            try:
+                embedding_info = EmbeddingInfo(**data)
+                embeddings.append(embedding_info)
+            except Exception as e:
+                self.logger.warning("Error parsing embedding metadata: %s", e)
+        
+        return embeddings
 
     def save_embedding_metadata(self, embedding_info: EmbeddingInfo) -> None:
-        """Save embedding metadata."""
-        try:
-            embeddings_dir = self.path_provider.get_embeddings_metadata_dir()
-            embeddings_dir.mkdir(parents=True, exist_ok=True)
-            
-            metadata_file = embeddings_dir / f"{embedding_info.name}.json"
-
-            with open(metadata_file, "w") as f:
-                json.dump(embedding_info.dict(), f, indent=2, default=str)
-            self.logger.debug("Saved embedding metadata: %s", embedding_info.name)
-            
-        except Exception as e:
-            raise ConfigurationError(f"Failed to save embedding metadata: {e}")
+        """Save embedding metadata via EmbeddingManager."""
+        # Use EmbeddingManager for metadata operations (SRP compliance)
+        self.embedding_manager.save_embedding_metadata(embedding_info.dict())
 
     def delete_embedding_metadata(self, embedding_name: str) -> None:
-        """Delete embedding metadata."""
-        try:
-            embeddings_dir = self.path_provider.get_embeddings_metadata_dir()
-            metadata_file = embeddings_dir / f"{embedding_name}.json"
-
-            if metadata_file.exists():
-                metadata_file.unlink()
-                self.logger.debug("Deleted embedding metadata: %s", embedding_name)
-        except Exception as e:
-            self.logger.warning("Failed to delete embedding metadata: %s", e)
+        """Delete embedding metadata via EmbeddingManager."""
+        # Use EmbeddingManager for metadata operations (SRP compliance)
+        self.embedding_manager.delete_embedding_metadata(embedding_name)
 
     def delete_embedding(self, embedding_name: str) -> bool:
-        """Delete embedding and its metadata (coordinated operation)."""
-        try:
-            # Delete actual data from vector store
-            from core.embeddings.vector_store import get_vector_store
-            vector_store = get_vector_store()
-            vector_deleted = vector_store.delete_embedding(embedding_name)
-            
-            # Delete metadata JSON (Settings responsibility)
-            self.delete_embedding_metadata(embedding_name)
-            
-            if vector_deleted:
-                self.logger.info("Deleted embedding '%s' and metadata", embedding_name)
-            
-            return vector_deleted
-        except Exception as e:
-            self.logger.error("Error deleting embedding '%s': %s", embedding_name, e)
-            raise ConfigurationError(f"Failed to delete embedding '{embedding_name}': {e}")
+        """Delete embedding and its metadata via EmbeddingManager."""
+        # Use EmbeddingManager for all embedding operations (SRP compliance)
+        return self.embedding_manager.delete_embedding(embedding_name)
 
 
     def _load_active(self) -> None:

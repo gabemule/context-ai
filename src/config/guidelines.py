@@ -40,12 +40,13 @@ class GuidelinesManager:
     
     def get_guideline(self, language: str) -> Optional[str]:
         """Get guideline content for a specific language."""
-        # Ensure configs exist via centralized copy (SettingsManager)
+        # Ensure configs exist via SetupManager (no circular dependency!)
         user_guidelines_dir = self._get_user_guidelines_dir()
         if not user_guidelines_dir.exists() or not list(user_guidelines_dir.glob("*.md")):
-            self.logger.debug("Guidelines missing, ensuring via SettingsManager...")
-            from config.settings import get_settings_manager
-            get_settings_manager()  # This copies languages + guidelines + prompts
+            self.logger.debug("Guidelines missing, ensuring via SetupManager...")
+            from config.setup import get_setup_manager
+            setup_manager = get_setup_manager()
+            setup_manager.ensure_all_configs_exist()  # Direct setup, no circular dependency
         
         # Check cache first
         if language in self._cache:
@@ -68,12 +69,13 @@ class GuidelinesManager:
     
     def get_available_languages(self) -> List[str]:
         """Get list of all available guideline languages."""
-        # Ensure configs exist via centralized copy (SettingsManager)
+        # Ensure configs exist via SetupManager (no circular dependency!)
         user_dir = self._get_user_guidelines_dir()
         if not user_dir.exists():
-            self.logger.debug("Guidelines directory missing, ensuring via SettingsManager...")
-            from config.settings import get_settings_manager
-            get_settings_manager()  # This copies languages + guidelines + prompts
+            self.logger.debug("Guidelines directory missing, ensuring via SetupManager...")
+            from config.setup import get_setup_manager
+            setup_manager = get_setup_manager()
+            setup_manager.ensure_all_configs_exist()  # Direct setup, no circular dependency
         
         user_dir = self._get_user_guidelines_dir()
         if not user_dir.exists():
@@ -112,12 +114,13 @@ class GuidelinesManager:
     
     def save_guideline(self, language: str, content: str) -> bool:
         """Save guideline content to file."""
-        # Ensure configs exist via centralized copy (SettingsManager)
+        # Ensure configs exist via SetupManager
         user_guidelines_dir = self._get_user_guidelines_dir()
         if not user_guidelines_dir.exists():
-            self.logger.debug("Guidelines directory missing, ensuring via SettingsManager...")
-            from config.settings import get_settings_manager
-            get_settings_manager()  # This copies languages + guidelines + prompts
+            self.logger.debug("Guidelines directory missing, ensuring via SetupManager...")
+            from config.setup import get_setup_manager
+            setup_manager = get_setup_manager()
+            setup_manager.ensure_all_configs_exist()
         
         guideline_file = self._get_user_guidelines_dir() / f"{language}.md"
         
