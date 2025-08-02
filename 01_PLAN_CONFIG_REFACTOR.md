@@ -493,14 +493,14 @@ from utils.file_operations import get_file_operations
 - [x] **IMPLEMENTAR** Adapter Pattern para seamless integration
 
 ##### **STEP 8: Reorganizar Providers Structure**
-- [ ] **PROBLEMA IDENTIFICADO**: `src/config/providers/base.py` mistura responsabilidades:
+- [x] **PROBLEMA IDENTIFICADO**: `src/config/providers/base.py` mistura responsabilidades:
 ```python
 # ❌ MISTURA: Protocols + Models + Abstract Classes
 class ProviderCapabilities:        # → Deveria ser Pydantic model local
 class AIProviderProtocol(Protocol): # → OK como protocol  
 class BaseProvider(ABC):           # → Desnecessário se temos protocol
 ```
-- [ ] **CRIAR** `src/config/providers/models.py` com modelos locais:
+- [x] **CRIAR** `src/config/providers/models.py` com modelos Pydantic:
 ```python
 class ProviderCapabilities(BaseModel):
     supports_streaming: bool = False
@@ -509,15 +509,12 @@ class ProviderCapabilities(BaseModel):
     max_context_window: int = 200000
     max_output_tokens: int = 4000
 ```
-- [ ] **RENOMEAR** `src/config/providers/base.py` → `src/config/providers/protocols.py`
-- [ ] **MANTER** apenas `AIProviderProtocol` no arquivo protocols
-- [ ] **REMOVER** `BaseProvider` (implementações usam protocol diretamente)
-- [ ] **ATUALIZAR** `src/config/providers/claude.py` para:
-```python
-from .protocols import AIProviderProtocol
-from .models import ProviderCapabilities
-```
-- [ ] **ATUALIZAR** imports em outros arquivos que usam providers
+- [x] **CRIAR** `src/config/providers/protocols.py` com apenas Protocol
+- [x] **MANTER** apenas `AIProviderProtocol` no arquivo protocols
+- [x] **REMOVER** `BaseProvider` (implementações usam protocol diretamente)
+- [x] **ATUALIZAR** `src/config/providers/claude.py` para usar novos imports
+- [x] **ATUALIZAR** `src/config/providers/__init__.py` para re-exportar corretamente
+- [x] **REMOVER** `src/config/providers/base.py` (obsoleto)
 
 ##### **STEP 9: Criar Setup Manager (Separação Final de Responsabilidades)**
 - [ ] **PROBLEMA IDENTIFICADO**: `_ensure_all_configs_exist()` não deveria estar no SettingsManager:

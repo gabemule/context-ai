@@ -6,7 +6,8 @@ models, and capabilities.
 """
 
 from typing import Dict, List, Any
-from .base import BaseProvider, ProviderCapabilities
+from .protocols import AIProviderProtocol
+from .models import ProviderCapabilities
 
 __all__ = [
     'CLAUDE_MODELS',
@@ -73,11 +74,11 @@ CLAUDE_MODELS = {
 }
 
 
-class ClaudeProvider(BaseProvider):
-    """Claude provider implementation."""
+class ClaudeProvider:
+    """Claude provider implementation using Protocol."""
     
     def __init__(self):
-        super().__init__("claude")
+        self._name = "claude"
         self._capabilities = ProviderCapabilities(
             supports_streaming=True,
             supports_function_calling=True,
@@ -85,6 +86,16 @@ class ClaudeProvider(BaseProvider):
             max_context_window=200000,
             max_output_tokens=64000
         )
+    
+    @property
+    def name(self) -> str:
+        """Provider name."""
+        return self._name
+    
+    @property
+    def capabilities(self) -> ProviderCapabilities:
+        """Provider capabilities."""
+        return self._capabilities
     
     def get_available_models(self) -> List[str]:
         """Get list of available Claude models."""

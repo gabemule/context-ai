@@ -13,17 +13,20 @@ Usage:
 """
 
 # Import all providers from domain-specific modules
-from .base import *
+from .protocols import *
+from .models import *
 from .claude import *
 from .registry import *
 
 # Aggregate all __all__ lists for complete re-export
-from .base import __all__ as base_all
+from .protocols import __all__ as protocols_all
+from .models import __all__ as models_all
 from .claude import __all__ as claude_all
 from .registry import __all__ as registry_all
 
 __all__ = (
-    base_all +
+    protocols_all +
+    models_all +
     claude_all +
     registry_all
 )
