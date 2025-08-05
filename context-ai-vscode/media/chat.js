@@ -10,8 +10,8 @@
     const messageInput = document.getElementById('messageInput');
     const sendBtn = document.getElementById('sendBtn');
     const clearBtn = document.getElementById('clearBtn');
-    const sendText = sendBtn.querySelector('.send-text');
-    const loadingText = sendBtn.querySelector('.loading');
+    let sendText = null;
+    let loadingText = null;
     
     let isLoading = false;
     let currentLoadingMessage = null;
@@ -21,6 +21,8 @@
     let initializationStatus = null;
     let chatInfoShown = false;
     let rawStreamContent = '';
+    let isScrolledUp = false;
+    let userManuallyScrolled = false;
 
     // ✅ REAL markdown-it initialization with bundled libs
     let md = null;
@@ -77,17 +79,19 @@
         // ✅ Initialize BUNDLED markdown-it and highlight.js
         initializeMarkdown();
         
-        // ✅ GARANTIR estado inicial correto do botão
-        sendText.classList.remove('hidden');
-        loadingText.classList.add('hidden');
+        // Initialize button HTML structure FIRST
+        initializeSendButton();
         
         // Show empty state initially
         showEmptyState();
         
         // Event listeners
-        sendBtn.addEventListener('click', sendMessage);
+        sendBtn.addEventListener('click', handleSendButtonClick);
         clearBtn.addEventListener('click', clearChat);
         messageInput.addEventListener('keydown', handleKeyDown);
+        
+        // Scroll detection
+        messagesContainer.addEventListener('scroll', handleScroll);
         
         // Example question buttons
         document.addEventListener('click', (e) => {
@@ -214,8 +218,8 @@
         messageDiv.appendChild(contentDiv);
         messagesContainer.appendChild(messageDiv);
         
-        // Scroll to bottom
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        // 🔽 Smart scroll - só scroll se estiver no bottom
+        smartScroll();
         
         return messageDiv;
     }
@@ -267,17 +271,22 @@
     function setLoading(loading) {
         isLoading = loading;
         
+        console.log('🔽 setLoading called:', { loading, isInitializing, sendText, loadingText });
+        
         if (loading && !isInitializing) { // ✅ SÓ mostrar se não estiver inicializando
             sendBtn.disabled = true;
-            sendText.classList.add('hidden');
-            loadingText.classList.remove('hidden');
+            if (sendText) sendText.classList.add('hidden');
+            if (loadingText) loadingText.classList.remove('hidden');
             showHeaderLoading(); // ✅ USAR header loading
         } else if (!loading) {
             sendBtn.disabled = false;
-            sendText.classList.remove('hidden');
-            loadingText.classList.add('hidden');
+            if (sendText) sendText.classList.remove('hidden');
+            if (loadingText) loadingText.classList.add('hidden');
             hideHeaderLoading(); // ✅ ESCONDER header loading
         }
+        
+        // ✅ SEMPRE atualizar o botão após mudar o estado de loading
+        updateSendButton();
     }
 
     function showHeaderLoading() {
@@ -421,7 +430,9 @@ Special commands:
         messagesContainer.appendChild(messageDiv);
         
         currentStreamingMessage = messageDiv;
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        
+        // 🔽 Smart scroll - só scroll se estiver no bottom
+        smartScroll();
     }
 
     function formatStreamingMarkdown(text) {
@@ -463,8 +474,8 @@ Special commands:
         // Update content with formatted markdown
         contentDiv.innerHTML = formattedContent;
         
-        // Scroll to bottom
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        // 🔽 Smart scroll - só scroll se usuário estiver no bottom
+        smartScroll();
     }
 
     function completeStreaming() {
@@ -613,6 +624,134 @@ Special commands:
         tokenStatsDiv.classList.add('block');
         
         console.log('📊 Updated token stats:', displayText);
+    }
+
+    // 🔽 Smart Scroll Functions
+    function initializeSendButton() {
+        // Estruturar o HTML do botão com texto "Scroll Down"
+        sendBtn.innerHTML = `
+            <span class="send-text">Send</span>
+            <span class="loading hidden">Sending...</span>
+            <span class="scroll-text hidden">Scroll Down</span>
+        `;
+        
+        // ✅ Atualizar referências GLOBAIS (sem const)
+        sendText = sendBtn.querySelector('.send-text');
+        loadingText = sendBtn.querySelector('.loading');
+        
+        console.log('🔽 Button initialized:', { sendText, loadingText });
+        
+        updateSendButton();
+    }
+
+    function handleSendButtonClick() {
+        if (sendBtn.classList.contains('scroll-mode')) {
+            // Modo scroll - fazer scroll to bottom
+            scrollToBottom();
+        } else {
+            // Modo normal - enviar mensagem
+            sendMessage();
+        }
+    }
+
+    function handleScroll() {
+        const threshold = 100; // pixels do bottom
+        const atBottom = isAtBottom(threshold);
+        
+        console.log('🔽 Scroll detected:', { atBottom, isScrolledUp, userManuallyScrolled, isStreaming });
+        
+        // Detectar se usuário scrollou manualmente para cima
+        if (!atBottom) {
+            userManuallyScrolled = true;
+            isScrolledUp = true;
+            console.log('🔽 User scrolled UP - enabling scroll mode');
+        } else if (atBottom) {
+            userManuallyScrolled = false;
+            isScrolledUp = false;
+            console.log('🔽 User at BOTTOM - disabling scroll mode');
+        }
+        
+        updateSendButton();
+    }
+
+    function isAtBottom(threshold = 50) {
+        const container = messagesContainer;
+        return (container.scrollHeight - container.scrollTop - container.clientHeight) <= threshold;
+    }
+
+    function updateSendButton() {
+        console.log('🔽 updateSendButton called:', {
+            isScrolledUp,
+            isLoading,
+            isInitializing,
+            isStreaming,
+            hasScrollMode: sendBtn.classList.contains('scroll-mode')
+        });
+        
+        const scrollText = sendBtn.querySelector('.scroll-text');
+        const sendTextEl = sendBtn.querySelector('.send-text');
+        const loadingEl = sendBtn.querySelector('.loading');
+        
+        // ✅ CORREÇÃO: Permitir scroll mode durante streaming, só bloquear se inicializando
+        if (isScrolledUp && !isInitializing) {
+            // Transformar em botão de scroll
+            console.log('🔽 ENABLING scroll mode');
+            sendBtn.classList.add('scroll-mode');
+            
+            // ✅ FORÇAR ENABLE e mostrar texto correto
+            sendBtn.disabled = false;
+            if (scrollText) scrollText.classList.remove('hidden');
+            if (sendTextEl) sendTextEl.classList.add('hidden');
+            if (loadingEl) loadingEl.classList.add('hidden');
+            
+        } else {
+            // Voltar ao modo normal
+            console.log('🔽 DISABLING scroll mode');
+            sendBtn.classList.remove('scroll-mode');
+            
+            // Restaurar estado normal
+            if (scrollText) scrollText.classList.add('hidden');
+            if (sendTextEl) sendTextEl.classList.remove('hidden');
+            
+            // Só desabilitar se não estiver inicializando
+            if (!isInitializing) {
+                sendBtn.disabled = isLoading;
+            }
+        }
+        
+        console.log('🔽 Button state after update:', {
+            hasScrollMode: sendBtn.classList.contains('scroll-mode'),
+            disabled: sendBtn.disabled,
+            classList: sendBtn.classList.toString()
+        });
+    }
+
+    function scrollToBottom() {
+        if (isStreaming) {
+            // ⚡ Scroll instantâneo durante streaming para evitar problema de timing
+            console.log('🔽 Using INSTANT scroll (streaming active)');
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        } else {
+            // 🎨 Smooth scroll quando não há streaming
+            console.log('🔽 Using SMOOTH scroll (no streaming)');
+            messagesContainer.scrollTo({
+                top: messagesContainer.scrollHeight,
+                behavior: 'smooth'
+            });
+        }
+        
+        // Reset scroll state
+        isScrolledUp = false;
+        userManuallyScrolled = false;
+        updateSendButton();
+    }
+
+    // Override original scroll behavior during streaming
+    function smartScroll() {
+        // Só fazer auto-scroll se usuário estiver no bottom
+        if (!userManuallyScrolled && isAtBottom(150)) {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
     }
 
     // Auto-resize textarea - CSP compliant (sem inline styles)

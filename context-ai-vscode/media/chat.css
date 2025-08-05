@@ -423,10 +423,54 @@ body {
     font-size: 14px;
     font-weight: 500;
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: all 0.25s ease;
     width: 100%;
     height: 22px;
     order: 1; /* ✅ Botão primeiro */
+    position: relative;
+    overflow: hidden;
+}
+
+/* 🔽 Send Button transformado em Scroll to Bottom */
+.send-btn.scroll-mode {
+    background-color: #007ACC !important;
+    color: #ffffff !important;
+    font-size: 16px;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 122, 204, 0.3);
+    opacity: 1 !important;
+    cursor: pointer !important;
+}
+
+.send-btn.scroll-mode:hover {
+    background-color: #005a9e !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 122, 204, 0.4);
+}
+
+.send-btn.scroll-mode:active {
+    transform: translateY(0);
+}
+
+.send-btn.scroll-mode:disabled {
+    background-color: #007ACC !important;
+    color: #ffffff !important;
+    opacity: 1 !important;
+    cursor: pointer !important;
+}
+
+/* Controle de visibilidade dos textos */
+.send-btn .scroll-text {
+    display: none;
+}
+
+.send-btn.scroll-mode .send-text,
+.send-btn.scroll-mode .loading {
+    display: none !important;
+}
+
+.send-btn.scroll-mode .scroll-text {
+    display: inline-block !important;
 }
 
 #messageInput {

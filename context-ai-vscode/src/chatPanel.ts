@@ -688,9 +688,6 @@ export class ChatPanel {
                                 🏗️ Explain the architecture
                             </button>
                             <button class="example-btn" data-question="Detail the libraries and its exports">
-                                🏗️ Explain the architecture
-                            </button>
-                            <button class="example-btn" data-question="Detail the libraries and its exports">
                                 📚 Detail libraries
                             </button>
                         </div>
