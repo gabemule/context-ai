@@ -88,8 +88,8 @@ class SetupManager:
             if guidelines_dir.exists() and self.file_ops.list_files(guidelines_dir, "*.md"):
                 return  # Guidelines already exist
             
-            # Copy guidelines from samples
-            samples_guidelines = self._get_samples_guidelines_directory()
+            # Copy guidelines from samples - use StorageManager template path
+            samples_guidelines = self.storage_manager.path_manager.template_guidelines_dir
             
             if not self.file_ops.directory_exists(samples_guidelines):
                 self.logger.warning(f"Guidelines samples not found: {samples_guidelines}")
@@ -127,8 +127,8 @@ class SetupManager:
             if self.file_ops.directory_exists(prompts_dir):
                 return  # Prompts already exist
             
-            # Copy prompts from samples
-            samples_prompts = self._get_samples_prompts_directory()
+            # Copy prompts from samples - use StorageManager template path
+            samples_prompts = self.storage_manager.path_manager.template_prompts_dir
             
             if not self.file_ops.directory_exists(samples_prompts):
                 self.logger.warning(f"Prompts samples not found: {samples_prompts}")
@@ -147,20 +147,6 @@ class SetupManager:
         except Exception as e:
             self.logger.warning(f"Error ensuring prompts config: {e}")
     
-    def _get_samples_guidelines_directory(self) -> Path:
-        """Get path to samples/guidelines/ directory."""
-        return self._get_samples_directory() / "guidelines"
-    
-    def _get_samples_prompts_directory(self) -> Path:
-        """Get path to samples/prompts/ directory."""
-        return self._get_samples_directory() / "prompts"
-    
-    def _get_samples_directory(self) -> Path:
-        """Get path to src/config/samples/ directory."""
-        # Navigate from current file to samples directory
-        current_file = Path(__file__)
-        config_dir = current_file.parent  # src/config/
-        return config_dir / "samples"
     
     def get_config_directory(self) -> Path:
         """Get the configuration directory path via StorageManager."""
