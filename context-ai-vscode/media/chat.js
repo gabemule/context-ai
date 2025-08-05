@@ -1,4 +1,8 @@
+// ✅ Libs will be bundled by Vite and available globally
 (function() {
+    // Use libs that were made available globally by the bundle
+    const markdownit = window.markdownit;
+    const hljs = window.hljs;
     const vscode = acquireVsCodeApi();
     
     // DOM elements
@@ -18,13 +22,64 @@
     let chatInfoShown = false;
     let rawStreamContent = '';
 
+    // ✅ REAL markdown-it initialization with bundled libs
+    let md = null;
+    let libsLoaded = false;
+    
+    function initializeMarkdown() {
+        console.log('🚀 Initializing markdown-it with BUNDLED libs from Vite');
+        
+        try {
+            // Configure markdown-it with highlight.js (REAL implementation!)
+            md = markdownit({
+                html: true,
+                linkify: true,
+                typographer: true,
+                breaks: true,
+                highlight: function (str, lang) {
+                    if (lang && hljs.getLanguage && hljs.getLanguage(lang)) {
+                        try {
+                            console.log(`🎨 Highlighting ${lang} code with highlight.js`);
+                            return '<pre><code class="hljs language-' + lang + '">' +
+                                   hljs.highlight(str, { language: lang, ignoreIllegals: true }).value +
+                                   '</code></pre>';
+                        } catch (error) {
+                            console.warn('⚠️ Highlight.js error:', error);
+                        }
+                    }
+                    
+                    return '<pre><code class="hljs">' + md.utils.escapeHtml(str) + '</code></pre>';
+                }
+            });
+            
+            libsLoaded = true;
+            console.log('✅ BUNDLED markdown-it + highlight.js initialized successfully!');
+        } catch (error) {
+            console.error('❌ Failed to initialize bundled libraries:', error);
+            
+            // Basic fallback
+            md = {
+                render: function(text) {
+                    return text
+                        .replace(/\n/g, '<br>')
+                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                        .replace(/`(.*?)`/g, '<code>$1</code>');
+                }
+            };
+            libsLoaded = true;
+        }
+    }
+
     // Initialize
     init();
 
     function init() {
+        // ✅ Initialize BUNDLED markdown-it and highlight.js
+        initializeMarkdown();
+        
         // ✅ GARANTIR estado inicial correto do botão
-        sendText.style.display = 'inline';
-        loadingText.style.display = 'none';
+        sendText.classList.remove('hidden');
+        loadingText.classList.add('hidden');
         
         // Show empty state initially
         showEmptyState();
@@ -98,6 +153,13 @@
         const message = messageInput.value.trim();
         if (!message || isLoading) return;
 
+        // ✅ PROTEÇÃO CRÍTICA: Bloquear envio se libs não carregaram
+        if (!libsLoaded || !md) {
+            console.error('❌ BLOCKED: Cannot send message - libraries not ready');
+            console.warn('❌ Libraries still loading. Please wait a moment and try again.');
+            return;
+        }
+
         // Add user message to chat
         addMessage(message, 'user');
         
@@ -145,7 +207,7 @@
         const contentDiv = document.createElement('div');
         contentDiv.className = 'message-content';
         
-        // Process markdown-like formatting
+        // Process markdown formatting with REAL markdown-it
         contentDiv.innerHTML = formatMessage(text);
 
         messageDiv.appendChild(headerDiv);
@@ -159,30 +221,20 @@
     }
 
     function formatMessage(text) {
-        // Basic markdown formatting for better display
-        let formatted = text
-            // Headers
-            .replace(/^### (.*$)/gm, '<h3>$1</h3>')
-            .replace(/^## (.*$)/gm, '<h2>$1</h2>')
-            .replace(/^# (.*$)/gm, '<h1>$1</h1>')
-            // Bold
-            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-            // Code blocks
-            .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
-            // Inline code
-            .replace(/`([^`]+)`/g, '<code>$1</code>')
-            // Lists
-            .replace(/^\* (.*$)/gm, '<li>$1</li>')
-            .replace(/^- (.*$)/gm, '<li>$1</li>')
-            // Line breaks
-            .replace(/\n/g, '<br>');
+        // ✅ PROTEÇÃO CRÍTICA: Verificar se markdown-it carregou
+        if (!md) {
+            console.error('❌ CRITICAL: markdown-it not loaded, cannot format message!');
+            throw new Error('Markdown-it not ready - bundling failed');
+        }
+        
+        console.log('🎯 Using BUNDLED markdown-it formatting');
+        return md.render(text);
+    }
 
-        // Wrap consecutive list items in ul tags
-        formatted = formatted.replace(/(<li>.*<\/li>)(\s*<br>\s*<li>.*<\/li>)*/g, (match) => {
-            return '<ul>' + match.replace(/<br>\s*/g, '') + '</ul>';
-        });
-
-        return formatted;
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     function addLoadingMessage() {
@@ -217,13 +269,13 @@
         
         if (loading && !isInitializing) { // ✅ SÓ mostrar se não estiver inicializando
             sendBtn.disabled = true;
-            sendText.style.display = 'none';
-            loadingText.style.display = 'inline';
+            sendText.classList.add('hidden');
+            loadingText.classList.remove('hidden');
             showHeaderLoading(); // ✅ USAR header loading
         } else if (!loading) {
             sendBtn.disabled = false;
-            sendText.style.display = 'inline';
-            loadingText.style.display = 'none';
+            sendText.classList.remove('hidden');
+            loadingText.classList.add('hidden');
             hideHeaderLoading(); // ✅ ESCONDER header loading
         }
     }
@@ -277,11 +329,11 @@
                 break;
                 
                 case 'clearMessages':
-                    messagesDiv.innerHTML = '';
+                    messagesContainer.innerHTML = '';
                     // Hide token stats when clearing
                     const tokenStats = document.getElementById('tokenStats');
                     if (tokenStats) {
-                        tokenStats.style.display = 'none';
+                        tokenStats.classList.add('hidden');
                     }
                     break;
 
@@ -372,6 +424,23 @@ Special commands:
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
 
+    function formatStreamingMarkdown(text) {
+        // ✅ Use BUNDLED markdown-it for streaming
+        console.log('🎯 Using BUNDLED markdown-it for streaming formatting');
+        
+        if (!md) {
+            console.warn('⚠️ Markdown-it not ready for streaming, using fallback');
+            return escapeHtml(text).replace(/\n/g, '<br>');
+        }
+        
+        try {
+            return md.render(text);
+        } catch (error) {
+            console.warn('⚠️ Error in streaming markdown formatting:', error);
+            return escapeHtml(text).replace(/\n/g, '<br>');
+        }
+    }
+
     function appendStreamChunk(chunk) {
         if (!currentStreamingMessage || !isStreaming) return;
         
@@ -388,8 +457,8 @@ Special commands:
         // Accumulate raw content
         rawStreamContent += chunk;
         
-        // Apply markdown formatting that preserves line breaks
-        const formattedContent = formatMarkdownPreservingBreaks(rawStreamContent);
+        // ✅ Use BUNDLED markdown-it streaming formatting
+        const formattedContent = formatStreamingMarkdown(rawStreamContent);
         
         // Update content with formatted markdown
         contentDiv.innerHTML = formattedContent;
@@ -398,75 +467,14 @@ Special commands:
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
 
-    function formatMarkdownPreservingBreaks(text) {
-        // ✅ USAR marked.js para formatação perfeita
-        if (typeof marked !== 'undefined') {
-            // console.log('✅ Using marked.js for markdown formatting');
-            
-            // ✅ CONFIGURAÇÃO do marked.js com breaks: true
-            marked.setOptions({
-                breaks: true,       // ✅ ATIVAR breaks para detectar melhor separações
-                gfm: true,          // GitHub Flavored Markdown
-                headerIds: false,   // Sem IDs nos headers
-                mangle: false,      // Não alterar texto
-                sanitize: false     // Permitir HTML (seguro no VSCode)
-            });
-            
-            // ✅ LIMPEZA BÁSICA do texto
-            let cleaned = text
-                .replace(/\n{2,}/g, '\n')  // Max 1 quebras
-                .trim();
-            
-            // Debug: Ver sample text
-            // console.log('📄 Input text sample:', cleaned.substring(0, 200) + '...');
-            
-            const result = marked.parse(cleaned);
-            
-            // ✅ DEBUG: Ver HTML gerado pelo marked.js
-            // console.log('🎯 HTML gerado pelo marked.js:', result);
-            // console.log('🔍 Contains <li><p>:', result.includes('<li><p>'));
-            // console.log('🔍 Contains <ul>:', result.includes('<ul>'));
-            // console.log('🔍 Contains <li> only:', result.match(/<li>/g)?.length || 0);
-            
-            return result;
-        } else {
-            // ✅ FALLBACK com regex manual se marked.js não carregar
-            console.warn('⚠️ marked.js not available, using fallback formatting');
-            
-            let normalized = text
-                .replace(/\n{3,}/g, '\n\n')
-                .replace(/([•\-\*].*?)\n{2,}(?=[•\-\*])/g, '$1\n')
-                .replace(/(\d+\..*?)\n{2,}(?=\d+\.)/g, '$1\n')
-                .replace(/\n{2,}(?=[🎯🔧🔑🛡️🔄])/g, '\n')
-                .trim();
-
-            let formatted = normalized
-                .replace(/^### (.*?)$/gm, '<h3>$1</h3>')
-                .replace(/^## (.*?)$/gm, '<h2>$1</h2>')
-                .replace(/^# (.*?)$/gm, '<h1>$1</h1>')
-                .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                .replace(/`([^`]+)`/g, '<code>$1</code>')
-                .replace(/^\* (.*$)/gm, '<li>$1</li>')
-                .replace(/^- (.*$)/gm, '<li>$1</li>');
-
-            formatted = formatted.replace(/(<li>.*<\/li>\n?)+/g, (match) => {
-                return '<ul>' + match + '</ul>';
-            });
-
-            return formatted;
-        }
-    }
-
     function completeStreaming() {
         isStreaming = false;
         
         if (currentStreamingMessage) {
-            // Apply final formatting on completion
+            // Apply final formatting on completion with BUNDLED markdown-it
             const contentDiv = currentStreamingMessage.querySelector('.message-content');
             if (rawStreamContent) {
-                contentDiv.innerHTML = formatMarkdownPreservingBreaks(rawStreamContent);
+                contentDiv.innerHTML = formatMessage(rawStreamContent);
             }
             
             // Remove streaming class
@@ -601,14 +609,23 @@ Special commands:
         }
         
         tokenStatsDiv.innerHTML = displayText;
-        tokenStatsDiv.style.display = 'block';
+        tokenStatsDiv.classList.remove('hidden');
+        tokenStatsDiv.classList.add('block');
         
         console.log('📊 Updated token stats:', displayText);
     }
 
-    // Auto-resize textarea
+    // Auto-resize textarea - CSP compliant (sem inline styles)
     messageInput.addEventListener('input', function() {
-        this.style.height = 'auto';
-        this.style.height = Math.min(this.scrollHeight, 150) + 'px';
+        // Use classes para diferentes tamanhos
+        this.classList.remove('height-small', 'height-medium', 'height-large');
+        
+        if (this.scrollHeight <= 72) {
+            this.classList.add('height-small');
+        } else if (this.scrollHeight <= 100) {
+            this.classList.add('height-medium');
+        } else {
+            this.classList.add('height-large');
+        }
     });
 })();

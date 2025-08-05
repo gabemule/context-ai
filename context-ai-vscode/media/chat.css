@@ -131,32 +131,238 @@ body {
     overflow-wrap: break-word;
 }
 
+/* 🎨 Monokai Theme for Code Blocks - FORCED STYLING */
 .message-content pre {
-    background-color: var(--vscode-textCodeBlock-background);
-    border: 1px solid var(--vscode-panel-border);
+    background-color: #272822 !important;
+    border: 1px solid #49483e !important;
     border-radius: 4px;
-    padding: 8px;
+    padding: 12px;
     margin: 8px 0;
     overflow-x: auto;
     font-family: var(--vscode-editor-font-family);
     font-size: var(--vscode-editor-font-size);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
+.message-content pre code,
+.message-content pre code.monokai {
+    background: transparent !important;
+    color: #F8F8F2 !important;
+    padding: 0;
+    border-radius: 0;
+    font-family: var(--vscode-editor-font-family);
+    line-height: 1.4;
+}
+
+/* Inline code - keep VSCode theme for better integration */
 .message-content code {
     background-color: var(--vscode-textCodeBlock-background);
+    color: var(--vscode-textPreformat-foreground);
     padding: 2px 4px;
     border-radius: 3px;
     font-family: var(--vscode-editor-font-family);
+    font-size: 0.9em;
 }
 
-.message-content h1, .message-content h2, .message-content h3 {
+/* 🎨 Comment styling - special formatting for comments */
+.message-content code.comment {
+    background-color: rgba(117, 113, 94, 0.15) !important;
+    color: #75715E !important;
+    font-style: italic;
+    padding: 2px 6px;
+    border-left: 3px solid #75715E;
+    border-radius: 3px;
+    font-family: var(--vscode-editor-font-family);
+    font-size: 0.9em;
+    font-weight: 500;
+}
+
+/* 🎨 Monokai Syntax Highlighting */
+.message-content pre code {
+    /* Base text color */
+    color: #F8F8F2;
+}
+
+/* Language-specific syntax highlighting */
+.message-content pre code.language-javascript,
+.message-content pre code.language-js,
+.message-content pre code.language-typescript,
+.message-content pre code.language-ts {
+    color: #F8F8F2;
+}
+
+.message-content pre code.language-python,
+.message-content pre code.language-py {
+    color: #F8F8F2;
+}
+
+.message-content pre code.language-java,
+.message-content pre code.language-cpp,
+.message-content pre code.language-c,
+.message-content pre code.language-csharp,
+.message-content pre code.language-cs {
+    color: #F8F8F2;
+}
+
+.message-content pre code.language-html,
+.message-content pre code.language-xml {
+    color: #F8F8F2;
+}
+
+.message-content pre code.language-css,
+.message-content pre code.language-scss,
+.message-content pre code.language-sass {
+    color: #F8F8F2;
+}
+
+.message-content pre code.language-json {
+    color: #F8F8F2;
+}
+
+.message-content pre code.language-yaml,
+.message-content pre code.language-yml {
+    color: #F8F8F2;
+}
+
+.message-content pre code.language-bash,
+.message-content pre code.language-shell,
+.message-content pre code.language-sh {
+    color: #F8F8F2;
+}
+
+.message-content pre code.language-sql {
+    color: #F8F8F2;
+}
+
+.message-content pre code.language-rust,
+.message-content pre code.language-go,
+.message-content pre code.language-php,
+.message-content pre code.language-ruby,
+.message-content pre code.language-swift,
+.message-content pre code.language-kotlin {
+    color: #F8F8F2;
+}
+
+/* 🎨 Monokai Color Scheme Enhancement */
+.message-content pre {
+    position: relative;
+}
+
+.message-content pre::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, #F92672, #A6E22E, #FD971F, #66D9EF, #AE81FF);
+    border-radius: 4px 4px 0 0;
+}
+
+/* 🎨 Language badge for code blocks */
+.message-content pre code[class*="language-"]::before {
+    content: attr(class);
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(249, 38, 114, 0.8);
+    color: #F8F8F2;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    opacity: 0.7;
+    z-index: 1;
+}
+
+/* JavaScript */
+.message-content pre code.language-javascript::before { content: "JS"; background: #f1e05a; color: #000000; }
+.message-content pre code.language-js::before { content: "JS"; background: #f1e05a; color: #000000; }
+
+/* TypeScript */
+.message-content pre code.language-typescript::before { content: "TS"; background: #3178c6; }
+.message-content pre code.language-ts::before { content: "TS"; background: #3178c6; }
+
+/* Python */
+.message-content pre code.language-python::before { content: "PY"; background: #3572A5; }
+.message-content pre code.language-py::before { content: "PY"; background: #3572A5; }
+
+/* Java */
+.message-content pre code.language-java::before { content: "JAVA"; background: #b07219; }
+
+/* HTML */
+.message-content pre code.language-html::before { content: "HTML"; background: #e34c26; }
+
+/* CSS & Preprocessors */
+.message-content pre code.language-css::before { content: "CSS"; background: #1572B4; }
+.message-content pre code.language-scss::before { content: "SCSS"; background: #c6538c; }
+.message-content pre code.language-sass::before { content: "SASS"; background: #a53b70; }
+.message-content pre code.language-less::before { content: "LESS"; background: #1d365d; }
+
+/* JSON */
+.message-content pre code.language-json::before { content: "JSON"; background: #292929; }
+
+/* YAML */
+.message-content pre code.language-yaml::before { content: "YAML"; background: #cb171e; }
+.message-content pre code.language-yml::before { content: "YML"; background: #cb171e; }
+
+/* Markdown */
+.message-content pre code.language-markdown::before { content: "MD"; background: #083fa1; }
+.message-content pre code.language-md::before { content: "MD"; background: #083fa1; }
+
+/* Go */
+.message-content pre code.language-go::before { content: "GO"; background: #00ADD8; }
+
+/* Rust */
+.message-content pre code.language-rust::before { content: "RUST"; background: #dea584; color: #000000; }
+.message-content pre code.language-rs::before { content: "RUST"; background: #dea584; color: #000000; }
+
+/* C/C++ */
+.message-content pre code.language-cpp::before { content: "C++"; background: #f34b7d; }
+.message-content pre code.language-c::before { content: "C"; background: #555555; }
+.message-content pre code.language-cc::before { content: "C++"; background: #f34b7d; }
+.message-content pre code.language-cxx::before { content: "C++"; background: #f34b7d; }
+.message-content pre code.language-h::before { content: "C/H"; background: #555555; }
+.message-content pre code.language-hpp::before { content: "C++/H"; background: #f34b7d; }
+
+/* Frontend Frameworks */
+.message-content pre code.language-vue::before { content: "VUE"; background: #41b883; }
+.message-content pre code.language-svelte::before { content: "SVELTE"; background: #ff3e00; }
+.message-content pre code.language-astro::before { content: "ASTRO"; background: #ff5a03; }
+
+/* Template Engines */
+.message-content pre code.language-twig::before { content: "TWIG"; background: #c1d72e; color: #000000; }
+
+/* SQL */
+.message-content pre code.language-sql::before { content: "SQL"; background: #e38c00; }
+
+/* GraphQL */
+.message-content pre code.language-graphql::before { content: "GQL"; background: #e10098; }
+.message-content pre code.language-gql::before { content: "GQL"; background: #e10098; }
+
+/* XML */
+.message-content pre code.language-xml::before { content: "XML"; background: #0060ac; }
+
+/* Shell/Bash */
+.message-content pre code.language-bash::before { content: "BASH"; background: #89e051; color: #000000; }
+.message-content pre code.language-shell::before { content: "SHELL"; background: #89e051; color: #000000; }
+.message-content pre code.language-sh::before { content: "SH"; background: #89e051; color: #000000; }
+
+.message-content h1, .message-content h2, .message-content h3,
+.message-content h4, .message-content h5, .message-content h6 {
     margin: 12px 0 8px 0;
     color: var(--vscode-foreground);
+    font-weight: 600;
 }
 
 .message-content h1 { font-size: 1.5em; }
 .message-content h2 { font-size: 1.3em; }
 .message-content h3 { font-size: 1.1em; }
+.message-content h4 { font-size: 1.0em; }
+.message-content h5 { font-size: 0.9em; }
+.message-content h6 { font-size: 0.8em; color: var(--vscode-descriptionForeground); }
 
 .message-content ul, .message-content ol {
     margin: 4px 0;
@@ -434,4 +640,45 @@ body {
     color: var(--vscode-descriptionForeground);
     font-style: italic;
     opacity: 0.8;
+}
+
+/* ✅ Utility classes for CSP compliance */
+.hidden {
+    display: none !important;
+}
+
+.visible {
+    display: inline !important;
+}
+
+.block {
+    display: block !important;
+}
+
+/* ✅ Auto-resize textarea */
+#messageInput.auto-resize {
+    height: var(--dynamic-height, 72px);
+    transition: height 0.2s ease;
+}
+
+/* ✅ Token stats display */
+#tokenStats {
+    display: none;
+}
+
+#tokenStats.block {
+    display: block !important;
+}
+
+/* ✅ Textarea height classes */
+#messageInput.height-small {
+    height: 72px;
+}
+
+#messageInput.height-medium {
+    height: 100px;
+}
+
+#messageInput.height-large {
+    height: 150px;
 }

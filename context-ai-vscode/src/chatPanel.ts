@@ -30,7 +30,9 @@ export class ChatPanel {
                 enableScripts: true,
                 retainContextWhenHidden: true,
                 localResourceRoots: [
-                    vscode.Uri.joinPath(extensionUri, 'media')
+                    vscode.Uri.joinPath(extensionUri, 'media'),
+                    vscode.Uri.joinPath(extensionUri, 'out'),
+                    vscode.Uri.joinPath(extensionUri, 'node_modules')
                 ]
             }
         );
@@ -627,25 +629,29 @@ export class ChatPanel {
     }
 
     private _getHtmlForWebview(webview: vscode.Webview) {
-        // Local path to main script run in the webview
-        const scriptPathOnDisk = vscode.Uri.joinPath(this._extensionUri, 'media', 'chat.js');
-        const scriptUri = webview.asWebviewUri(scriptPathOnDisk);
-
-        // Local path to css styles
-        const stylePathOnDisk = vscode.Uri.joinPath(this._extensionUri, 'media', 'chat.css');
-        const styleUri = webview.asWebviewUri(stylePathOnDisk);
+        // Local paths for CSS and JS  
+        const bundledScriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'out', 'media', 'chat.bundle.js'));
+        const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'out', 'media', 'chat.css'));
 
         // Use a nonce to only allow specific scripts to be run
         const nonce = getNonce();
+        
+        console.log('🔧 DEBUG: Creating webview HTML');
+        console.log('🔧 bundledScriptUri:', bundledScriptUri.toString());
+        console.log('🔧 styleUri:', styleUri.toString());
+        console.log('🔧 nonce:', nonce);
 
         return `<!DOCTYPE html>
             <html lang="en">
             <head>
                 <meta charset="UTF-8">
-                <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}' https://cdn.jsdelivr.net;">
+                <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval' vscode-resource:; script-src-elem 'self' 'unsafe-inline' vscode-resource:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https: vscode-resource:; font-src 'self' https: vscode-resource:;">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <link href="${styleUri}" rel="stylesheet">
-                <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+                
+                <!-- ✅ HIGHLIGHT.JS DEFAULT THEME CSS -->
+                <link href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/monokai.min.css" rel="stylesheet">
+                
                 <title>Context-AI Chat</title>
             </head>
             <body>
@@ -655,7 +661,7 @@ export class ChatPanel {
                             <h1>🤖 Context-AI Chat</h1>
                             <button id="clearBtn" class="clear-btn">Clear Chat</button>
                         </div>
-                        <div id="tokenStats" class="token-stats" style="display: none;"></div>
+                        <div id="tokenStats" class="token-stats hidden"></div>
                     </div>
                     
                     <div id="messages" class="messages"></div>
@@ -668,7 +674,7 @@ export class ChatPanel {
                         ></textarea>
                         <button id="sendBtn" class="send-btn">
                             <span class="send-text">Send</span>
-                            <span class="loading" style="display: none;">Sending...</span>
+                            <span class="loading hidden">Sending...</span>
                         </button>
                     </div>
                     
@@ -682,13 +688,17 @@ export class ChatPanel {
                                 🏗️ Explain the architecture
                             </button>
                             <button class="example-btn" data-question="Detail the libraries and its exports">
+                                🏗️ Explain the architecture
+                            </button>
+                            <button class="example-btn" data-question="Detail the libraries and its exports">
                                 📚 Detail libraries
                             </button>
                         </div>
                     </div>
                 </div>
 
-                <script nonce="${nonce}" src="${scriptUri}"></script>
+                <!-- ✅ BUNDLED SCRIPT -->
+                <script src="${bundledScriptUri}"></script>
             </body>
             </html>`;
     }
