@@ -39,18 +39,34 @@
                 typographer: true,
                 breaks: true,
                 highlight: function (str, lang) {
+                    const escapedCode = md.utils.escapeHtml(str);
+                    
                     if (lang && hljs.getLanguage && hljs.getLanguage(lang)) {
                         try {
                             console.log(`🎨 Highlighting ${lang} code with highlight.js`);
-                            return '<pre><code class="hljs language-' + lang + '">' +
-                                   hljs.highlight(str, { language: lang, ignoreIllegals: true }).value +
-                                   '</code></pre>';
+                            const highlighted = hljs.highlight(str, { language: lang, ignoreIllegals: true }).value;
+                            
+                            // 📋 Add copy button to code block
+                            return '<pre class="code-block-container">' +
+                                   '<button class="code-copy-btn" onclick="copyCodeToClipboard(this)" title="Copy code">' +
+                                   '<span class="copy-icon">📋</span>' +
+                                   '<span class="copy-text">COPY</span>' +
+                                   '</button>' +
+                                   '<code class="hljs language-' + lang + '">' + highlighted + '</code>' +
+                                   '</pre>';
                         } catch (error) {
                             console.warn('⚠️ Highlight.js error:', error);
                         }
                     }
                     
-                    return '<pre><code class="hljs">' + md.utils.escapeHtml(str) + '</code></pre>';
+                    // 📋 Add copy button even for non-highlighted code
+                    return '<pre class="code-block-container">' +
+                           '<button class="code-copy-btn" onclick="copyCodeToClipboard(this)" title="Copy code">' +
+                           '<span class="copy-icon">📋</span>' +
+                           '<span class="copy-text">COPY</span>' +
+                           '</button>' +
+                           '<code class="hljs">' + escapedCode + '</code>' +
+                           '</pre>';
                 }
             });
             
@@ -751,6 +767,83 @@ Special commands:
         // Só fazer auto-scroll se usuário estiver no bottom
         if (!userManuallyScrolled && isAtBottom(150)) {
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+    }
+
+    // 📋 Copy Code to Clipboard Function
+    window.copyCodeToClipboard = function(button) {
+        try {
+            // Find the code element within the pre container
+            const preContainer = button.closest('.code-block-container');
+            const codeElement = preContainer.querySelector('code');
+            
+            if (!codeElement) {
+                console.error('❌ Code element not found');
+                return;
+            }
+            
+            // Get the raw text content (without HTML formatting)
+            const codeText = codeElement.textContent || codeElement.innerText;
+            
+            // Copy to clipboard using the Clipboard API
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(codeText).then(() => {
+                    console.log('📋 Code copied to clipboard successfully');
+                    showCopyFeedback(button);
+                }).catch((err) => {
+                    console.error('❌ Failed to copy code:', err);
+                    fallbackCopyToClipboard(codeText, button);
+                });
+            } else {
+                // Fallback for older browsers
+                fallbackCopyToClipboard(codeText, button);
+            }
+            
+        } catch (error) {
+            console.error('❌ Copy operation failed:', error);
+        }
+    };
+    
+    // Fallback copy method for older browsers
+    function fallbackCopyToClipboard(text, button) {
+        try {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            
+            console.log('📋 Code copied using fallback method');
+            showCopyFeedback(button);
+        } catch (error) {
+            console.error('❌ Fallback copy failed:', error);
+        }
+    }
+    
+    // Show visual feedback when code is copied
+    function showCopyFeedback(button) {
+        const copyTextSpan = button.querySelector('.copy-text');
+        const copyIconSpan = button.querySelector('.copy-icon');
+        
+        if (copyTextSpan && copyIconSpan) {
+            // Store original content
+            const originalText = copyTextSpan.textContent;
+            const originalIcon = copyIconSpan.textContent;
+            
+            // Show success feedback
+            copyTextSpan.textContent = 'COPIED!';
+            copyIconSpan.textContent = '✅';
+            button.style.backgroundColor = '#28a745';
+            
+            // Reset after 2 seconds
+            setTimeout(() => {
+                copyTextSpan.textContent = originalText;
+                copyIconSpan.textContent = originalIcon;
+                button.style.backgroundColor = '';
+            }, 2000);
         }
     }
 
