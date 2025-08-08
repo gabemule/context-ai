@@ -733,7 +733,7 @@ def _display_ai_provider(config, logger) -> None:
         logger.info("   Model: %s (%dK tokens)", provider_config.default_model, max_tokens_k)
         logger.info("   API Key: %s", "***configured***" if provider_config.api_key else "❌ not set")
     else:
-        logger.info("   ❌ %s configuration missing", active_provider.title())
+        logger.info("   ❌ %s not configured - run: context-ai config set --%s-key YOUR_KEY", active_provider.title(), active_provider)
     
     logger.info("")
 
@@ -807,26 +807,23 @@ def _display_storage(config, logger, verbose: bool) -> None:
 
 
 def _display_file_types(extensions: List[str], logger) -> None:
-    """Display supported file types by category."""
+    """Display supported file types grouped by language from LanguagesRegistry."""
     logger.info("   File types: %d supported", len(extensions))
     
-    # Group extensions by category
-    categories = {
-        'JavaScript/TS': ['.js', '.ts', '.jsx', '.tsx', '.vue', '.svelte'],
-        'Web/Styles': ['.html', '.css', '.scss', '.sass', '.less'],
-        'Config': ['.json', '.yaml', '.yml'],
-    }
-    
-    for category, category_exts in categories.items():
-        matching = [ext for ext in extensions if ext in category_exts]
-        if matching:
-            logger.info("     %s: %s", category, ", ".join(matching))
-    
-    # Show other extensions
-    all_categorized = [ext for exts in categories.values() for ext in exts]
-    other_exts = [ext for ext in extensions if ext not in all_categorized]
-    if other_exts:
-        logger.info("     Other: %s", ", ".join(other_exts))
+    try:
+        from config.languages.registry import get_languages_registry
+        languages_registry = get_languages_registry()
+        all_languages = languages_registry.get_all_languages()
+        
+        # Group extensions by their actual language
+        for lang_name, lang_config in sorted(all_languages.items()):
+            lang_extensions = [ext for ext in lang_config.extensions if ext in extensions]
+            if lang_extensions:
+                logger.info("     %s: %s", lang_name.title(), ", ".join(sorted(lang_extensions)))
+                
+    except Exception:
+        # If LanguagesRegistry fails, just show all extensions
+        logger.info("     All: %s", ", ".join(sorted(extensions)))
 
 
 # =============================================================================

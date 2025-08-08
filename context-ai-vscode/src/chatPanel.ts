@@ -650,7 +650,7 @@ export class ChatPanel {
                 <link href="${styleUri}" rel="stylesheet">
                 
                 <!-- ✅ HIGHLIGHT.JS DEFAULT THEME CSS -->
-                // <link href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/monokai.min.css" rel="stylesheet">
+                <!-- link href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/monokai.min.css" rel="stylesheet" -->
                 <link href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/github-dark.min.css" rel="stylesheet">
                 
                 <title>Context-AI Chat</title>

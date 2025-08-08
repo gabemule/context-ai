@@ -9,6 +9,8 @@ making it easy to extend support for new providers.
 from pydantic import BaseModel, Field
 from typing import Dict, Any
 
+from config.constants.validation import MIN_CONTEXT_WINDOW_VALIDATION, MIN_OUTPUT_TOKENS_VALIDATION
+
 __all__ = [
     'ProviderCapabilities',
 ]
@@ -39,13 +41,13 @@ class ProviderCapabilities(BaseModel):
     
     max_context_window: int = Field(
         default=200000,
-        ge=1000,
+        ge=MIN_CONTEXT_WINDOW_VALIDATION,
         description="Maximum context window size in tokens"
     )
     
     max_output_tokens: int = Field(
         default=4000,
-        ge=100,
+        ge=MIN_OUTPUT_TOKENS_VALIDATION,
         description="Maximum output tokens per response"
     )
     

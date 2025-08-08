@@ -9,6 +9,8 @@ __all__ = [
     'MIN_CHUNK_SIZE_LIMIT',
     'MAX_CHUNK_SIZE_LIMIT',
     'MAX_EMBEDDING_NAME_LENGTH',
+    'MIN_CONTEXT_WINDOW_VALIDATION',
+    'MIN_OUTPUT_TOKENS_VALIDATION',
     'QUERY_POOL_SIZE',
     'CONTEXT_DEFAULT_CHUNKS',
     'CONTEXT_PERFORMANCE_LIMIT',
@@ -22,10 +24,14 @@ __all__ = [
     'PROMPT_GLOBAL_FILES',
 ]
 
-# Validation constants
+# Validation constants  
 MIN_CHUNK_SIZE_LIMIT = 10
 MAX_CHUNK_SIZE_LIMIT = 10000
 MAX_EMBEDDING_NAME_LENGTH = 100
+
+# Provider validation constants
+MIN_CONTEXT_WINDOW_VALIDATION = 1000  # Minimum context window for model validation
+MIN_OUTPUT_TOKENS_VALIDATION = 100    # Minimum output tokens for model validation
 
 # Query and search defaults - clarified for specific purposes
 QUERY_POOL_SIZE = 1000              # Wide search pool for vector queries (internal)

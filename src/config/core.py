@@ -36,10 +36,10 @@ class ConfigCore:
         if config_path:
             self.config_file = config_path
         else:
-            # Use default path 
-            from config.constants import DEFAULT_CONFIG_DIR
-            base_path = Path(DEFAULT_CONFIG_DIR).expanduser().resolve()
-            self.config_file = base_path / "config.json"
+            # Use StorageManager for consistent path management
+            from config.storage import get_storage_manager
+            storage_manager = get_storage_manager()
+            self.config_file = storage_manager.path_manager.config_file
         
         self._data: Optional[Dict] = None
     
@@ -196,30 +196,46 @@ class ConfigCore:
     
     def _get_default_config(self) -> Dict[str, Any]:
         """Get default configuration structure."""
+        # Use ProviderRegistry to get the default provider (single source of truth)
+        from config.providers.registry import get_provider_registry
+        registry = get_provider_registry()
+        default_provider = registry.default_provider
+        
+        # Import all constants (single source of truth approach)
+        from config.constants.ai import DEFAULT_SYSTEM_PROMPT_STRATEGY
+        from config.constants.chunking import (
+            DEFAULT_CHUNK_SIZE, DEFAULT_CHUNK_OVERLAP, DEFAULT_MIN_CHUNK_SIZE,
+            DEFAULT_MAX_CHUNKS, DEFAULT_PRIORITIZE_CROSS_PROJECT, DEFAULT_INCLUDE_METADATA
+        )
+        from config.constants.storage import (
+            DEFAULT_CONFIG_DIR, DEFAULT_MAX_EMBEDDINGS, DEFAULT_CLEANUP_AFTER_DAYS
+        )
+        
+        # Get supported extensions dynamically from LanguagesRegistry
+        from config.languages.registry import get_languages_registry
+        languages_registry = get_languages_registry()
+        supported_extensions = list(languages_registry.get_supported_extensions())
+        
         return {
-            "active_provider": None,
+            "active_provider": default_provider,
             "ai": {},
             "prompt_mode": "standard",
-            "system_prompt_strategy": "comprehensive",
+            "system_prompt_strategy": DEFAULT_SYSTEM_PROMPT_STRATEGY,
             "chunking": {
-                "chunk_size": 1000,
-                "chunk_overlap": 200,
-                "min_chunk_size": 100,
-                "supported_extensions": [
-                    ".py", ".js", ".ts", ".jsx", ".tsx", ".vue",
-                    ".html", ".css", ".scss", ".sass", ".less",
-                    ".md", ".mdx", ".txt", ".json", ".yaml", ".yml"
-                ]
+                "chunk_size": DEFAULT_CHUNK_SIZE,
+                "chunk_overlap": DEFAULT_CHUNK_OVERLAP,
+                "min_chunk_size": DEFAULT_MIN_CHUNK_SIZE,
+                "supported_extensions": supported_extensions
             },
             "context_assembly": {
-                "max_chunks": 20,
-                "prioritize_cross_project": True,
-                "include_metadata": True
+                "max_chunks": DEFAULT_MAX_CHUNKS,
+                "prioritize_cross_project": DEFAULT_PRIORITIZE_CROSS_PROJECT,
+                "include_metadata": DEFAULT_INCLUDE_METADATA
             },
             "storage": {
-                "base_path": "~/.context-ai",
-                "max_embeddings": 50,
-                "cleanup_after_days": 30
+                "base_path": DEFAULT_CONFIG_DIR,
+                "max_embeddings": DEFAULT_MAX_EMBEDDINGS,
+                "cleanup_after_days": DEFAULT_CLEANUP_AFTER_DAYS
             }
         }
 

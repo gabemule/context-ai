@@ -24,8 +24,6 @@ from utils.logging import get_logger
 
 CLEANUP_METADATA_FILE = ".last_cleanup"
 DEFAULT_TEMP_CLEANUP_HOURS = 24
-DEFAULT_MODEL_UNUSED_DAYS = 30
-DEFAULT_LOG_RETENTION_DAYS = 30
 
 STORAGE_DIRECTORIES = [
     "embeddings",
