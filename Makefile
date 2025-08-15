@@ -23,7 +23,11 @@ help:
 	@echo ""
 	@echo "Build & Release:"
 	@echo "  build          Build package for distribution"
-	@echo "  publish        Publish to PyPI"
+	@echo "  test-publish   Publish to TestPyPI (testing)"
+	@echo "  publish        Publish to PyPI (production)"
+	@echo "  test-install   Install from TestPyPI"
+	@echo "  test-uninstall Uninstall context-ai"  
+	@echo "  verify-install Verify installation works"
 	@echo ""
 	@echo "Usage Examples:"
 	@echo "  make setup     # Setup new development environment"
@@ -85,9 +89,26 @@ build: clean
 	@echo "📦 Building package..."
 	python -m build
 
+test-publish: build
+	@echo "🧪 Publishing to TestPyPI..."
+	python -m twine upload --repository testpypi dist/*
+
 publish: build
 	@echo "🚀 Publishing to PyPI..."
 	python -m twine upload dist/*
+
+test-install:
+	@echo "🔍 Installing from TestPyPI with pipx..."
+	pipx install --index-url https://test.pypi.org/simple/ context-ai --prerelease
+
+test-uninstall:
+	@echo "🗑️  Uninstalling context-ai..."
+	pipx uninstall context-ai
+
+verify-install:
+	@echo "✅ Verifying installation..."
+	context-ai --version
+	context-ai --help
 
 # Quick development workflow
 dev: format lint test

@@ -18,6 +18,9 @@
 - **[Config Command](commands/config.md)** - Manage configuration settings
 - **[Storage Command](commands/storage.md)** - Manage storage and cleanup operations
 
+### **Deployment & Publishing**
+- **[PyPI Publishing Guide](deployment/pypi-publishing.md)** - Complete guide to publish Context-AI to PyPI and TestPyPI
+
 ### **Quick Navigation**
 
 | Topic | Document | Description |
