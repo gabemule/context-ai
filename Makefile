@@ -108,7 +108,7 @@ alpha-publish: clean
 
 alpha-install:
 	@echo "🔍 Installing context-ai-alpha from TestPyPI with pipx..."
-	pipx install --index-url https://test.pypi.org/simple/ context-ai-alpha --pre
+	pipx install --pip-args="--index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/" context-ai-alpha
 
 alpha-uninstall:
 	@echo "🗑️  Uninstalling context-ai-alpha..."
