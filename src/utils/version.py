@@ -1,41 +1,34 @@
 """
 Version utilities for Context-AI.
 
-ALWAYS reads version from pyproject.toml - the single source of truth.
+Professional version management using importlib.metadata - industry standard approach.
+Used by Click, Django, and other major Python libraries.
 """
 
-import re
-from pathlib import Path
+from importlib.metadata import version, PackageNotFoundError
 
 
 def get_version() -> str:
     """
-    Get the version from pyproject.toml.
-
-    ALWAYS reads from pyproject.toml, whether running locally or installed.
-
+    Get the version using importlib.metadata - the professional standard.
+    
+    This approach:
+    - Works reliably in all installed environments (pipx, pip, etc)
+    - Is the industry standard used by Click, Django, and other major libs
+    - Reads from package metadata, not files that may not exist
+    - Follows Python packaging best practices
+    
     Returns:
-        str: Version string from pyproject.toml or "development" if not found
+        str: Version string from package metadata or "development" if not installed
     """
     try:
-        # Find pyproject.toml starting from current file location
-        current_dir = Path(__file__).resolve().parent
-
-        # Walk up directories to find pyproject.toml
-        while current_dir != current_dir.parent:
-            pyproject_path = current_dir / "pyproject.toml"
-            if pyproject_path.exists():
-                content = pyproject_path.read_text(encoding="utf-8")
-                # Look for version = "x.x.x" pattern
-                match = re.search(r'version\s*=\s*["\']([^"\']+)["\']', content)
-                if match:
-                    return match.group(1)
-                break
-            current_dir = current_dir.parent
-    except Exception:
-        pass
-
-    return "development"
+        # Try both possible package names (alpha and production)
+        try:
+            return version("context-ai-alpha")
+        except PackageNotFoundError:
+            return version("context-ai")
+    except PackageNotFoundError:
+        return "development"
 
 
 def get_version_info() -> tuple[str, bool]:
