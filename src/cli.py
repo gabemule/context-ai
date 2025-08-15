@@ -10,6 +10,7 @@ import sys
 from typing import List, Optional
 
 from utils.logging import get_logger, setup_logging
+from utils.version import format_version_display
 
 # Silence HuggingFace tokenizers warning about forking
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -58,7 +59,7 @@ def create_parser() -> argparse.ArgumentParser:
         """,
     )
 
-    parser.add_argument("--version", action="version", version="context-ai 0.1.0")
+    parser.add_argument("--version", action="version", version=format_version_display())
 
     parser.add_argument(
         "--verbose", "-v", action="store_true", help="Enable verbose output"
