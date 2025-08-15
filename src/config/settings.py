@@ -2,31 +2,30 @@
 Settings Manager for Context-AI.
 
 High-level interface for user configuration operations. Coordinates complex
-configuration changes that involve multiple managers while providing a 
+configuration changes that involve multiple managers while providing a
 simple, consistent API for end users.
 """
 
 import json
 from datetime import datetime
-from pathlib import Path
 from typing import List, Optional
 
 from utils.exceptions import ConfigurationError
 from utils.logging import get_logger
 
 from .core import get_config_core
-from .models import ActiveEmbeddings, AIProviderConfig, ContextAIConfig, EmbeddingInfo
 from .interfaces import PathProvider, get_default_path_provider
+from .models import ActiveEmbeddings, ContextAIConfig, EmbeddingInfo
 
 
 class SettingsManager:
     """
     User-facing interface for configuration management.
-    
+
     Purpose: Provides a simple, consistent API for users to configure the system
-    without needing to understand the underlying architecture. Coordinates 
+    without needing to understand the underlying architecture. Coordinates
     complex operations across multiple managers.
-    
+
     Benefits:
     - Single interface for all user configuration needs
     - Handles complex multi-step configuration changes automatically
@@ -34,7 +33,12 @@ class SettingsManager:
     - Abstracts away implementation details from users
     """
 
-    def __init__(self, config_core=None, embedding_manager=None, path_provider: Optional[PathProvider] = None):
+    def __init__(
+        self,
+        config_core=None,
+        embedding_manager=None,
+        path_provider: Optional[PathProvider] = None,
+    ):
         """
         Initialize settings manager.
 
@@ -56,6 +60,7 @@ class SettingsManager:
             self.embedding_manager = embedding_manager
         else:
             from .embeddings import get_embedding_manager
+
             self.embedding_manager = get_embedding_manager()
 
         # Use dependency injection for paths (eliminates hardcoding)
@@ -116,16 +121,17 @@ class SettingsManager:
         # Use ConfigCore directly - cleaner and simpler
         self.config_core.set_provider_api_key("claude", api_key)
         self.config_core.set_active_provider("claude")
-        
+
         # Set default model and max_tokens via ProviderRegistry
         from .providers.registry import get_provider_registry
+
         registry = get_provider_registry()
         default_model = registry.default_model
         max_tokens = registry.get_max_tokens()
-        
+
         self.config_core.set_provider_model("claude", default_model)
         self.config_core.set_provider_max_tokens("claude", max_tokens)
-        
+
         self.logger.info("Claude API key configured successfully")
 
     def get_claude_api_key(self) -> Optional[str]:
@@ -156,8 +162,10 @@ class SettingsManager:
         """Set active embeddings (validates via EmbeddingManager)."""
         # Use EmbeddingManager for validation (SRP compliance)
         valid_embeddings = self.embedding_manager.validate_embeddings(embedding_names)
-        
-        active = ActiveEmbeddings(selected=valid_embeddings, last_updated=datetime.now())
+
+        active = ActiveEmbeddings(
+            selected=valid_embeddings, last_updated=datetime.now()
+        )
         self.save_active_embeddings(active)
         self.logger.info("Active embeddings set: %s", ", ".join(valid_embeddings))
 
@@ -165,7 +173,7 @@ class SettingsManager:
         """Get list of available embeddings with metadata via EmbeddingManager."""
         # Use EmbeddingManager for metadata operations (SRP compliance)
         metadata_list = self.embedding_manager.get_available_embeddings_metadata()
-        
+
         # Convert to EmbeddingInfo objects
         embeddings = []
         for data in metadata_list:
@@ -174,7 +182,7 @@ class SettingsManager:
                 embeddings.append(embedding_info)
             except Exception as e:
                 self.logger.warning("Error parsing embedding metadata: %s", e)
-        
+
         return embeddings
 
     def save_embedding_metadata(self, embedding_info: EmbeddingInfo) -> None:
@@ -191,7 +199,6 @@ class SettingsManager:
         """Delete embedding and its metadata via EmbeddingManager."""
         # Use EmbeddingManager for all embedding operations (SRP compliance)
         return self.embedding_manager.delete_embedding(embedding_name)
-
 
     def _load_active(self) -> None:
         """Load active embeddings from file."""
@@ -222,7 +229,6 @@ class SettingsManager:
             raise ConfigurationError(f"Failed to save active embeddings: {e}")
 
 
-
 # Global settings manager instance
 _settings_manager: Optional[SettingsManager] = None
 
@@ -233,9 +239,10 @@ def get_settings_manager() -> SettingsManager:
     if _settings_manager is None:
         # Ensure setup is complete first using dedicated SetupManager
         from config.setup import get_setup_manager
+
         setup_manager = get_setup_manager()
         setup_manager.ensure_all_configs_exist()
-        
+
         _settings_manager = SettingsManager()
         _settings_manager.initialize()  # Only handles config.json/active.json
     return _settings_manager

@@ -129,18 +129,19 @@ class ContextFormatter:
     def _validate_token_limit(self, max_tokens: Optional[int]) -> int:
         """
         Validate and sanitize token limit with intelligent fallbacks.
-        
+
         Args:
             max_tokens: Requested token limit or None for auto-calculation
-            
+
         Returns:
             Validated token limit within safe bounds
         """
         from config.constants import CONTEXT_TOKEN_RATIO
-        
+
         # If not provided, calculate dynamically from provider limits
         if max_tokens is None:
             from config.providers.registry import get_provider_registry
+
             registry = get_provider_registry()
             dynamic_limit = int(registry.get_max_tokens() * CONTEXT_TOKEN_RATIO)
             self.logger.debug(
@@ -150,7 +151,7 @@ class ContextFormatter:
                 registry.get_max_tokens() // 1000,
             )
             return dynamic_limit
-        
+
         # If exceeds provider limit, cap with warning
         get_max_tokens = get_provider_function("get_max_tokens")
         if max_tokens > get_max_tokens():
@@ -161,7 +162,7 @@ class ContextFormatter:
                 get_max_tokens() // 1000,
             )
             return get_max_tokens()
-        
+
         # If too small, use sensible minimum
         min_tokens = 1000
         if max_tokens < min_tokens:
@@ -171,7 +172,7 @@ class ContextFormatter:
                 min_tokens,
             )
             return min_tokens
-            
+
         return max_tokens
 
     def format_context(
@@ -250,13 +251,17 @@ class ContextFormatter:
             sources.add(result.source_embedding)
 
         # 2. Project Structures
-        project_structure = self._generate_project_structure_xml(results, max_depth=None)
+        project_structure = self._generate_project_structure_xml(
+            results, max_depth=None
+        )
         if project_structure:
             content_parts.append(project_structure)
             token_count += count_tokens(project_structure)
 
         # 3. Similarity Matches
-        matches_result = self._generate_similarity_matches_xml(results, token_limit - token_count, source_stats)
+        matches_result = self._generate_similarity_matches_xml(
+            results, token_limit - token_count, source_stats
+        )
         content_parts.append(matches_result["content"])
         token_count += matches_result["tokens"]
         results_sent = matches_result["results_sent"]
@@ -374,41 +379,41 @@ class ContextFormatter:
     def _build_directory_tree(self, file_paths):
         """Build a nested directory tree from file paths."""
         tree = {}
-        
+
         for file_path in file_paths:
             if file_path == "unknown":
                 continue
-                
+
             parts = file_path.split("/")
             current = tree
-            
+
             for part in parts:
                 if part not in current:
                     current[part] = {}
                 current = current[part]
-        
+
         return tree
-    
+
     def _format_tree(self, tree, prefix="", is_last=True, max_depth=4, current_depth=0):
         """Format directory tree with proper indentation."""
         if max_depth is not None and current_depth >= max_depth:
             return ["  └── ... (more files)"] if tree else []
-        
+
         items = []
         sorted_items = sorted(tree.items())
-        
+
         for i, (name, subtree) in enumerate(sorted_items):
             is_last_item = i == len(sorted_items) - 1
-            
+
             # Choose connector
             if current_depth == 0:
                 connector = "├── " if not is_last_item else "└── "
             else:
                 connector = "├── " if not is_last_item else "└── "
-            
+
             # Add current item
             items.append(f"{prefix}{connector}{name}")
-            
+
             # Add children if it's a directory
             if subtree:
                 # Determine prefix for children
@@ -416,48 +421,54 @@ class ContextFormatter:
                     child_prefix = prefix + ("│   " if not is_last_item else "    ")
                 else:
                     child_prefix = prefix + ("│   " if not is_last_item else "    ")
-                
+
                 child_items = self._format_tree(
                     subtree, child_prefix, is_last_item, max_depth, current_depth + 1
                 )
                 items.extend(child_items)
-        
+
         return items
-    
+
     def _generate_context_overview_xml(self, results: List[QueryResult]) -> str:
         """Generate XML-structured context overview for the beginning of the context."""
         projects_data = self._analyze_projects(results)
-        
+
         overview_parts = ["<overview>"]
-        overview_parts.append(f"<summary>Found relevant code in {len(projects_data)} projects</summary>")
+        overview_parts.append(
+            f"<summary>Found relevant code in {len(projects_data)} projects</summary>"
+        )
         overview_parts.append("<projects>")
-        
+
         all_languages = set()
         all_patterns = set()
-        
+
         for project, data in projects_data.items():
             languages = ",".join(sorted(data["languages"] - {"unknown"}))
             patterns = ",".join(sorted(set(data["patterns"])))
-            
+
             overview_parts.append(
                 f'<project name="{project}" matches="{len(data["results"])}" '
                 f'languages="{languages}" patterns="{patterns}"/>'
             )
-            
+
             all_languages.update(data["languages"] - {"unknown"})
             all_patterns.update(data["patterns"])
-        
+
         overview_parts.append("</projects>")
-        overview_parts.append(f"<technology_stack>{','.join(sorted(all_languages))}</technology_stack>")
-        overview_parts.append(f"<code_patterns>{','.join(sorted(all_patterns))}</code_patterns>")
+        overview_parts.append(
+            f"<technology_stack>{','.join(sorted(all_languages))}</technology_stack>"
+        )
+        overview_parts.append(
+            f"<code_patterns>{','.join(sorted(all_patterns))}</code_patterns>"
+        )
         overview_parts.append("</overview>")
-        
+
         return "\n".join(overview_parts)
-    
+
     def _analyze_projects(self, results: List[QueryResult]) -> Dict[str, Dict]:
         """Analyze query results and group by project with metadata."""
         projects_data = {}
-        
+
         for result in results:
             project = result.source_embedding
             if project not in projects_data:
@@ -484,101 +495,107 @@ class ContextFormatter:
                 projects_data[project]["patterns"].append("classes/interfaces")
             if "component" in text or "export default" in text:
                 projects_data[project]["patterns"].append("components")
-        
+
         return projects_data
-    
-    def _generate_project_structure_xml(self, results: List[QueryResult], max_depth: int = 4) -> str:
+
+    def _generate_project_structure_xml(
+        self, results: List[QueryResult], max_depth: int = 4
+    ) -> str:
         """Generate XML-structured project structures."""
         if not results:
             return ""
-        
+
         # Group files by source embedding
         projects = {}
         for result in results:
             source = result.source_embedding
             file_path = result.metadata.get("file_path", "unknown")
-            
+
             if source not in projects:
                 projects[source] = set()
             projects[source].add(file_path)
-        
+
         if not projects:
             return ""
-        
+
         structure_parts = ["<project_structures>"]
-        
+
         for source, files in projects.items():
             structure_parts.append(f'<project name="{source}">')
-            
+
             # Build directory tree
             tree = self._build_directory_tree(files)
-            
+
             # Add tree structure
             structure_parts.append(f"📁 {source}:")
             structure_parts.extend(self._format_tree(tree, max_depth=max_depth))
-            
+
             structure_parts.append("</project>")
-        
+
         structure_parts.append("</project_structures>")
         return "\n".join(structure_parts)
-    
-    def _generate_similarity_matches_xml(self, results: List[QueryResult], remaining_tokens: int, source_stats: Dict) -> Dict:
+
+    def _generate_similarity_matches_xml(
+        self, results: List[QueryResult], remaining_tokens: int, source_stats: Dict
+    ) -> Dict:
         """Generate XML-structured similarity matches with token management."""
         matches_parts = ["<similarity_matches>"]
         token_count = count_tokens("<similarity_matches>")
         results_sent = 0
         truncated = False
-        
+
         for result in results:
             source = result.source_embedding
-            
+
             # Create match XML
             match_xml = self._create_match_xml(result)
             match_tokens = count_tokens(match_xml)
-            
+
             # Check token limit
             if token_count + match_tokens > remaining_tokens:
                 truncated = True
                 break
-            
+
             matches_parts.append(match_xml)
             token_count += match_tokens
             results_sent += 1
-            
+
             # Track tokens per source
             if source not in source_stats:
                 source_stats[source] = {"count": 0, "tokens": 0}
             source_stats[source]["count"] += 1
             source_stats[source]["tokens"] += match_tokens
-        
+
         matches_parts.append("</similarity_matches>")
         token_count += count_tokens("</similarity_matches>")
-        
+
         return {
             "content": "\n".join(matches_parts),
             "tokens": token_count,
             "results_sent": results_sent,
             "truncated": truncated,
-            "source_stats": source_stats
+            "source_stats": source_stats,
         }
-    
+
     def _create_match_xml(self, result: QueryResult) -> str:
         """Create XML structure for a single match."""
         source = result.source_embedding
         similarity = result.normalized_score
         file_path = result.metadata.get("file_path", "unknown")
         language = result.metadata.get("language", "text")
-        
+
         # Escape XML special characters in attributes
-        file_path_escaped = file_path.replace('"', '&quot;').replace('<', '&lt;').replace('>', '&gt;')
-        
-        return f'''<match source="{source}" similarity="{similarity:.3f}" file="{file_path_escaped}" language="{language}">
+        file_path_escaped = (
+            file_path.replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
+        )
+
+        return f"""<match source="{source}" similarity="{similarity:.3f}" file="{file_path_escaped}" language="{language}">
 <content>
 ```{language}
 {result.text}
 ```
 </content>
-</match>'''
+</match>"""
 
     def _format_json(
         self, results: List[QueryResult], query: str = ""

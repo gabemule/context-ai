@@ -23,14 +23,18 @@ Complete guide to publish Context-AI to PyPI and TestPyPI.
 
 ### Local Configuration
 
-#### Install Publishing Tools
+#### Setup Development Environment
 ```bash
-# Install twine for uploads
-pip install twine
+# Create virtual environment and install all dependencies
+make setup           # Creates venv
+source venv/bin/activate
+make install-dev     # Installs all dev dependencies (including twine)
 
 # Verify pipx is available
 pipx --version
 ```
+
+**Note**: `twine` is now included in the dev dependencies, so `make install-dev` installs everything you need.
 
 #### Configure Credentials
 
@@ -183,6 +187,54 @@ make test-uninstall  # Clean up
 
 # Update version, repeat...
 ```
+
+### Alpha Testing Workflow (TestPyPI)
+
+Complete workflow from development setup to alpha testing:
+
+```bash
+# === INITIAL SETUP (one time only) ===
+# 1. Setup development environment
+make setup
+source venv/bin/activate
+make install-dev
+
+# 2. Configure API tokens in ~/.pypirc (see setup section above)
+
+# === DEVELOPMENT & TESTING CYCLE ===
+# 3. Develop your changes (ensure you're in venv)
+source venv/bin/activate  # if not already active
+
+# 4. Run development checks
+make dev  # format, lint, type-check, test
+
+# 5. Update version in pyproject.toml (e.g., version = "0.1.0a1")
+
+# 6. Publish alpha to TestPyPI (done in venv)
+make alpha-publish
+
+# 7. Exit venv for clean testing environment
+deactivate
+
+# 8. Install and test globally with pipx
+make alpha-install
+
+# 9. Test installation works for end users
+context-ai --version
+context-ai --help
+
+# 10. Remove test installation
+make alpha-uninstall
+
+# 11. Return to development (repeat from step 3 for next iteration)
+source venv/bin/activate
+```
+
+**Key Points:**
+- **Publishing** happens inside venv (needs twine, build tools)
+- **Testing** happens outside venv (simulates end user experience)
+- **TestPyPI** allows you to delete packages if needed
+- Update version (e.g., `0.1.0a1` → `0.1.0a2`) for each iteration
 
 ## 🔧 Manual Commands (if needed)
 

@@ -7,39 +7,39 @@ across all configuration operations.
 """
 
 from datetime import datetime
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
 
 from .constants.ai import DEFAULT_SYSTEM_PROMPT_STRATEGY
-from .constants.storage import (
-    DEFAULT_CONFIG_DIR,
-    DEFAULT_MAX_EMBEDDINGS,
-    DEFAULT_CLEANUP_AFTER_DAYS,
-)
 from .constants.chunking import (
-    DEFAULT_CHUNK_SIZE,
     DEFAULT_CHUNK_OVERLAP,
+    DEFAULT_CHUNK_SIZE,
     DEFAULT_INCLUDE_METADATA,
     DEFAULT_MAX_CHUNKS,
     DEFAULT_MIN_CHUNK_SIZE,
     DEFAULT_PRIORITIZE_CROSS_PROJECT,
 )
+from .constants.storage import (
+    DEFAULT_CLEANUP_AFTER_DAYS,
+    DEFAULT_CONFIG_DIR,
+    DEFAULT_MAX_EMBEDDINGS,
+)
 
 __all__ = [
     # Base Models
-    'TimestampedModel',
-    'ConfigurableModel',
+    "TimestampedModel",
+    "ConfigurableModel",
     # AI Models
-    'AIProviderConfig',
-    'ContextAIConfig',
+    "AIProviderConfig",
+    "ContextAIConfig",
     # Storage Models
-    'StorageConfig',
-    'EmbeddingInfo',
-    'ActiveEmbeddings',
+    "StorageConfig",
+    "EmbeddingInfo",
+    "ActiveEmbeddings",
     # Chunking Models
-    'ChunkingConfig',
-    'ContextAssemblyConfig',
+    "ChunkingConfig",
+    "ContextAssemblyConfig",
 ]
 
 
@@ -47,22 +47,25 @@ __all__ = [
 # BASE MODELS
 # =============================================================================
 
+
 class TimestampedModel(BaseModel):
     """Base model with timestamp tracking."""
-    
+
     created_at: datetime = datetime.now()
     updated_at: datetime = datetime.now()
-    
+
     class Config:
         """Pydantic config for timestamped models."""
+
         json_encoders = {datetime: lambda v: v.isoformat()}
 
 
 class ConfigurableModel(BaseModel):
     """Base model for configuration objects."""
-    
+
     class Config:
         """Pydantic config for configuration models."""
+
         json_encoders = {datetime: lambda v: v.isoformat()}
         extra = "forbid"  # Prevent extra fields
         validate_assignment = True  # Validate on assignment
@@ -72,12 +75,15 @@ class ConfigurableModel(BaseModel):
 # AI MODELS
 # =============================================================================
 
+
 class AIProviderConfig(ConfigurableModel):
     """Configuration for AI providers."""
 
     api_key: str = Field(..., description="API key for the provider")
     default_model: str = Field(..., description="Default model to use")
-    max_tokens: Optional[int] = Field(None, description="Maximum tokens per request (resolved by business logic)")
+    max_tokens: Optional[int] = Field(
+        None, description="Maximum tokens per request (resolved by business logic)"
+    )
 
 
 class ContextAIConfig(BaseModel):
@@ -85,8 +91,10 @@ class ContextAIConfig(BaseModel):
 
     # Use Any but create proper objects at runtime
     storage: Any = Field(default_factory=dict, description="Storage configuration")
-    chunking: Any = Field(default_factory=dict, description="Chunking configuration")  
-    context_assembly: Any = Field(default_factory=dict, description="Context assembly configuration")
+    chunking: Any = Field(default_factory=dict, description="Chunking configuration")
+    context_assembly: Any = Field(
+        default_factory=dict, description="Context assembly configuration"
+    )
     ai: Dict[str, AIProviderConfig] = Field(default_factory=dict)
     active_provider: str = Field("claude", description="Active AI provider")
     active_embeddings: List[str] = Field(
@@ -100,25 +108,30 @@ class ContextAIConfig(BaseModel):
     def __init__(self, **kwargs):
         """Initialize with proper config objects."""
         # Convert dicts to proper config objects if needed
-        if 'storage' in kwargs and isinstance(kwargs['storage'], dict):
-            kwargs['storage'] = StorageConfig(**kwargs['storage'])
-        elif 'storage' not in kwargs:
-            kwargs['storage'] = StorageConfig()
-            
-        if 'chunking' in kwargs and isinstance(kwargs['chunking'], dict):
-            kwargs['chunking'] = ChunkingConfig(**kwargs['chunking'])
-        elif 'chunking' not in kwargs:
-            kwargs['chunking'] = ChunkingConfig()
-            
-        if 'context_assembly' in kwargs and isinstance(kwargs['context_assembly'], dict):
-            kwargs['context_assembly'] = ContextAssemblyConfig(**kwargs['context_assembly'])
-        elif 'context_assembly' not in kwargs:
-            kwargs['context_assembly'] = ContextAssemblyConfig()
-            
+        if "storage" in kwargs and isinstance(kwargs["storage"], dict):
+            kwargs["storage"] = StorageConfig(**kwargs["storage"])
+        elif "storage" not in kwargs:
+            kwargs["storage"] = StorageConfig()
+
+        if "chunking" in kwargs and isinstance(kwargs["chunking"], dict):
+            kwargs["chunking"] = ChunkingConfig(**kwargs["chunking"])
+        elif "chunking" not in kwargs:
+            kwargs["chunking"] = ChunkingConfig()
+
+        if "context_assembly" in kwargs and isinstance(
+            kwargs["context_assembly"], dict
+        ):
+            kwargs["context_assembly"] = ContextAssemblyConfig(
+                **kwargs["context_assembly"]
+            )
+        elif "context_assembly" not in kwargs:
+            kwargs["context_assembly"] = ContextAssemblyConfig()
+
         super().__init__(**kwargs)
 
     class Config:
         """Pydantic config."""
+
         json_encoders = {datetime: lambda v: v.isoformat()}
         extra = "allow"  # Allow extra fields for backward compatibility
         arbitrary_types_allowed = True  # Allow custom types
@@ -127,6 +140,7 @@ class ContextAIConfig(BaseModel):
 # =============================================================================
 # STORAGE MODELS
 # =============================================================================
+
 
 class StorageConfig(ConfigurableModel):
     """Configuration for storage."""
@@ -165,9 +179,11 @@ class ActiveEmbeddings(TimestampedModel):
 # CHUNKING MODELS
 # =============================================================================
 
+
 def _get_supported_extensions() -> set:
     """Get supported extensions dynamically from LanguagesRegistry."""
     from .languages.registry import get_languages_registry
+
     return get_languages_registry().get_supported_extensions()
 
 
@@ -184,8 +200,8 @@ class ChunkingConfig(ConfigurableModel):
         DEFAULT_MIN_CHUNK_SIZE, description="Minimum chunk size"
     )
     supported_extensions: List[str] = Field(
-        default_factory=lambda: list(_get_supported_extensions()), 
-        description="Supported file extensions"
+        default_factory=lambda: list(_get_supported_extensions()),
+        description="Supported file extensions",
     )
 
 

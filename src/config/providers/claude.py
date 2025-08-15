@@ -5,17 +5,17 @@ This module contains all Claude (Anthropic) provider configurations,
 models, and capabilities.
 """
 
-from typing import Dict, List, Any
-from .protocols import AIProviderProtocol
+from typing import Any, Dict, List
+
 from .models import ProviderCapabilities
 
 __all__ = [
-    'CLAUDE_MODELS',
-    'DEFAULT_MODEL',
-    'ClaudeProvider',
-    'get_claude_model_config',
-    'get_claude_available_models',
-    'get_max_tokens',
+    "CLAUDE_MODELS",
+    "DEFAULT_MODEL",
+    "ClaudeProvider",
+    "get_claude_model_config",
+    "get_claude_available_models",
+    "get_max_tokens",
 ]
 
 
@@ -31,7 +31,6 @@ CLAUDE_MODELS = {
         "pricing_input": 3.0,
         "pricing_output": 15.0,
     },
-    
     # Claude 3.5 models (2024) - Fast and reliable
     "claude-3-5-haiku": {
         "api_name": "claude-3-5-haiku-20241022",
@@ -43,7 +42,7 @@ CLAUDE_MODELS = {
         "pricing_output": 4.0,
     },
     "claude-3-5-sonnet": {
-        "api_name": "claude-3-5-sonnet-20241022", 
+        "api_name": "claude-3-5-sonnet-20241022",
         "max_output_tokens": 8192,
         "speed": "fast",
         "description": "Intelligent and capable",
@@ -51,7 +50,6 @@ CLAUDE_MODELS = {
         "pricing_input": 3.0,
         "pricing_output": 15.0,
     },
-    
     # Claude 3.7 models (2025) - Extended capabilities
     "claude-3-7-sonnet": {
         "api_name": "claude-3-7-sonnet-20250219",
@@ -62,12 +60,11 @@ CLAUDE_MODELS = {
         "pricing_input": 3.0,
         "pricing_output": 15.0,
     },
-    
     # Claude 4 Opus - Most capable
     "claude-opus-4": {
         "api_name": "claude-opus-4-20250514",
         "max_output_tokens": 32000,
-        "speed": "moderately_fast", 
+        "speed": "moderately_fast",
         "description": "Most capable, highest intelligence",
         "context_window": 200000,
         "pricing_input": 15.0,  # $/MTok
@@ -81,7 +78,7 @@ DEFAULT_MODEL = list(CLAUDE_MODELS.values())[0]["api_name"]
 
 class ClaudeProvider:
     """Claude provider implementation using Protocol."""
-    
+
     def __init__(self):
         self._name = "claude"
         self._capabilities = ProviderCapabilities(
@@ -89,23 +86,23 @@ class ClaudeProvider:
             supports_function_calling=True,
             supports_vision=True,
             max_context_window=200000,
-            max_output_tokens=64000
+            max_output_tokens=64000,
         )
-    
+
     @property
     def name(self) -> str:
         """Provider name."""
         return self._name
-    
+
     @property
     def capabilities(self) -> ProviderCapabilities:
         """Provider capabilities."""
         return self._capabilities
-    
+
     def get_available_models(self) -> List[str]:
         """Get list of available Claude models."""
         return list(CLAUDE_MODELS.keys())
-    
+
     def get_model_config(self, model_name: str) -> Dict[str, Any]:
         """Get configuration for a specific Claude model."""
         return CLAUDE_MODELS.get(model_name, {})
@@ -127,6 +124,6 @@ def get_max_tokens(model_key: str = None) -> int:
     if model_key is None:
         # Use default model
         model_key = list(CLAUDE_MODELS.keys())[0]
-    
+
     model_config = CLAUDE_MODELS.get(model_key, {})
     return model_config.get("max_output_tokens", 8192)  # Default fallback

@@ -192,7 +192,9 @@ class LangChainChunker(ChunkerProtocol):
                 )
             else:
                 # Use recursive splitter with language-appropriate separators
-                separators = self.languages_registry.get_language_separators(language or "default")
+                separators = self.languages_registry.get_language_separators(
+                    language or "default"
+                )
                 return RecursiveCharacterTextSplitter(
                     chunk_size=chunk_size,
                     chunk_overlap=chunk_overlap,

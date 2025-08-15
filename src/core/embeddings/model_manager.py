@@ -5,17 +5,15 @@ Handles loading, caching, and management of sentence-transformer models
 with intelligent caching and progress tracking for model downloads.
 """
 
-import json
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import torch
 from sentence_transformers import SentenceTransformer
 
+from config.storage import get_storage_manager
 from utils.exceptions import ConfigurationError
 from utils.logging import get_logger
-from config.storage import get_storage_manager
 
 # Model specifications
 AVAILABLE_MODELS = {
@@ -90,57 +88,55 @@ class ModelInfo:
 
 from abc import ABC, abstractmethod
 
+
 class ModelCacheInterface(ABC):
     """Interface for model caching operations (ISP)."""
-    
+
     @abstractmethod
     def is_cached(self, model_name: str) -> bool:
         """Check if model is cached."""
-        pass
-    
+
     @abstractmethod
     def get_cached_model(self, model_name: str) -> Optional[SentenceTransformer]:
         """Get cached model if available."""
-        pass
-    
+
     @abstractmethod
     def cache_model(self, model_name: str, model: SentenceTransformer) -> None:
         """Cache a loaded model."""
-        pass
 
 
 class ModelLoaderInterface(ABC):
     """Interface for model loading operations (ISP)."""
-    
+
     @abstractmethod
     def load_model(self, model_name: str, show_progress: bool) -> SentenceTransformer:
         """Load a model."""
-        pass
 
 
 # =============================================================================
 # SINGLE RESPONSIBILITY CLASSES (SOLID: SRP)
 # =============================================================================
 
+
 class ModelValidator:
     """Validates model operations (SRP)."""
-    
+
     def __init__(self):
         self.logger = get_logger(__name__)
-    
+
     def validate_model_name(self, model_name: str) -> str:
         """Validate and normalize model name."""
         if model_name is None:
             return DEFAULT_MODEL_NAME
-        
+
         if model_name not in AVAILABLE_MODELS:
             available = ", ".join(AVAILABLE_MODELS.keys())
             raise ConfigurationError(
                 f"Model '{model_name}' not available. Available models: {available}"
             )
-        
+
         return model_name
-    
+
     def validate_texts(self, texts: List[str]) -> None:
         """Validate texts for embedding generation."""
         if not texts:
@@ -149,43 +145,44 @@ class ModelValidator:
 
 class ModelCache(ModelCacheInterface):
     """Handles model caching operations (SRP)."""
-    
+
     def __init__(self, cache_dir: Path):
         self.logger = get_logger(__name__)
         self.cache_dir = cache_dir
         self._memory_cache: Dict[str, SentenceTransformer] = {}
-        
+
         # Ensure cache directory exists
         from utils.file_operations import get_file_operations
+
         file_ops = get_file_operations()
         file_ops.ensure_directory_exists(self.cache_dir)
-    
+
     def is_cached(self, model_name: str) -> bool:
         """Check if model is cached in memory or disk."""
         return self._is_memory_cached(model_name) or self._is_disk_cached(model_name)
-    
+
     def get_cached_model(self, model_name: str) -> Optional[SentenceTransformer]:
         """Get cached model (memory first, then disk)."""
         if self._is_memory_cached(model_name):
             self.logger.debug("⚡ Using memory cached model: %s", model_name)
             return self._memory_cache[model_name]
-        
+
         return None
-    
+
     def cache_model(self, model_name: str, model: SentenceTransformer) -> None:
         """Cache model in memory."""
         self._memory_cache[model_name] = model
         self.logger.debug("💾 Cached model in memory: %s", model_name)
-    
+
     def _is_memory_cached(self, model_name: str) -> bool:
         """Check if model is in memory cache."""
         return model_name in self._memory_cache
-    
+
     def _is_disk_cached(self, model_name: str) -> bool:
         """Check if model is cached on disk."""
         cache_path = self._get_cache_path(model_name)
         return cache_path.exists() and cache_path.is_dir()
-    
+
     def _get_cache_path(self, model_name: str) -> Path:
         """Get cache path for a model."""
         safe_name = model_name.replace("/", "_").replace(":", "_")
@@ -194,104 +191,118 @@ class ModelCache(ModelCacheInterface):
 
 class ModelLoader(ModelLoaderInterface):
     """Handles model loading operations (SRP)."""
-    
+
     def __init__(self, cache_dir: Path):
         self.logger = get_logger(__name__)
         self.cache_dir = cache_dir
-    
+
     def load_model(self, model_name: str, show_progress: bool) -> SentenceTransformer:
         """Load model with optimized performance."""
         is_cached = self._is_disk_cached(model_name)
-        
+
         if not is_cached and show_progress:
             self._show_download_info(model_name)
-        
+
         return self._load_sentence_transformer(model_name, is_cached)
-    
-    def _load_sentence_transformer(self, model_name: str, is_cached: bool) -> SentenceTransformer:
+
+    def _load_sentence_transformer(
+        self, model_name: str, is_cached: bool
+    ) -> SentenceTransformer:
         """Load SentenceTransformer with minimal overhead."""
         self.logger.info("🤖 Loading embedding model: %s", model_name)
-        
+
         if is_cached:
             # Fast path - direct loading
             return SentenceTransformer(model_name, cache_folder=str(self.cache_dir))
         else:
             # Show progress for downloads
             return self._load_with_progress(model_name)
-    
+
     def _load_with_progress(self, model_name: str) -> SentenceTransformer:
         """Load model with progress indicator."""
         from rich.console import Console
+
         console = Console()
-        
+
         with console.status(f"[bold green]Loading {model_name}...", spinner="dots"):
             return SentenceTransformer(model_name, cache_folder=str(self.cache_dir))
-    
+
     def _is_disk_cached(self, model_name: str) -> bool:
         """Check if model is cached on disk."""
         cache_path = self._get_cache_path(model_name)
         return cache_path.exists() and cache_path.is_dir()
-    
+
     def _get_cache_path(self, model_name: str) -> Path:
         """Get cache path for a model."""
         safe_name = model_name.replace("/", "_").replace(":", "_")
         return self.cache_dir / safe_name
-    
+
     def _show_download_info(self, model_name: str) -> None:
         """Show download information for first-time downloads."""
         if model_name not in AVAILABLE_MODELS:
             return
-        
+
         model_info = AVAILABLE_MODELS[model_name]
-        self.logger.info("📥 Downloading model %s (~%.0f MB)...", model_name, model_info["size_mb"])
+        self.logger.info(
+            "📥 Downloading model %s (~%.0f MB)...", model_name, model_info["size_mb"]
+        )
 
 
 class EmbeddingGenerator:
     """Handles embedding generation (SRP)."""
-    
+
     def __init__(self):
         self.logger = get_logger(__name__)
-    
+
     def generate_embeddings(
-        self, 
-        model: SentenceTransformer, 
-        texts: List[str], 
+        self,
+        model: SentenceTransformer,
+        texts: List[str],
         batch_size: int = DEFAULT_BATCH_SIZE,
-        show_progress: bool = True
+        show_progress: bool = True,
     ) -> List[List[float]]:
         """Generate embeddings using provided model."""
         self.logger.info("🔄 Generating embeddings for %d texts", len(texts))
-        
+
         try:
             embeddings = self._encode_texts(model, texts, batch_size, show_progress)
             result = embeddings.tolist()
-            
+
             self.logger.info("✅ Generated %d embeddings", len(result))
             return result
-            
+
         except Exception as e:
             self.logger.error("Error generating embeddings: %s", e)
             raise ConfigurationError(f"Failed to generate embeddings: {e}") from e
-    
-    def _encode_texts(self, model: SentenceTransformer, texts: List[str], 
-                     batch_size: int, show_progress: bool):
+
+    def _encode_texts(
+        self,
+        model: SentenceTransformer,
+        texts: List[str],
+        batch_size: int,
+        show_progress: bool,
+    ):
         """Encode texts with appropriate progress tracking."""
         if show_progress and len(texts) > LARGE_BATCH_THRESHOLD:
             return model.encode(
-                texts, batch_size=batch_size, 
-                show_progress_bar=True, convert_to_numpy=True
+                texts,
+                batch_size=batch_size,
+                show_progress_bar=True,
+                convert_to_numpy=True,
             )
         else:
             return model.encode(
-                texts, batch_size=batch_size, 
-                show_progress_bar=False, convert_to_numpy=True
+                texts,
+                batch_size=batch_size,
+                show_progress_bar=False,
+                convert_to_numpy=True,
             )
 
 
 class EmbeddingModelManager:
     """
     Orchestrates embedding model operations (Clean Architecture).
-    
+
     Follows SOLID principles with dependency injection and single responsibilities.
     """
 
@@ -300,7 +311,7 @@ class EmbeddingModelManager:
         self.logger = get_logger(__name__)
         self.storage_manager = get_storage_manager()
         self._model_cache_dir = self.storage_manager.path_manager.models_dir
-        
+
         # Dependency Injection (SOLID: DIP)
         self.validator = ModelValidator()
         self.cache = ModelCache(self._model_cache_dir)
@@ -374,15 +385,18 @@ class EmbeddingModelManager:
 
         # ✅ SOLID: Use loader to load model (SRP)
         model = self.loader.load_model(model_name, show_progress)
-        
+
         # ✅ SOLID: Cache the loaded model (SRP)
         self.cache.cache_model(model_name, model)
-        
+
         # ✅ Log success
         model_info = AVAILABLE_MODELS[model_name]
-        self.logger.info("✅ Model loaded successfully: %s (%d dimensions)", 
-                        model_name, model_info["dimensions"])
-        
+        self.logger.info(
+            "✅ Model loaded successfully: %s (%d dimensions)",
+            model_name,
+            model_info["dimensions"],
+        )
+
         return model
 
     def generate_embeddings(
@@ -413,7 +427,9 @@ class EmbeddingModelManager:
         model = self.load_model(model_name, show_progress=show_progress)
 
         # ✅ SOLID: Generate embeddings (SRP)
-        return self.generator.generate_embeddings(model, texts, batch_size, show_progress)
+        return self.generator.generate_embeddings(
+            model, texts, batch_size, show_progress
+        )
 
     def get_model_memory_usage(self, model_name: str) -> Optional[float]:
         """
@@ -490,21 +506,22 @@ def get_model_manager() -> EmbeddingModelManager:
     global _model_manager
     if _model_manager is None:
         import time
+
         from utils.logging import get_logger
-        
+
         logger = get_logger(__name__)
         verbose = logger.isEnabledFor(10)  # DEBUG level = 10
-        
+
         if verbose:
             start_time = time.time()
             logger.info("🤖 Creating EmbeddingModelManager...")
-        
+
         _model_manager = EmbeddingModelManager()
-        
+
         if verbose:
             creation_time = time.time() - start_time
             logger.info("⏱️  EmbeddingModelManager creation: %.3fs", creation_time)
-    
+
     return _model_manager
 
 

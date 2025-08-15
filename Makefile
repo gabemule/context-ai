@@ -24,6 +24,7 @@ help:
 	@echo "Build & Release:"
 	@echo "  build          Build package for distribution"
 	@echo "  test-publish   Publish to TestPyPI (testing)"
+	@echo "  alpha-publish  Publish alpha to TestPyPI (context-ai-alpha)"
 	@echo "  publish        Publish to PyPI (production)"
 	@echo "  test-install   Install from TestPyPI"
 	@echo "  test-uninstall Uninstall context-ai"  
@@ -89,23 +90,31 @@ build: clean
 	@echo "📦 Building package..."
 	python -m build
 
-test-publish: build
-	@echo "🧪 Publishing to TestPyPI..."
-	python -m twine upload --repository testpypi dist/*
-
 publish: build
 	@echo "🚀 Publishing to PyPI..."
 	python -m twine upload dist/*
 
-test-install:
-	@echo "🔍 Installing from TestPyPI with pipx..."
-	pipx install --index-url https://test.pypi.org/simple/ context-ai --prerelease
+alpha-publish: clean
+	@echo "🔄 Changing name to context-ai-alpha..."
+	@cp pyproject.toml pyproject.toml.backup
+	@sed 's/name = "context-ai"/name = "context-ai-alpha"/' pyproject.toml > pyproject.toml.tmp && mv pyproject.toml.tmp pyproject.toml
+	@echo "📦 Building alpha package..."
+	python -m build
+	@echo "🚀 Publishing alpha to TestPyPI..."
+	python -m twine upload --repository testpypi dist/*
+	@echo "🔄 Restoring original name..."
+	@mv pyproject.toml.backup pyproject.toml
+	@echo "✅ Alpha published to TestPyPI successfully!"
 
-test-uninstall:
-	@echo "🗑️  Uninstalling context-ai..."
-	pipx uninstall context-ai
+alpha-install:
+	@echo "🔍 Installing context-ai-alpha from TestPyPI with pipx..."
+	pipx install --index-url https://test.pypi.org/simple/ context-ai-alpha --pre
 
-verify-install:
+alpha-uninstall:
+	@echo "🗑️  Uninstalling context-ai-alpha..."
+	pipx uninstall context-ai-alpha
+
+verify:
 	@echo "✅ Verifying installation..."
 	context-ai --version
 	context-ai --help

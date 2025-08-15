@@ -13,9 +13,7 @@ import chromadb
 from chromadb.config import Settings
 
 from config.constants import (
-    QUERY_POOL_SIZE,
     CONTEXT_DEFAULT_CHUNKS,
-    CONTEXT_PERFORMANCE_LIMIT,
 )
 from utils.exceptions import ConfigurationError
 from utils.logging import get_logger
@@ -47,7 +45,9 @@ class VectorStoreManager:
     def __init__(self, storage_manager=None):
         """Initialize vector store manager."""
         self.logger = get_logger(__name__)
-        self._storage_manager = storage_manager  # Lazy initialization to avoid circular dependency
+        self._storage_manager = (
+            storage_manager  # Lazy initialization to avoid circular dependency
+        )
         self._client: Optional[chromadb.ClientAPI] = None
         self._collection: Optional[chromadb.Collection] = None
         self._db_path = None  # Lazy initialization
@@ -56,6 +56,7 @@ class VectorStoreManager:
         """Get storage manager with lazy loading to avoid circular dependency."""
         if self._storage_manager is None:
             from config.storage import get_storage_manager  # Lazy import
+
             self._storage_manager = get_storage_manager()
         return self._storage_manager
 
@@ -66,6 +67,7 @@ class VectorStoreManager:
             self._db_path = storage_mgr.path_manager.chromadb_dir
             # Ensure database directory exists via file operations
             from utils.file_operations import get_file_operations
+
             file_ops = get_file_operations()
             file_ops.ensure_directory_exists(self._db_path)
         return self._db_path

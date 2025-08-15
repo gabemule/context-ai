@@ -6,12 +6,12 @@ Language-specific data is now handled by the LanguagesRegistry system.
 """
 
 __all__ = [
-    'DEFAULT_CHUNK_SIZE',
-    'DEFAULT_CHUNK_OVERLAP',
-    'DEFAULT_MIN_CHUNK_SIZE',
-    'DEFAULT_MAX_CHUNKS',
-    'DEFAULT_PRIORITIZE_CROSS_PROJECT',
-    'DEFAULT_INCLUDE_METADATA',
+    "DEFAULT_CHUNK_SIZE",
+    "DEFAULT_CHUNK_OVERLAP",
+    "DEFAULT_MIN_CHUNK_SIZE",
+    "DEFAULT_MAX_CHUNKS",
+    "DEFAULT_PRIORITIZE_CROSS_PROJECT",
+    "DEFAULT_INCLUDE_METADATA",
 ]
 
 # Chunking defaults

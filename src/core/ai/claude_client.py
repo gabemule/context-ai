@@ -15,9 +15,9 @@ from config.constants import (
     DEFAULT_TIMEOUT,
 )
 from config.providers.claude import (
+    CLAUDE_MODELS,
     DEFAULT_MODEL,
     get_max_tokens,
-    CLAUDE_MODELS,
 )
 from core.ai.ai_client_interface import AIClientFactory, AIClientInterface, AIResponse
 from utils.exceptions import APIError, ConfigurationError
@@ -117,13 +117,14 @@ class ClaudeClient(AIClientInterface):
         """
         model = model or self.default_model
         max_tokens = max_tokens or get_max_tokens()
-        
+
         # Get API name dynamically from model config
         from config.providers.registry import get_provider_function
+
         get_model_config = get_provider_function("get_model_config")
         model_config = get_model_config(model)
         model_name = model_config.get("api_name", model) if model_config else model
-        
+
         # Extract parameters from provider_kwargs
         verbose = provider_kwargs.get("verbose", False)
         text_callback = provider_kwargs.get("text_callback", None)
@@ -137,6 +138,7 @@ class ClaudeClient(AIClientInterface):
         # Show streaming message after prompt is built (correct position!)
         if text_callback:  # Only show if streaming is expected
             from rich.console import Console
+
             console = Console()
             console.print("\n🌊 Context-AI Streaming Response...\n", style="bold green")
 
@@ -146,7 +148,10 @@ class ClaudeClient(AIClientInterface):
 
         # Make API call with retry
         claude_response = self._make_request_with_retry(
-            prompt=prompt, model=model_name, max_tokens=max_tokens, text_callback=text_callback
+            prompt=prompt,
+            model=model_name,
+            max_tokens=max_tokens,
+            text_callback=text_callback,
         )
 
         # Only log response in verbose mode
@@ -212,43 +217,53 @@ class ClaudeClient(AIClientInterface):
 
     def _should_use_streaming(self, prompt: str) -> bool:
         """Determine if streaming should be used based on input size."""
-        from core.formatting.context_formatter import count_tokens
         from config.constants import STREAMING_THRESHOLD_TOKENS
-        
+        from core.formatting.context_formatter import count_tokens
+
         # Use streaming for large contexts to avoid timeouts
         input_tokens = count_tokens(prompt)
-        
+
         should_stream = input_tokens > STREAMING_THRESHOLD_TOKENS
         if should_stream:
             self.logger.debug(
-                "🌊 Using streaming for large context (%dK tokens > %dK threshold)", 
-                input_tokens // 1000, 
-                STREAMING_THRESHOLD_TOKENS // 1000
+                "🌊 Using streaming for large context (%dK tokens > %dK threshold)",
+                input_tokens // 1000,
+                STREAMING_THRESHOLD_TOKENS // 1000,
             )
-        
+
         return should_stream
 
-    def _make_request(self, prompt: str, model: str, max_tokens: int, text_callback=None) -> ClaudeResponse:
+    def _make_request(
+        self, prompt: str, model: str, max_tokens: int, text_callback=None
+    ) -> ClaudeResponse:
         """Make API request with automatic streaming detection."""
         use_streaming = self._should_use_streaming(prompt)
-        
+
         try:
             if use_streaming:
-                return self._make_streaming_request(prompt, model, max_tokens, text_callback)
+                return self._make_streaming_request(
+                    prompt, model, max_tokens, text_callback
+                )
             else:
                 return self._make_standard_request(prompt, model, max_tokens)
         except Exception as e:
             # Fallback: if streaming fails, try standard (if we were streaming)
             if use_streaming:
-                self.logger.warning("🌊 Streaming failed, falling back to standard API: %s", e)
+                self.logger.warning(
+                    "🌊 Streaming failed, falling back to standard API: %s", e
+                )
                 try:
                     return self._make_standard_request(prompt, model, max_tokens)
                 except Exception as fallback_error:
-                    raise APIError(f"Both streaming and standard API failed. Last error: {fallback_error}")
+                    raise APIError(
+                        f"Both streaming and standard API failed. Last error: {fallback_error}"
+                    )
             else:
                 raise
 
-    def _make_standard_request(self, prompt: str, model: str, max_tokens: int) -> ClaudeResponse:
+    def _make_standard_request(
+        self, prompt: str, model: str, max_tokens: int
+    ) -> ClaudeResponse:
         """Make standard (non-streaming) API request."""
         try:
             import anthropic
@@ -292,7 +307,9 @@ class ClaudeClient(AIClientInterface):
         except Exception as e:
             raise APIError(f"Unexpected error calling Claude API: {e}")
 
-    def _make_streaming_request(self, prompt: str, model: str, max_tokens: int, text_callback=None) -> ClaudeResponse:
+    def _make_streaming_request(
+        self, prompt: str, model: str, max_tokens: int, text_callback=None
+    ) -> ClaudeResponse:
         """Make streaming API request with real-time progress and optional text callback."""
         try:
             import anthropic
@@ -319,35 +336,37 @@ class ClaudeClient(AIClientInterface):
                 max_tokens=max_tokens,
                 messages=[{"role": "user", "content": prompt}],
             ) as stream:
-                
+
                 for event in stream:
-                    if hasattr(event, 'type'):
+                    if hasattr(event, "type"):
                         # Handle different event types
                         if event.type == "message_start":
-                            if hasattr(event.message, 'usage'):
+                            if hasattr(event.message, "usage"):
                                 input_tokens = event.message.usage.input_tokens
-                            if hasattr(event.message, 'model'):
+                            if hasattr(event.message, "model"):
                                 model_used = event.message.model
-                                
+
                         elif event.type == "content_block_delta":
-                            if hasattr(event.delta, 'text'):
+                            if hasattr(event.delta, "text"):
                                 text_chunk = event.delta.text
                                 content_parts.append(text_chunk)
-                                
+
                                 # Call text callback for real-time display
                                 if text_callback:
                                     text_callback(text_chunk)
-                                
+
                         elif event.type == "message_delta":
-                            if hasattr(event.delta, 'stop_reason'):
+                            if hasattr(event.delta, "stop_reason"):
                                 finish_reason = event.delta.stop_reason
-                            if hasattr(event.usage, 'output_tokens'):
+                            if hasattr(event.usage, "output_tokens"):
                                 output_tokens = event.usage.output_tokens
 
             # Combine all content parts
             content = "".join(content_parts)
 
-            self.logger.debug("🌊 Streaming completed successfully (%d tokens)", output_tokens)
+            self.logger.debug(
+                "🌊 Streaming completed successfully (%d tokens)", output_tokens
+            )
 
             return ClaudeResponse(
                 content=content,

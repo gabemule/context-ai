@@ -11,21 +11,21 @@ from pathlib import Path
 def get_version() -> str:
     """
     Get the version from pyproject.toml.
-    
+
     ALWAYS reads from pyproject.toml, whether running locally or installed.
-    
+
     Returns:
         str: Version string from pyproject.toml or "development" if not found
     """
     try:
         # Find pyproject.toml starting from current file location
         current_dir = Path(__file__).resolve().parent
-        
+
         # Walk up directories to find pyproject.toml
         while current_dir != current_dir.parent:
             pyproject_path = current_dir / "pyproject.toml"
             if pyproject_path.exists():
-                content = pyproject_path.read_text(encoding='utf-8')
+                content = pyproject_path.read_text(encoding="utf-8")
                 # Look for version = "x.x.x" pattern
                 match = re.search(r'version\s*=\s*["\']([^"\']+)["\']', content)
                 if match:
@@ -34,14 +34,14 @@ def get_version() -> str:
             current_dir = current_dir.parent
     except Exception:
         pass
-    
+
     return "development"
 
 
 def get_version_info() -> tuple[str, bool]:
     """
     Get version info with development flag.
-    
+
     Returns:
         tuple: (version_string, is_development)
     """
@@ -53,10 +53,10 @@ def get_version_info() -> tuple[str, bool]:
 def format_version_display(include_name: bool = True) -> str:
     """
     Format version for display purposes.
-    
+
     Args:
         include_name: Whether to include "context-ai" prefix
-        
+
     Returns:
         str: Formatted version string
     """

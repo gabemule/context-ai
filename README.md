@@ -69,11 +69,16 @@ make type-check    # Run type checking (mypy)
 
 # Build & Release
 make build         # Build package for distribution
-make publish       # Publish to PyPI
+make test-publish  # Publish to TestPyPI (alpha testing)
+make publish       # Publish to PyPI (production)
+make test-install  # Install from TestPyPI for testing
+make test-uninstall # Remove test installation
+make verify-install # Verify installation works
 
 # Quick workflows
 make format lint test    # Pre-commit checks
 make dev                # Full development cycle
+make test-publish && make test-install && make verify-install  # Test release cycle
 ```
 
 
