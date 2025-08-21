@@ -25,6 +25,25 @@
     "clean": "rm -rf out dist node_modules/.vite"
   },
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "contextAiContainer",
+          "title": "Context-AI",
+          "icon": "$(comment-discussion)"
+        }
+      ]
+    },
+    "views": {
+      "contextAiContainer": [
+        {
+          "id": "contextAiChat",
+          "name": "Chat",
+          "type": "webview",
+          "when": "true"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "context-ai.openChat",

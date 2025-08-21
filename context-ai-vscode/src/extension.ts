@@ -1,12 +1,24 @@
 import * as vscode from 'vscode';
-import { ChatPanel } from './chatPanel';
+import { ChatViewProvider } from './chatViewProvider';
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('Context-AI extension is now active!');
 
-    // Register the open chat command
+    // Create and register the chat view provider
+    const chatViewProvider = new ChatViewProvider(context.extensionUri);
+    
+    context.subscriptions.push(
+        vscode.window.registerWebviewViewProvider(
+            ChatViewProvider.viewType,
+            chatViewProvider
+        )
+    );
+
+    // Register the open chat command to focus the view
     const openChatDisposable = vscode.commands.registerCommand('context-ai.openChat', () => {
-        ChatPanel.createOrShow(context.extensionUri);
+        // Focus the chat view directly
+        vscode.commands.executeCommand('contextAiChat.focus');
+        chatViewProvider.focus();
     });
 
     // Add commands to subscriptions

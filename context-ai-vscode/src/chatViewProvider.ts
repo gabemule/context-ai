@@ -2,64 +2,59 @@ import * as vscode from 'vscode';
 import { spawn } from 'child_process';
 import * as path from 'path';
 
-export class ChatPanel {
-    public static currentPanel: ChatPanel | undefined;
-    public static readonly viewType = 'contextAIChat';
+export class ChatViewProvider implements vscode.WebviewViewProvider {
+    public static readonly viewType = 'contextAiChat';
 
-    private readonly _panel: vscode.WebviewPanel;
-    private readonly _extensionUri: vscode.Uri;
+    private _view?: vscode.WebviewView;
+    private _extensionUri: vscode.Uri;
     private _disposables: vscode.Disposable[] = [];
 
-    public static createOrShow(extensionUri: vscode.Uri): ChatPanel {
-        const column = vscode.window.activeTextEditor
-            ? vscode.ViewColumn.Beside
-            : undefined;
+    // Chat process management
+    private _chatProcess: any = null;
+    private _isInitializing = false;
+    private _isProcessing = false;
+    private _chatInitialized = false;
+    private _needsReinitialization = false;
 
-        // If we already have a panel, show it
-        if (ChatPanel.currentPanel) {
-            ChatPanel.currentPanel._panel.reveal(column);
-            return ChatPanel.currentPanel;
-        }
-
-        // Otherwise, create a new panel
-        const panel = vscode.window.createWebviewPanel(
-            ChatPanel.viewType,
-            'Context-AI Chat',
-            column || vscode.ViewColumn.One,
-            {
-                enableScripts: true,
-                retainContextWhenHidden: true,
-                localResourceRoots: [
-                    vscode.Uri.joinPath(extensionUri, 'media'),
-                    vscode.Uri.joinPath(extensionUri, 'out'),
-                    vscode.Uri.joinPath(extensionUri, 'node_modules')
-                ]
-            }
-        );
-
-        ChatPanel.currentPanel = new ChatPanel(panel, extensionUri);
-        return ChatPanel.currentPanel;
+    constructor(private readonly extensionUri: vscode.Uri) {
+        this._extensionUri = extensionUri;
     }
 
-    private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
-        this._panel = panel;
-        this._extensionUri = extensionUri;
+    public resolveWebviewView(
+        webviewView: vscode.WebviewView,
+        context: vscode.WebviewViewResolveContext,
+        _token: vscode.CancellationToken,
+    ) {
+        // Clean up previous process if view is being reactivated
+        if (this._chatProcess) {
+            console.log('🔄 View reactivated, cleaning previous process');
+            this._cleanupProcess();
+        }
 
-        // Set the webview's initial html content
-        this._update();
+        // Reset state for clean initialization
+        this._resetState();
+        this._view = webviewView;
 
-        // Listen for when the panel is disposed
-        this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
+        webviewView.webview.options = {
+            enableScripts: true,
+            localResourceRoots: [
+                vscode.Uri.joinPath(this._extensionUri, 'media'),
+                vscode.Uri.joinPath(this._extensionUri, 'out'),
+                vscode.Uri.joinPath(this._extensionUri, 'node_modules')
+            ]
+        };
+
+        webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
         // Handle messages from the webview
-        this._panel.webview.onDidReceiveMessage(
+        webviewView.webview.onDidReceiveMessage(
             async (message) => {
                 switch (message.command) {
                     case 'sendMessage':
                         await this._handleSendMessage(message.text);
                         break;
                     case 'clearChat':
-                        this._panel.webview.postMessage({
+                        webviewView.webview.postMessage({
                             command: 'clearMessages'
                         });
                         break;
@@ -69,26 +64,62 @@ export class ChatPanel {
             this._disposables
         );
 
-        // Pre-initialize chat process when panel opens for better UX
-        this._initializeChatProcess().catch((error) => {
+        // Listen for visibility changes
+        webviewView.onDidChangeVisibility(() => {
+            if (webviewView.visible) {
+                console.log('👁️ View became visible');
+                console.log('🔍 Checking process state - Process exists:', !!this._chatProcess);
+                console.log('🔍 Process killed status:', this._chatProcess ? this._chatProcess.killed : 'N/A');
+                console.log('🔍 Chat initialized status:', this._chatInitialized);
+                
+                // Force reinitialize process when view becomes visible after being hidden
+                // This ensures fresh process every time user reopens the sidebar
+                console.log('🔄 View reactivated, forcing process reinitialization...');
+                this._forceReinitializeProcess().catch((error) => {
+                    console.log('⚠️ Forced reinitialization failed:', error.message);
+                });
+            } else {
+                console.log('👁️‍🗨️ View became hidden - marking for reinitialization');
+                // Mark that we need to reinitialize when view becomes visible again
+                this._needsReinitialization = true;
+            }
+        }, null, this._disposables);
+
+        // Pre-initialize chat process when view opens for better UX
+        this._ensureProcessRunning().catch((error) => {
             console.log('⚠️ Pre-initialization failed, will retry on first question:', error.message);
         });
+
+        // Listen for view disposal
+        webviewView.onDidDispose(() => this.dispose(), null, this._disposables);
+    }
+
+    public focus() {
+        if (this._view) {
+            this._view.show?.(true);
+        }
     }
 
     public sendQuestion(question: string) {
-        this._panel.webview.postMessage({
-            command: 'addQuestion',
-            text: question
-        });
-        this._handleSendMessage(question);
+        if (this._view) {
+            this._view.webview.postMessage({
+                command: 'addQuestion',
+                text: question
+            });
+            this._handleSendMessage(question);
+        }
     }
 
     private async _handleSendMessage(text: string) {
+        if (!this._view) {
+            return;
+        }
+
         try {
             console.log('🚀 _handleSendMessage START:', text);
             
             // Show loading state
-            this._panel.webview.postMessage({
+            this._view.webview.postMessage({
                 command: 'showLoading',
                 isLoading: true
             });
@@ -98,7 +129,7 @@ export class ChatPanel {
 
             console.log('✅ _executeContextAI completed, sending streamComplete');
             
-            this._panel.webview.postMessage({
+            this._view.webview.postMessage({
                 command: 'streamComplete'
             });
 
@@ -108,7 +139,7 @@ export class ChatPanel {
             console.log('❌ _handleSendMessage ERROR:', error);
             
             // Handle errors - only send receiveMessage for errors
-            this._panel.webview.postMessage({
+            this._view.webview.postMessage({
                 command: 'receiveMessage',
                 text: `❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
                 isLoading: false,
@@ -116,11 +147,6 @@ export class ChatPanel {
             });
         }
     }
-
-    private _chatProcess: any = null;
-    private _isInitializing = false;
-    private _isProcessing = false;
-    private _chatInitialized = false;
 
     private _executeContextAI(question: string): Promise<string> {
         return new Promise(async (resolve, reject) => {
@@ -314,6 +340,11 @@ export class ChatPanel {
             return;
         }
 
+        if (!this._view) {
+            reject(new Error('View not available'));
+            return;
+        }
+
         console.log(`📨 Sending question to chat: "${question}"`);
 
         let output = '';
@@ -330,7 +361,7 @@ export class ChatPanel {
             this._chatProcess.stderr.off('data', errorHandler);
             
             // Send completion signal
-            this._panel.webview.postMessage({
+            this._view!.webview.postMessage({
                 command: 'streamComplete'
             });
             
@@ -397,7 +428,7 @@ export class ChatPanel {
                     responseStarted = true;
                     
                     // Send stream start message
-                    this._panel.webview.postMessage({
+                    this._view!.webview.postMessage({
                         command: 'streamStart'
                     });
                 }
@@ -417,7 +448,7 @@ export class ChatPanel {
                 console.log(`📝 Streaming chunk - total output: ${output.length} chars`);
                 
                 // Send chunk to UI for real-time display
-                this._panel.webview.postMessage({
+                this._view!.webview.postMessage({
                     command: 'streamChunk',
                     text: chunk
                 });
@@ -469,11 +500,11 @@ export class ChatPanel {
         // Detectar todos os panels conhecidos automaticamente
         this.detectPanel(accumulatedOutput, 'Token Usage', (panelContent: string) => {
             const stats = this.extractStatsFromTokenPanel(panelContent);
-            if (stats) {
+            if (stats && this._view) {
                 console.log('📊 Successfully extracted token stats from panel:', stats);
                 
                 // Send stats to webview
-                this._panel.webview.postMessage({
+                this._view.webview.postMessage({
                     command: 'updateTokenStats',
                     stats: stats
                 });
@@ -481,12 +512,14 @@ export class ChatPanel {
         });
         
         this.detectPanel(accumulatedOutput, 'Context-AI Chat Session with History', (panelContent: string) => {
+            if (!this._view) return;
+
             const chatInfo = this.extractChatInfoFromPanel(panelContent);
             if (chatInfo) {
                 console.log('🎯 Found dynamic Chat Session panel, sending chatReady');
                 
                 // Send dynamic chat info instead of mock
-                this._panel.webview.postMessage({
+                this._view.webview.postMessage({
                     command: 'chatReady',
                     chatInfo: chatInfo
                 });
@@ -494,13 +527,12 @@ export class ChatPanel {
                 console.log('⚠️ Chat info extraction failed, sending fallback chatReady');
                 
                 // Send fallback to ensure loading is removed
-                this._panel.webview.postMessage({
+                this._view.webview.postMessage({
                     command: 'chatReady',
                     chatInfo: 'Ask questions about your codebase. Chat history will be maintained for context.\n\nSpecial commands:\n/embeddings - Show active embeddings\n/history - Show chat statistics\n/clear - Reset conversation history\n/verbose - Toggle detailed logging\n/mode - Change prompt mode\nexit - Quit chat session'
                 });
             }
         });
-        
         
         return shouldStopCollecting;
     }
@@ -603,29 +635,88 @@ export class ChatPanel {
         }
     }
 
-    public dispose() {
-        ChatPanel.currentPanel = undefined;
+    private _resetState(): void {
+        console.log('🔄 Resetting ChatViewProvider state');
+        this._isInitializing = false;
+        this._isProcessing = false;
+        this._chatInitialized = false;
+    }
 
-        // Clean up chat process
+    private _cleanupProcess(): void {
+        console.log('🗑️ Cleaning up chat process');
         if (this._chatProcess) {
-            this._chatProcess.kill();
+            try {
+                this._chatProcess.kill('SIGTERM');
+                // Give process time to terminate gracefully
+                setTimeout(() => {
+                    if (this._chatProcess && !this._chatProcess.killed) {
+                        console.log('🔧 Force killing process with SIGKILL');
+                        this._chatProcess.kill('SIGKILL');
+                    }
+                }, 2000);
+            } catch (error) {
+                console.log('⚠️ Error killing process:', error);
+            }
             this._chatProcess = null;
         }
+    }
 
+    private async _ensureProcessRunning(): Promise<void> {
+        console.log('🔍 Ensuring chat process is running...');
+        
+        if (this._chatProcess && !this._chatProcess.killed && this._chatInitialized) {
+            console.log('✅ Process already running and initialized, skipping');
+            return;
+        }
+        
+        if (this._isInitializing) {
+            console.log('⏳ Process is already being initialized, waiting...');
+            // Wait for current initialization to complete
+            while (this._isInitializing) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            return;
+        }
+        
+        console.log('🚀 Starting new chat process...');
+        await this._initializeChatProcess();
+    }
+
+    private async _forceReinitializeProcess(): Promise<void> {
+        console.log('🔥 Force reinitializing chat process...');
+        
+        // Always cleanup existing process first
+        if (this._chatProcess) {
+            console.log('🗑️ Cleaning up existing process before reinitialization');
+            this._cleanupProcess();
+        }
+        
+        // Reset state completely
+        this._resetState();
+        this._needsReinitialization = false;
+        
+        // Wait a moment for cleanup to complete
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Force new initialization
+        console.log('🚀 Starting fresh chat process...');
+        await this._initializeChatProcess();
+    }
+
+    public dispose() {
+        console.log('🗑️ Disposing ChatViewProvider');
+        
+        this._cleanupProcess();
+        this._resetState();
+        this._view = undefined;
+        
         // Clean up our resources
-        this._panel.dispose();
-
         while (this._disposables.length) {
             const x = this._disposables.pop();
             if (x) {
                 x.dispose();
             }
         }
-    }
-
-    private _update() {
-        const webview = this._panel.webview;
-        this._panel.webview.html = this._getHtmlForWebview(webview);
     }
 
     private _getHtmlForWebview(webview: vscode.Webview) {
