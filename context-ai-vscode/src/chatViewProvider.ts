@@ -200,37 +200,68 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         logger.debug('📁 Working directory:', cwd);
         logger.debug('🏠 HOME directory:', process.env.HOME);
 
-        // Try different possible commands for chat
-        const possibleCommands = [
-            'context-ai',
-            `${process.env.HOME}/.local/bin/context-ai`,
-            '/opt/homebrew/bin/context-ai',
-            '/usr/local/bin/context-ai',
-            'python3 -m src.cli',
-            'python -m src.cli',
-            'poetry run context-ai'
-        ];
+        // Detect platform for appropriate command paths
+        const isWindows = process.platform === 'win32';
+        const isWSL = process.env.WSL_DISTRO_NAME !== undefined || 
+                     process.env.WSL_INTEROP !== undefined ||
+                     process.env.NAME?.includes('Microsoft') === true;
+
+        // Build platform-specific command list
+        const possibleCommands: string[] = [];
+
+        // Generic command (works if context-ai is in PATH)
+        possibleCommands.push('context-ai');
+
+        if (isWindows) {
+            // Windows paths - pipx and Python Scripts locations
+            const userProfile = process.env.USERPROFILE || '';
+            const appData = process.env.APPDATA || '';
+            const localAppData = process.env.LOCALAPPDATA || '';
+            
+            possibleCommands.push(
+                `${userProfile}\\.local\\bin\\context-ai`,
+                `${userProfile}\\AppData\\Roaming\\Python\\Scripts\\context-ai`,
+                `${appData}\\Python\\Scripts\\context-ai`,
+                `${localAppData}\\Programs\\Python\\Python311\\Scripts\\context-ai`,
+                `${localAppData}\\Programs\\Python\\Python310\\Scripts\\context-ai`,
+                `${localAppData}\\Programs\\Python\\Python39\\Scripts\\context-ai`
+            );
+        } else {
+            // macOS/Linux paths
+            const homeDir = process.env.HOME || '';
+            
+            possibleCommands.push(
+                `${homeDir}/.local/bin/context-ai`,
+                '/opt/homebrew/bin/context-ai',    // macOS Homebrew
+                '/usr/local/bin/context-ai',       // Standard Unix location
+                '/usr/bin/context-ai'              // System-wide installation
+            );
+
+            // WSL-specific paths (access to Windows pipx installation)
+            if (isWSL) {
+                // Try to access Windows user directory from WSL
+                const windowsUsers = [
+                    process.env.WSL_DISTRO_NAME,
+                    process.env.USER,
+                    'user', 'admin', 'Administrator'
+                ].filter(Boolean);
+
+                for (const user of windowsUsers) {
+                    possibleCommands.push(
+                        `/mnt/c/Users/${user}/.local/bin/context-ai`,
+                        `/mnt/c/Users/${user}/AppData/Roaming/Python/Scripts/context-ai`
+                    );
+                }
+            }
+        }
 
         logger.debug('🔧 Will try these commands:', possibleCommands);
 
         for (const command of possibleCommands) {
             try {
-                let cmd: string;
-                let cmdArgs: string[];
-
-                if (command.startsWith('python3 -m src.cli')) {
-                    cmd = 'python3';
-                    cmdArgs = ['-m', 'src.cli', 'chat'];
-                } else if (command.startsWith('python -m src.cli')) {
-                    cmd = 'python';
-                    cmdArgs = ['-m', 'src.cli', 'chat'];
-                } else if (command.includes('poetry')) {
-                    cmd = 'poetry';
-                    cmdArgs = ['run', 'context-ai', 'chat'];
-                } else {
-                    cmd = command;
-                    cmdArgs = ['chat'];
-                }
+                // All commands in our list are direct context-ai executables
+                const cmd = command;
+                const cmdArgs = ['chat'];
 
                 logger.debug(`🔄 Trying command: ${cmd} ${cmdArgs.join(' ')}`);
                 logger.debug(`📂 CWD: ${cwd}`);
