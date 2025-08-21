@@ -7,9 +7,9 @@ window.markdownit = markdownit;
 window.hljs = hljs;
 window.libsReady = true; // Flag to indicate libs are loaded
 
-console.log('🎯 BUNDLE: Libraries loaded and made available globally');
-console.log('🎯 BUNDLE: markdownit type:', typeof window.markdownit);
-console.log('🎯 BUNDLE: hljs type:', typeof window.hljs);
+// console.log('🎯 BUNDLE: Libraries loaded and made available globally');
+// console.log('🎯 BUNDLE: markdownit type:', typeof window.markdownit);
+// console.log('🎯 BUNDLE: hljs type:', typeof window.hljs);
 
 // Wait for DOM to be ready, then import chat.js
 if (document.readyState === 'loading') {
