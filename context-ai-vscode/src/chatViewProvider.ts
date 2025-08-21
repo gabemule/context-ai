@@ -642,29 +642,45 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this._chatInitialized = false;
     }
 
+    private _isProcessDead(): boolean {
+        return !this._chatProcess || 
+               this._chatProcess.killed || 
+               this._chatProcess.exitCode !== null;
+    }
+
+    private _ensureCleanState(): void {
+        if (this._isProcessDead()) {
+            console.log('🧹 Process is dead, cleaning state');
+            this._chatProcess = null;
+            this._resetState();
+        }
+    }
+
     private _cleanupProcess(): void {
         console.log('🗑️ Cleaning up chat process');
-        if (this._chatProcess) {
+        if (this._chatProcess && this._chatProcess.pid) {
             try {
-                this._chatProcess.kill('SIGTERM');
-                // Give process time to terminate gracefully
-                setTimeout(() => {
-                    if (this._chatProcess && !this._chatProcess.killed) {
-                        console.log('🔧 Force killing process with SIGKILL');
-                        this._chatProcess.kill('SIGKILL');
-                    }
-                }, 2000);
+                console.log(`💀 Killing process PID ${this._chatProcess.pid} immediately`);
+                // Kill immediately with SIGKILL - no timeouts, no delays
+                this._chatProcess.kill('SIGKILL');
             } catch (error) {
                 console.log('⚠️ Error killing process:', error);
             }
-            this._chatProcess = null;
         }
+        
+        // Always null the reference regardless of kill success
+        this._chatProcess = null;
+        console.log('✅ Process cleanup completed');
     }
 
     private async _ensureProcessRunning(): Promise<void> {
         console.log('🔍 Ensuring chat process is running...');
         
-        if (this._chatProcess && !this._chatProcess.killed && this._chatInitialized) {
+        // Clean up any dead processes first
+        this._ensureCleanState();
+        
+        // Check if we already have a healthy, initialized process
+        if (!this._isProcessDead() && this._chatInitialized) {
             console.log('✅ Process already running and initialized, skipping');
             return;
         }
