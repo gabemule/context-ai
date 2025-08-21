@@ -36,12 +36,14 @@ FASE 1: Chunking Refactor → FASE 2: Embeddings Extensibility → FASE 3: Query
 
 ## 📊 **SITUAÇÃO ATUAL IDENTIFICADA:**
 
-### **🧩 CHUNKING - MELHORAR + REGISTRY PATTERN**
+### **🧩 CHUNKING - MELHORAR + REGISTRY PATTERN + TREE-SITTER FIRST**
 - **Protocol + models misturados** no mesmo arquivo
 - **Language detection simples** - não usa extends/additional_separators
 - **Token counting já centralizado**
 - **❌ SEM REGISTRY:** Hardcoded LangChain, difícil extensão para Tree-sitter
 - **❌ SEM PROVIDERS:** Não é possível trocar chunking algorithm facilmente
+- **❌ SEM TREE-SITTER:** AST-based chunking mais preciso que regex/heurística
+- **❌ SEM DOCUMENT SUPPORT:** PDF, DOC, DOCX, TXT não suportados
 
 ### **🤖 EMBEDDINGS - POUCO EXTENSÍVEL + REGISTRY PATTERN**
 - **Hardcoded model list** - não configurável
@@ -81,10 +83,58 @@ from typing import Dict, List, Optional, Type
 from .protocol import ChunkerProtocol, ChunkingStrategy
 from utils.logging import get_logger
 
+# =============================================================================
+# CONSTANTS - Extension mappings for provider selection
+# =============================================================================
+
+# 🥇 TreeSitter Extensions (PRIMARY - 80% dos arquivos)
+TREESITTER_EXTENSIONS = {
+    # Programming Languages
+    ".py", ".pyx", ".pyi", ".pyw",                    # Python
+    ".js", ".jsx", ".mjs", ".cjs",                   # JavaScript  
+    ".ts", ".tsx", ".d.ts", ".cts", ".mts",          # TypeScript
+    ".go",                                           # Go
+    ".rs",                                           # Rust
+    ".java",                                         # Java
+    ".cpp", ".cc", ".cxx", ".c", ".h", ".hpp",       # C/C++
+    ".php",                                          # PHP
+    ".rb",                                           # Ruby
+    ".swift",                                        # Swift
+    ".kt", ".kts",                                   # Kotlin
+    
+    # Web & Markup
+    ".html", ".htm",                                 # HTML
+    ".css", ".scss", ".sass",                       # CSS
+    ".md", ".markdown",                              # Markdown
+    
+    # Config & Data  
+    ".json",                                        # JSON
+    ".yaml", ".yml",                                # YAML
+    ".toml",                                        # TOML
+    ".xml",                                         # XML
+    
+    # DevOps & Build
+    "dockerfile", ".dockerfile",                     # Docker
+    "makefile", ".mk",                              # Make
+    ".sh", ".bash",                                 # Shell
+    
+    # Database
+    ".sql", ".ddl", ".dml",                         # SQL
+    ".graphql", ".gql",                             # GraphQL
+}
+
+# 🥈 Document Extensions  
+DOCUMENT_EXTENSIONS = {".pdf", ".doc", ".docx", ".txt", ".rtf"}
+
+# =============================================================================
+# ENUMS & CLASSES
+# =============================================================================
+
 class ChunkingProviders(Enum):
     """Available chunking providers."""
-    LANGCHAIN = "langchain"
-    TREESITTER = "treesitter"  # Future implementation
+    TREESITTER = "treesitter"     # 🥇 Primary - AST-based chunking
+    DOCUMENT = "document"          # 🥈 For PDF/DOC/DOCX/TXT files  
+    LANGCHAIN = "langchain"        # 🥉 Fallback only
 
 class ChunkingRegistry:
     """
@@ -126,30 +176,36 @@ class ChunkingRegistry:
         chunker_class = self._providers[provider]
         return chunker_class(strategy=strategy)
     
-    def get_optimal_chunker(self, language: str = None, strategy: ChunkingStrategy = None) -> ChunkerProtocol:
+    def get_optimal_chunker(self, file_path: str = None, strategy: ChunkingStrategy = None) -> ChunkerProtocol:
         """
-        Get optimal chunker based on language and requirements.
+        Get optimal chunker based on file extension using TreeSitter-first strategy.
         
         Args:
-            language: Programming language (for provider selection)
+            file_path: File path for extension-based selection
             strategy: Chunking strategy configuration
             
         Returns:
             Optimal chunker instance
         """
-        # Linguagens com melhor suporte no Tree-sitter (futuro)
-        TREESITTER_PREFERRED = {
-            "python", "javascript", "typescript", "go", "rust", 
-            "java", "cpp", "c", "php", "ruby", "swift", "kotlin"
-        }
+        if not file_path:
+            return self.get_chunker(self._default_provider, strategy)
+            
+        from pathlib import Path
+        ext = Path(file_path).suffix.lower()
         
-        # Try Tree-sitter for supported languages (when available)
-        if (language in TREESITTER_PREFERRED and 
+        # TreeSitter-first selection (using constants defined at top of file)
+        if (ext in TREESITTER_EXTENSIONS and 
             self._is_provider_available(ChunkingProviders.TREESITTER.value)):
             return self.get_chunker(ChunkingProviders.TREESITTER.value, strategy)
-        
-        # Fallback to LangChain
-        return self.get_chunker(ChunkingProviders.LANGCHAIN.value, strategy)
+            
+        # Document chunker for binary/text documents
+        elif (ext in DOCUMENT_EXTENSIONS and
+              self._is_provider_available(ChunkingProviders.DOCUMENT.value)):
+            return self.get_chunker(ChunkingProviders.DOCUMENT.value, strategy)
+            
+        # LangChain fallback (rare cases)
+        else:
+            return self.get_chunker(ChunkingProviders.LANGCHAIN.value, strategy)
     
     def get_available_providers(self) -> List[str]:
         """Get list of available provider names."""
@@ -409,21 +465,115 @@ __all__ = [
 
 ---
 
-### **🧪 FASE 0.3: TESTES DE REGISTRY FOUNDATION**
+### **🌳 FASE 0.3: IMPLEMENTAR TREESITTER CHUNKER**
 
-#### **🔍 0.3.1 Testes de Chunking Registry**
+#### **📦 0.3.1 Setup TreeSitter Dependencies**
 
-- [ ] Testar criação de registry: `get_chunking_registry()`
-- [ ] Testar provider registration: `registry.register_provider()`
-- [ ] Testar factory methods: `create_chunker()`, `create_optimal_chunker()`
-- [ ] Testar fallback logic (quando Tree-sitter não disponível)
+**Adicionar ao pyproject.toml na seção `dependencies`:**
+- [ ] `tree-sitter>=0.20.4`
+- [ ] `tree-sitter-python>=0.20.4`
+- [ ] `tree-sitter-javascript>=0.20.3`
+- [ ] `tree-sitter-typescript>=0.20.3`
+- [ ] `tree-sitter-go>=0.20.0`
+- [ ] `tree-sitter-rust>=0.20.4`
+- [ ] `tree-sitter-java>=0.20.2`
+- [ ] `tree-sitter-cpp>=0.20.0`
+- [ ] `tree-sitter-html>=0.20.0`
+- [ ] `tree-sitter-css>=0.20.0`
 
-#### **🔍 0.3.2 Testes de Embeddings Registry**  
+**Instalação/Update:**
+- [ ] `pipx install -e .` (para reinstalar com novas deps)
 
-- [ ] Testar criação de registry: `get_embeddings_registry()`
-- [ ] Testar provider creation: `get_embedding_provider()`, `get_vector_provider()`
-- [ ] Testar optimal selection: `get_optimal_embedding_provider()`
-- [ ] Verificar backward compatibility com código existente
+#### **📦 0.3.2 Criar TreeSitter Adapter**
+
+**Arquivo:** `src/core/chunking/treesitter_adapter.py`
+
+**Especificações técnicas:**
+- [ ] **Interface:** Implementar `ChunkerProtocol`
+- [ ] **Language mapping:** Extensões → parsers (usando TREESITTER_EXTENSIONS do registry)
+- [ ] **AST analysis:** Extrair chunks baseados em nodes semanticamente importantes (funções, classes, interfaces)
+- [ ] **Fallback graceful:** Se TreeSitter falhar, usar chunking simples linha por linha
+- [ ] **Metadata rica:** Incluir start/end lines, function/class names, chunk_type do AST
+
+**Pontos de validação:**
+- [ ] ✅ Detecta language corretamente via extensão
+- [ ] ✅ Extrai chunks semanticamente coerentes (não corta no meio de função)
+- [ ] ✅ Fallback funciona quando parser não disponível
+- [ ] ✅ Metadata inclui informações do AST (function_name, class_name)
+- [ ] ✅ Respeita chunk_size limits definidos em ChunkingStrategy
+
+#### **📦 0.3.3 Registrar Provider no Registry**
+
+- [ ] Atualizar `registry.py._register_builtin_providers()`
+- [ ] Import condicional: só registrar se `TREESITTER_AVAILABLE = True`
+- [ ] Validar que `get_optimal_chunker()` seleciona TreeSitter para extensões suportadas
+
+---
+
+### **📄 FASE 0.4: IMPLEMENTAR DOCUMENT CHUNKER**
+
+#### **📦 0.4.1 Setup Document Processing Dependencies**
+
+**Adicionar ao pyproject.toml na seção `dependencies`:**
+- [ ] `PyPDF2>=3.0.1`
+- [ ] `python-docx>=0.8.11`
+- [ ] `pdfplumber>=0.9.0`
+- [ ] `textract>=1.6.5`
+
+**Instalação/Update:**
+- [ ] `pipx install -e .` (para reinstalar com novas deps)
+
+#### **📦 0.4.2 Criar Document Adapter**
+
+**Arquivo:** `src/core/chunking/document_adapter.py`
+
+**Especificações técnicas:**
+- [ ] **Interface:** Implementar `ChunkerProtocol`
+- [ ] **Multi-format support:** PDF (PyPDF2 + pdfplumber), DOCX (python-docx), TXT/RTF (encoding-aware), fallback (textract)
+- [ ] **Text cleaning:** Normalizar whitespace, remover page breaks, preservar paragraphs
+- [ ] **Paragraph-aware chunking:** Splits inteligentes em boundaries de parágrafo, não sentences
+- [ ] **Error handling robusto:** Graceful fallback se extração falhar
+
+**Pontos de validação:**
+- [ ] ✅ Extrai texto corretamente de PDF, DOCX, TXT 
+- [ ] ✅ Preserva estrutura de paragraphs (não mistura conceitos)
+- [ ] ✅ Chunks não quebram no meio de sentences importantes
+- [ ] ✅ Metadata inclui document type e file info
+- [ ] ✅ Handles documentos corrompidos sem crash
+
+#### **📦 0.4.3 Registrar Document Provider**
+
+- [ ] Atualizar `registry.py._register_builtin_providers()`
+- [ ] Validar que `get_optimal_chunker()` seleciona Document para .pdf/.docx/.txt
+
+---
+
+### **🧪 FASE 0.5: TESTES INTEGRATION**
+
+#### **🔍 0.5.1 Testes TreeSitter-first Strategy**
+
+- [ ] **Arquivo Python:** `.py` → TreeSitterChunker (functions/classes preservadas)
+- [ ] **Arquivo TypeScript:** `.ts` → TreeSitterChunker (interfaces/methods preservados)
+- [ ] **Arquivo PDF:** `.pdf` → DocumentChunker (paragraphs preservados)
+- [ ] **Arquivo desconhecido:** `.unknown` → LangChainChunker (fallback)
+
+#### **🔍 0.5.2 Testes Registry System**
+
+- [ ] `get_chunking_registry()` retorna singleton
+- [ ] `create_optimal_chunker("test.py")` retorna TreeSitter se disponível
+- [ ] `create_optimal_chunker("doc.pdf")` retorna Document se disponível
+- [ ] Provider registration/factory methods funcionando
+
+#### **🔍 0.5.3 Critérios de Sucesso**
+
+**Performance:**
+- [ ] TreeSitter chunking ≤ 2x slower que LangChain para arquivos pequenos (<50KB)
+- [ ] Document chunking processa PDFs típicos em <10s
+
+**Quality:**
+- [ ] TreeSitter chunks preserve semantic boundaries (90%+ functions não cortadas)
+- [ ] Document chunks preserve paragraph boundaries (95%+ paragraphs não cortados)
+- [ ] Metadata quality: function/class names extraídos corretamente (>80%)
 
 ---
 
@@ -1451,6 +1601,15 @@ Exemplo:
 
 ## 🚀 PRÓXIMOS PASSOS
 
+Após conclusão deste plano:
+
+1. **Implementar novos providers** (OpenAI embeddings, outros vector stores)
+2. **Adicionar métricas** avançadas de performance
+3. **Criar testes unitários** específicos para cada protocol
+4. **Documentar** APIs dos novos protocols
+5. **Otimizações** baseadas na nova arquitetura
+
+**🎯 Ready for implementation! Esta refatoração estabelecerá uma base sólida e extensível para o Context-AI.**
 Após conclusão deste plano:
 
 1. **Implementar novos providers** (OpenAI embeddings, outros vector stores)

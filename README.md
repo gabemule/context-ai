@@ -35,19 +35,28 @@ context-ai generate ./my-project --name "v1"
 
 ### For Developers (Contributing & Development)
 ```bash
-# Clone and run the smart installer  
+# Clone and use Makefile for setup
 git clone https://github.com/gabemule/context-ai
 cd context-ai
-source dev-install.sh  # 🎯 Creates venv + installs + activates everything automatically
+make setup      # 🎯 Creates venv + installs everything automatically
+source venv/bin/activate  # Activate the created environment
 ```
 
-**What the smart installer does:**
-- 🔍 **Auto-detects environment**: Checks if you're in a venv
-- 📦 **Creates venv automatically**: `python -m venv venv` if needed
-- ⚡ **Activates venv**: Keeps it active in your current shell (when using `source`)
-- 🧹 **Removes conflicts**: Uninstalls conflicting packages automatically
-- ✅ **Installs project**: Development mode with all dependencies
-- 🧪 **Tests installation**: Verifies everything works
+**What make setup does:**
+- 🔍 **Creates virtual environment**: `python -m venv venv` automatically
+- 📦 **Installs dependencies**: Both production and development packages
+- ⚡ **Ready to develop**: All tools configured and ready
+- 🧪 **Includes dev tools**: Testing, linting, formatting pre-configured
+- ✅ **Build tools ready**: Package building and publishing commands available
+
+#### Activate Development Environment
+```bash
+# After make setup, always activate the environment:
+source venv/bin/activate
+
+# Verify everything works:
+make dev  # Runs format + lint + test
+```
 
 #### 🛠️ Development Commands (Makefile)
 ```bash
@@ -119,8 +128,7 @@ python -m pipx ensurepath
 
 💡 **Which option to choose?**
 - **End User**: Just want to use context-ai → Use pipx
-- **Developer**: Want to contribute or modify → Use dev-install.sh  
-- **Advanced**: Need full control → Manual setup
+- **Developer**: Want to contribute or modify → Use make setup
 
 ### Verify Installation
 ```bash
@@ -174,7 +182,7 @@ pipx ensurepath
 source ~/.bashrc  # or ~/.zshrc
 
 # Development tools not working with pipx
-source dev-install.sh  # Use venv for development
+make setup && source venv/bin/activate  # Use venv for development
 ```
 
 ## ⚡ Quick Start

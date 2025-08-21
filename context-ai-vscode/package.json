@@ -71,7 +71,6 @@
   },
   "dependencies": {
     "@types/markdown-it": "^14.0.1",
-    "dotenv": "^17.2.1",
     "highlight.js": "^11.11.1",
     "markdown-it": "^14.1.0"
   },
