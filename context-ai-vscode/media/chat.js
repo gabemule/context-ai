@@ -1,5 +1,8 @@
 // ✅ Libs will be bundled by Vite and available globally
+import { logger } from '../src/shared/logger.js';
+
 (function() {
+
     // Use libs that were made available globally by the bundle
     const markdownit = window.markdownit;
     const hljs = window.hljs;
@@ -29,7 +32,7 @@
     let libsLoaded = false;
     
     function initializeMarkdown() {
-        console.log('🚀 Initializing markdown-it with BUNDLED libs from Vite');
+        logger.debug('🚀 Initializing markdown-it with BUNDLED libs from Vite');
         
         try {
             // Configure markdown-it with highlight.js (REAL implementation!)
@@ -43,7 +46,7 @@
                     
                     if (lang && hljs.getLanguage && hljs.getLanguage(lang)) {
                         try {
-                            console.log(`🎨 Highlighting ${lang} code with highlight.js`);
+                            logger.debug(`🎨 Highlighting ${lang} code with highlight.js`);
                             const highlighted = hljs.highlight(str, { language: lang, ignoreIllegals: true }).value;
                             
                             // 📋 Add copy button to code block
@@ -55,7 +58,7 @@
                                    '<code class="hljs language-' + lang + '">' + highlighted + '</code>' +
                                    '</pre>';
                         } catch (error) {
-                            console.warn('⚠️ Highlight.js error:', error);
+                            logger.warn('⚠️ Highlight.js error:', error);
                         }
                     }
                     
@@ -71,9 +74,9 @@
             });
             
             libsLoaded = true;
-            console.log('✅ BUNDLED markdown-it + highlight.js initialized successfully!');
+            logger.debug('✅ BUNDLED markdown-it + highlight.js initialized successfully!');
         } catch (error) {
-            console.error('❌ Failed to initialize bundled libraries:', error);
+            logger.error('❌ Failed to initialize bundled libraries:', error);
             
             // Basic fallback
             md = {
@@ -175,8 +178,8 @@
 
         // ✅ PROTEÇÃO CRÍTICA: Bloquear envio se libs não carregaram
         if (!libsLoaded || !md) {
-            console.error('❌ BLOCKED: Cannot send message - libraries not ready');
-            console.warn('❌ Libraries still loading. Please wait a moment and try again.');
+            logger.error('❌ BLOCKED: Cannot send message - libraries not ready');
+            logger.warn('❌ Libraries still loading. Please wait a moment and try again.');
             return;
         }
 
@@ -243,11 +246,11 @@
     function formatMessage(text) {
         // ✅ PROTEÇÃO CRÍTICA: Verificar se markdown-it carregou
         if (!md) {
-            console.error('❌ CRITICAL: markdown-it not loaded, cannot format message!');
+            logger.error('❌ CRITICAL: markdown-it not loaded, cannot format message!');
             throw new Error('Markdown-it not ready - bundling failed');
         }
         
-        console.log('🎯 Using BUNDLED markdown-it formatting');
+        logger.debug('🎯 Using BUNDLED markdown-it formatting');
         return md.render(text);
     }
 
@@ -272,22 +275,22 @@
     }
 
     function removeLoadingMessage() {
-        console.log('🧹 removeLoadingMessage called, currentLoadingMessage:', currentLoadingMessage);
+        logger.debug('🧹 removeLoadingMessage called, currentLoadingMessage:', currentLoadingMessage);
         
         if (currentLoadingMessage) {
-            console.log('🧹 Removing loading message');
+            logger.debug('🧹 Removing loading message');
             currentLoadingMessage.remove();
             currentLoadingMessage = null;
-            console.log('🧹 Loading message removed successfully');
+            logger.debug('🧹 Loading message removed successfully');
         } else {
-            console.log('🧹 No currentLoadingMessage to remove');
+            logger.debug('🧹 No currentLoadingMessage to remove');
         }
     }
 
     function setLoading(loading) {
         isLoading = loading;
         
-        console.log('🔽 setLoading called:', { loading, isInitializing, sendText, loadingText });
+        logger.debug('🔽 setLoading called:', { loading, isInitializing, sendText, loadingText });
         
         if (loading && !isInitializing) { // ✅ SÓ mostrar se não estiver inicializando
             sendBtn.disabled = true;
@@ -373,7 +376,7 @@
                 
             case 'streamStart':
                 // Start streaming - MANTER loading ativo
-                console.log('🎯 streamStart - starting streaming (keeping header loading)');
+                logger.debug('🎯 streamStart - starting streaming (keeping header loading)');
                 startStreaming();
                 break;
                 
@@ -384,16 +387,16 @@
                 
             case 'streamComplete':
                 // Complete streaming and remove loading
-                console.log('🎯 streamComplete - removing header loading');
+                logger.debug('🎯 streamComplete - removing header loading');
                 setLoading(false);
                 completeStreaming();
                 break;
                 
             case 'chatReady':
                 // Chat is ready - remove initialization status and enable input
-                console.log('🎯 chatReady received:', message);
-                console.log('🎯 chatInfo:', message.chatInfo);
-                console.log('🎯 chatInfoShown:', chatInfoShown);
+                logger.debug('🎯 chatReady received:', message);
+                logger.debug('🎯 chatInfo:', message.chatInfo);
+                logger.debug('🎯 chatInfoShown:', chatInfoShown);
                 
                 removeInitializationStatus();
                 
@@ -409,15 +412,15 @@ Special commands:
     exit        - Quit chat session`;
                 
                 const infoToShow = message.chatInfo || MOCK_INFO;
-                console.log('🎯 Using info:', infoToShow);
+                logger.debug('🎯 Using info:', infoToShow);
                 
                 if (!chatInfoShown) {
-                    console.log('🎯 Calling showChatInfo...');
+                    logger.debug('🎯 Calling showChatInfo...');
                     showChatInfo(infoToShow);
                     chatInfoShown = true;
-                    console.log('🎯 showChatInfo completed');
+                    logger.debug('🎯 showChatInfo completed');
                 } else {
-                    console.log('🎯 chatInfoShown already true, skipping');
+                    logger.debug('🎯 chatInfoShown already true, skipping');
                 }
                 
                 enableInput();
@@ -453,17 +456,17 @@ Special commands:
 
     function formatStreamingMarkdown(text) {
         // ✅ Use BUNDLED markdown-it for streaming
-        console.log('🎯 Using BUNDLED markdown-it for streaming formatting');
+        logger.debug('🎯 Using BUNDLED markdown-it for streaming formatting');
         
         if (!md) {
-            console.warn('⚠️ Markdown-it not ready for streaming, using fallback');
+            logger.warn('⚠️ Markdown-it not ready for streaming, using fallback');
             return escapeHtml(text).replace(/\n/g, '<br>');
         }
         
         try {
             return md.render(text);
         } catch (error) {
-            console.warn('⚠️ Error in streaming markdown formatting:', error);
+            logger.warn('⚠️ Error in streaming markdown formatting:', error);
             return escapeHtml(text).replace(/\n/g, '<br>');
         }
     }
@@ -514,7 +517,7 @@ Special commands:
     }
 
     function showChatInfo(rawChatInfo) {
-        console.log('🎯 showChatInfo START with:', rawChatInfo);
+        logger.debug('🎯 showChatInfo START with:', rawChatInfo);
         
         // Clean up the raw chat info - remove box drawing characters and format nicely
         const cleanedInfo = rawChatInfo
@@ -523,11 +526,11 @@ Special commands:
             .replace(/^\s*$/gm, '') // Remove empty lines
             .trim();
 
-        console.log('🎯 cleanedInfo:', cleanedInfo);
+        logger.debug('🎯 cleanedInfo:', cleanedInfo);
 
         // Extract key information
         const lines = cleanedInfo.split('\n').filter(line => line.trim());
-        console.log('🎯 lines:', lines);
+        logger.debug('🎯 lines:', lines);
         
         let embeddings = '';
         let description = '';
@@ -550,7 +553,7 @@ Special commands:
             }
         }
 
-        console.log('🎯 parsed data - embeddings:', embeddings, 'description:', description, 'commands:', commands);
+        logger.debug('🎯 parsed data - embeddings:', embeddings, 'description:', description, 'commands:', commands);
 
         // Create info card
         const infoDiv = document.createElement('div');
@@ -600,16 +603,16 @@ Special commands:
             `;
         }
         
-        console.log('🎯 generated html:', html);
+        logger.debug('🎯 generated html:', html);
         
         infoDiv.innerHTML = html;
-        console.log('🎯 appending to messagesContainer, current children:', messagesContainer.children.length);
+        logger.debug('🎯 appending to messagesContainer, current children:', messagesContainer.children.length);
         messagesContainer.appendChild(infoDiv);
-        console.log('🎯 after append, children:', messagesContainer.children.length);
+        logger.debug('🎯 after append, children:', messagesContainer.children.length);
         
         // Scroll to bottom
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        console.log('🎯 showChatInfo COMPLETE');
+        logger.debug('🎯 showChatInfo COMPLETE');
     }
 
     function updateTokenStats(stats) {
@@ -639,7 +642,7 @@ Special commands:
         tokenStatsDiv.classList.remove('hidden');
         tokenStatsDiv.classList.add('block');
         
-        console.log('📊 Updated token stats:', displayText);
+        logger.debug('📊 Updated token stats:', displayText);
     }
 
     // 🔽 Smart Scroll Functions
@@ -655,7 +658,6 @@ Special commands:
         sendText = sendBtn.querySelector('.send-text');
         loadingText = sendBtn.querySelector('.loading');
         
-        console.log('🔽 Button initialized:', { sendText, loadingText });
         
         updateSendButton();
     }
@@ -674,17 +676,13 @@ Special commands:
         const threshold = 100; // pixels do bottom
         const atBottom = isAtBottom(threshold);
         
-        console.log('🔽 Scroll detected:', { atBottom, isScrolledUp, userManuallyScrolled, isStreaming });
-        
         // Detectar se usuário scrollou manualmente para cima
         if (!atBottom) {
             userManuallyScrolled = true;
             isScrolledUp = true;
-            console.log('🔽 User scrolled UP - enabling scroll mode');
         } else if (atBottom) {
             userManuallyScrolled = false;
             isScrolledUp = false;
-            console.log('🔽 User at BOTTOM - disabling scroll mode');
         }
         
         updateSendButton();
@@ -696,14 +694,6 @@ Special commands:
     }
 
     function updateSendButton() {
-        console.log('🔽 updateSendButton called:', {
-            isScrolledUp,
-            isLoading,
-            isInitializing,
-            isStreaming,
-            hasScrollMode: sendBtn.classList.contains('scroll-mode')
-        });
-        
         const scrollText = sendBtn.querySelector('.scroll-text');
         const sendTextEl = sendBtn.querySelector('.send-text');
         const loadingEl = sendBtn.querySelector('.loading');
@@ -711,7 +701,6 @@ Special commands:
         // ✅ CORREÇÃO: Permitir scroll mode durante streaming, só bloquear se inicializando
         if (isScrolledUp && !isInitializing) {
             // Transformar em botão de scroll
-            console.log('🔽 ENABLING scroll mode');
             sendBtn.classList.add('scroll-mode');
             
             // ✅ FORÇAR ENABLE e mostrar texto correto
@@ -722,7 +711,6 @@ Special commands:
             
         } else {
             // Voltar ao modo normal
-            console.log('🔽 DISABLING scroll mode');
             sendBtn.classList.remove('scroll-mode');
             
             // Restaurar estado normal
@@ -734,22 +722,14 @@ Special commands:
                 sendBtn.disabled = isLoading;
             }
         }
-        
-        console.log('🔽 Button state after update:', {
-            hasScrollMode: sendBtn.classList.contains('scroll-mode'),
-            disabled: sendBtn.disabled,
-            classList: sendBtn.classList.toString()
-        });
     }
 
     function scrollToBottom() {
         if (isStreaming) {
             // ⚡ Scroll instantâneo durante streaming para evitar problema de timing
-            console.log('🔽 Using INSTANT scroll (streaming active)');
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         } else {
             // 🎨 Smooth scroll quando não há streaming
-            console.log('🔽 Using SMOOTH scroll (no streaming)');
             messagesContainer.scrollTo({
                 top: messagesContainer.scrollHeight,
                 behavior: 'smooth'
@@ -778,7 +758,7 @@ Special commands:
             const codeElement = preContainer.querySelector('code');
             
             if (!codeElement) {
-                console.error('❌ Code element not found');
+                logger.error('❌ Code element not found');
                 return;
             }
             
@@ -788,10 +768,10 @@ Special commands:
             // Copy to clipboard using the Clipboard API
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 navigator.clipboard.writeText(codeText).then(() => {
-                    console.log('📋 Code copied to clipboard successfully');
+                    logger.debug('📋 Code copied to clipboard successfully');
                     showCopyFeedback(button);
                 }).catch((err) => {
-                    console.error('❌ Failed to copy code:', err);
+                    logger.error('❌ Failed to copy code:', err);
                     fallbackCopyToClipboard(codeText, button);
                 });
             } else {
@@ -800,7 +780,7 @@ Special commands:
             }
             
         } catch (error) {
-            console.error('❌ Copy operation failed:', error);
+            logger.error('❌ Copy operation failed:', error);
         }
     };
     
@@ -816,10 +796,10 @@ Special commands:
             document.execCommand('copy');
             document.body.removeChild(textarea);
             
-            console.log('📋 Code copied using fallback method');
+            logger.debug('📋 Code copied using fallback method');
             showCopyFeedback(button);
         } catch (error) {
-            console.error('❌ Fallback copy failed:', error);
+            logger.error('❌ Fallback copy failed:', error);
         }
     }
     

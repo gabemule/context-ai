@@ -14,10 +14,13 @@ export function activate(context: vscode.ExtensionContext) {
         )
     );
 
-    // Register the open chat command to focus the view
-    const openChatDisposable = vscode.commands.registerCommand('context-ai.openChat', () => {
-        // Focus the chat view directly
-        vscode.commands.executeCommand('contextAiChat.focus');
+    // Register the open chat command to focus the view in sidebar
+    const openChatDisposable = vscode.commands.registerCommand('context-ai.openChat', async () => {
+        // First ensure the view container is visible
+        await vscode.commands.executeCommand('workbench.view.extension.contextAiContainer');
+        // Then focus the specific chat view
+        await vscode.commands.executeCommand('contextAiChat.focus');
+        // Also call our custom focus method
         chatViewProvider.focus();
     });
 

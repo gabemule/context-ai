@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { spawn } from 'child_process';
 import * as path from 'path';
+import { logger } from './shared/logger';
 
 export class ChatViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'contextAiChat';
@@ -27,7 +28,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     ) {
         // Clean up previous process if view is being reactivated
         if (this._chatProcess) {
-            console.log('🔄 View reactivated, cleaning previous process');
+            logger.debug('🔄 View reactivated, cleaning previous process');
             this._cleanupProcess();
         }
 
@@ -67,19 +68,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // Listen for visibility changes
         webviewView.onDidChangeVisibility(() => {
             if (webviewView.visible) {
-                console.log('👁️ View became visible');
-                console.log('🔍 Checking process state - Process exists:', !!this._chatProcess);
-                console.log('🔍 Process killed status:', this._chatProcess ? this._chatProcess.killed : 'N/A');
-                console.log('🔍 Chat initialized status:', this._chatInitialized);
+                logger.info('👁️ View became visible');
+                logger.debug('🔍 Checking process state - Process exists:', !!this._chatProcess);
+                logger.debug('🔍 Process killed status:', this._chatProcess ? this._chatProcess.killed : 'N/A');
+                logger.debug('🔍 Chat initialized status:', this._chatInitialized);
                 
                 // Force reinitialize process when view becomes visible after being hidden
                 // This ensures fresh process every time user reopens the sidebar
-                console.log('🔄 View reactivated, forcing process reinitialization...');
+                logger.info('🔄 View reactivated, forcing process reinitialization...');
                 this._forceReinitializeProcess().catch((error) => {
-                    console.log('⚠️ Forced reinitialization failed:', error.message);
+                    logger.warn('⚠️ Forced reinitialization failed:', error.message);
                 });
             } else {
-                console.log('👁️‍🗨️ View became hidden - marking for reinitialization');
+                logger.debug('👁️‍🗨️ View became hidden - marking for reinitialization');
                 // Mark that we need to reinitialize when view becomes visible again
                 this._needsReinitialization = true;
             }
@@ -87,7 +88,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
         // Pre-initialize chat process when view opens for better UX
         this._ensureProcessRunning().catch((error) => {
-            console.log('⚠️ Pre-initialization failed, will retry on first question:', error.message);
+            logger.warn('⚠️ Pre-initialization failed, will retry on first question:', error.message);
         });
 
         // Listen for view disposal
@@ -116,7 +117,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         }
 
         try {
-            console.log('🚀 _handleSendMessage START:', text);
+            logger.debug('🚀 _handleSendMessage START:', text);
             
             // Show loading state
             this._view.webview.postMessage({
@@ -127,16 +128,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             // Execute context-ai CLI
             await this._executeContextAI(text);
 
-            console.log('✅ _executeContextAI completed, sending streamComplete');
+            logger.debug('✅ _executeContextAI completed, sending streamComplete');
             
             this._view.webview.postMessage({
                 command: 'streamComplete'
             });
 
-            console.log('🏁 _handleSendMessage SUCCESS completed');
+            logger.debug('🏁 _handleSendMessage SUCCESS completed');
 
         } catch (error) {
-            console.log('❌ _handleSendMessage ERROR:', error);
+            logger.error('❌ _handleSendMessage ERROR:', error);
             
             // Handle errors - only send receiveMessage for errors
             this._view.webview.postMessage({
@@ -195,9 +196,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         const cwd = workspaceFolder ? workspaceFolder.uri.fsPath : process.cwd();
 
-        console.log('🚀 Initializing Context-AI chat process...');
-        console.log('📁 Working directory:', cwd);
-        console.log('🏠 HOME directory:', process.env.HOME);
+        logger.info('🚀 Initializing Context-AI chat process...');
+        logger.debug('📁 Working directory:', cwd);
+        logger.debug('🏠 HOME directory:', process.env.HOME);
 
         // Try different possible commands for chat
         const possibleCommands = [
@@ -210,7 +211,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             'poetry run context-ai'
         ];
 
-        console.log('🔧 Will try these commands:', possibleCommands);
+        logger.debug('🔧 Will try these commands:', possibleCommands);
 
         for (const command of possibleCommands) {
             try {
@@ -231,9 +232,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                     cmdArgs = ['chat'];
                 }
 
-                console.log(`🔄 Trying command: ${cmd} ${cmdArgs.join(' ')}`);
-                console.log(`📂 CWD: ${cwd}`);
-                console.log(`🔧 Shell: false, stdio: pipe`);
+                logger.debug(`🔄 Trying command: ${cmd} ${cmdArgs.join(' ')}`);
+                logger.debug(`📂 CWD: ${cwd}`);
+                logger.debug(`🔧 Shell: false, stdio: pipe`);
 
                 this._chatProcess = spawn(cmd, cmdArgs, {
                     cwd: cwd,
@@ -245,36 +246,60 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                     }
                 });
 
-                console.log(`🚀 Process PID: ${this._chatProcess.pid}`);
+                logger.debug(`🚀 Process spawned with PID: ${this._chatProcess.pid}`);
 
+                // Check if process failed immediately (no PID means spawn failed)
                 if (!this._chatProcess.pid) {
-                    console.log(`❌ Process failed to start (PID undefined)`);
-                    throw new Error('Process failed to start - PID undefined');
+                    logger.debug('💥 Process failed immediately - no PID assigned, trying next command');
+                    this._chatProcess = null;
+                    continue;
                 }
 
+                // Set up error handler to detect immediate failures
+                let processFailedImmediately = false;
+                const errorHandler = (error: Error) => {
+                    logger.debug(`💥 Process failed immediately with error: ${error.message}, trying next command`);
+                    processFailedImmediately = true;
+                };
+
+                this._chatProcess.on('error', errorHandler);
+
+                // Give the process a moment to potentially fail immediately
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                // If process failed immediately, try next command
+                if (processFailedImmediately) {
+                    this._chatProcess.removeListener('error', errorHandler);
+                    this._chatProcess = null;
+                    continue;
+                }
+
+                // Process seems to be running, wait for initialization
+                this._chatProcess.removeListener('error', errorHandler);
+
+                // Set up persistent error handler for runtime errors
                 this._chatProcess.on('error', (error: Error) => {
-                    console.log(`❌ Process spawn error: ${error.message}`);
-                    throw error;
+                    logger.warn(`⚠️ Runtime process error: ${error.message}`);
                 });
 
                 // Set up initialization listener to capture chat ready info
                 await this._waitForChatInitialization();
 
                 // Process started successfully
-                console.log('🎉 Chat process initialized successfully!');
+                logger.info('🎉 Chat process initialized successfully!');
                 this._isInitializing = false;
                 this._chatInitialized = true;
                 return;
 
             } catch (error) {
-                console.log(`❌ Command failed: ${error instanceof Error ? error.message : error}`);
+                logger.warn(`❌ Command failed: ${error instanceof Error ? error.message : error}`);
                 // Try next command
                 continue;
             }
         }
 
-        this._isInitializing = false;
-        throw new Error(`Could not start Context-AI chat. Tried commands: ${possibleCommands.join(', ')}`);
+this._isInitializing = false;
+throw new Error(`Could not start Context-AI chat. Tried commands: ${possibleCommands.join(', ')}`);
     }
 
     private async _waitForChatInitialization(): Promise<void> {
@@ -284,7 +309,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
             const initDataHandler = (data: Buffer) => {
                 const chunk = data.toString();
-                console.log(`📥 Init chunk (${chunk.length} chars):`, JSON.stringify(chunk));
+                logger.debug(`📥 Init chunk (${chunk.length} chars):`, JSON.stringify(chunk));
                 
                 // Accumulate output for panel processing
                 accumulatedInitOutput += chunk;
@@ -294,7 +319,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
                 // Detectar quando chat está pronto para receber mensagens
                 if (chunk.includes('#= Context-AI Loaded =#')) {
-                    console.log('🎯 Chat ready - initialization complete (Context-AI Loaded marker found)');
+                    logger.info('🎯 Chat ready - initialization complete (Context-AI Loaded marker found)');
 
                     // Remove initialization listener
                     this._chatProcess.stdout.off('data', initDataHandler);
@@ -310,14 +335,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             };
 
             const initErrorHandler = (data: Buffer) => {
-                const error = data.toString();
-                console.log(`🚨 Init stderr:`, JSON.stringify(error));
-                if (error.includes('error') || error.includes('Error')) {
-                    this._chatProcess.stdout.off('data', initDataHandler);
-                    this._chatProcess.stderr.off('data', initErrorHandler);
-                    clearTimeout(initTimeout);
-                    reject(new Error(`Context-AI initialization error: ${error}`));
-                }
+                const stderrOutput = data.toString();
+                // Context-AI uses stderr for normal logs, just log as debug
+                logger.debug(`📋 Context-AI stderr:`, stderrOutput.trim());
             };
 
             // Set up listeners
@@ -326,7 +346,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
             // Timeout after 30 seconds
             initTimeout = setTimeout(() => {
-                console.log('⏰ Initialization timeout after 30s');
+                logger.error('⏰ Initialization timeout after 30s');
                 this._chatProcess.stdout.off('data', initDataHandler);
                 this._chatProcess.stderr.off('data', initErrorHandler);
                 reject(new Error('Initialization timeout after 30 seconds'));
@@ -345,7 +365,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             return;
         }
 
-        console.log(`📨 Sending question to chat: "${question}"`);
+        logger.debug(`📨 Sending question to chat: "${question}"`);
 
         let output = '';
         let isCollecting = false;
@@ -356,7 +376,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             if (requestCompleted) return;
             requestCompleted = true;
             
-            console.log('🧹 Cleaning up listeners and resolving');
+            logger.debug('🧹 Cleaning up listeners and resolving');
             this._chatProcess.stdout.off('data', dataHandler);
             this._chatProcess.stderr.off('data', errorHandler);
             
@@ -372,7 +392,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             if (requestCompleted) return;
             requestCompleted = true;
             
-            console.log('🧹 Cleaning up listeners and rejecting');
+            logger.debug('🧹 Cleaning up listeners and rejecting');
             this._chatProcess.stdout.off('data', dataHandler);
             this._chatProcess.stderr.off('data', errorHandler);
             reject(error);
@@ -384,15 +404,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             if (requestCompleted) return; // Ignore if already completed
             
             const chunk = data.toString();
-            console.log(`📥 Received stdout chunk (${chunk.length} chars):`, JSON.stringify(chunk));
+            logger.debug(`📥 Received stdout chunk (${chunk.length} chars):`, JSON.stringify(chunk));
             
             // Accumulate all output for token stats detection
             accumulatedOutput += chunk;
             
+            // DEBUGGING: Log current state
+            logger.debug(`🔍 DEBUG State - isCollecting: ${isCollecting}, responseStarted: ${responseStarted}, chatInitialized: ${this._chatInitialized}`);
+            
             // Check for complete Rich panels (generic detection)
             const shouldStopCollecting = this.processCompletePanels(accumulatedOutput);
             if (shouldStopCollecting && isCollecting) {
-                console.log('🎯 Stopping chunk streaming due to Answer panel detection');
+                logger.debug('🎯 Stopping chunk streaming due to Answer panel detection');
                 isCollecting = false;
             }
             
@@ -401,13 +424,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                 // Detect initialization completion with safe marker
                 if (chunk.includes('#= Context-AI Loaded =#')) {
                     this._chatInitialized = true;
-                    console.log('🎯 Chat initialized - waiting for dynamic panel content (Context-AI Loaded marker)');
+                    logger.info('🎯 Chat initialized - waiting for dynamic panel content (Context-AI Loaded marker)');
                     // Don't send chatReady here - let processCompletePanels handle it with dynamic content
                     return;
                 }
                 
                 // Skip all initialization chunks
-                console.log('📋 Skipping initialization chunk');
+                logger.debug('📋 Skipping initialization chunk');
                 return;
             }
 
@@ -415,7 +438,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             
             // Only stop when we see Context-AI End marker (this comes after panel ends and stats are sent)
             if (chunk.includes('#= Context-AI End =#')) {
-                console.log('🏁 Response complete (found Context-AI End marker - panel closed, stats sent)');
+                logger.debug('🏁 Response complete (found Context-AI End marker - panel closed, stats sent)');
                 cleanupAndResolve(output.trim());
                 return;
             }
@@ -423,7 +446,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             // Start collecting when we see streaming start marker
             if (chunk.includes('#= Context-AI Streaming START =#')) {
                 if (!isCollecting) {
-                    console.log('🎯 Started streaming response (Context-AI Streaming START marker)');
+                    logger.debug('🎯 Started streaming response (Context-AI Streaming START marker)');
                     isCollecting = true;
                     responseStarted = true;
                     
@@ -437,32 +460,37 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
             // Stop collecting when we see streaming end marker
             if (chunk.includes('#= Context-AI Streaming END =#')) {
-                console.log('🎯 Streaming ended (Context-AI Streaming END marker)');
+                logger.debug('🎯 Streaming ended (Context-AI Streaming END marker)');
                 isCollecting = false;
                 return;
             }
 
+            // DEBUGGING: Log before streaming check
+            logger.debug(`🔍 DEBUG Before streaming check - chunk content: ${JSON.stringify(chunk.substring(0, 100))}`);
+            logger.debug(`🔍 DEBUG Streaming condition - isCollecting: ${isCollecting} && responseStarted: ${responseStarted} = ${isCollecting && responseStarted}`);
+
             // Stream chunks in real-time if we're collecting
             if (isCollecting && responseStarted) {
                 output += chunk;
-                console.log(`📝 Streaming chunk - total output: ${output.length} chars`);
+                logger.info(`📝 Streaming chunk - total output: ${output.length} chars`);
+                logger.info(`📨 SENDING streamChunk to webview with content: ${JSON.stringify(chunk.substring(0, 50))}`);
                 
                 // Send chunk to UI for real-time display
                 this._view!.webview.postMessage({
                     command: 'streamChunk',
                     text: chunk
                 });
+            } else {
+                logger.debug(`⚠️ NOT streaming chunk - conditions not met`);
             }
         };
 
         const errorHandler = (data: Buffer) => {
             if (requestCompleted) return;
             
-            const error = data.toString();
-            console.log(`🚨 Received stderr:`, JSON.stringify(error));
-            if (error.includes('error') || error.includes('Error')) {
-                cleanupAndReject(new Error(`Context-AI error: ${error}`));
-            }
+            const stderrOutput = data.toString();
+            // Context-AI uses stderr for normal logs, just log as debug
+            logger.debug(`📋 Context-AI stderr:`, stderrOutput.trim());
         };
 
         // Set up listeners
@@ -470,12 +498,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this._chatProcess.stderr.on('data', errorHandler);
 
         // Send question
-        console.log('✍️ Writing question to stdin...');
+        logger.debug('✍️ Writing question to stdin...');
         this._chatProcess.stdin.write(`${question}\n`);
 
         // Timeout after 90 seconds (reduced timeout)
         const timeoutId = setTimeout(() => {
-            console.log('⏰ Request timeout after 90s');
+            logger.error('⏰ Request timeout after 90s');
             cleanupAndReject(new Error('Request timeout after 90 seconds'));
         }, 90000);
 
@@ -501,7 +529,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.detectPanel(accumulatedOutput, 'Token Usage', (panelContent: string) => {
             const stats = this.extractStatsFromTokenPanel(panelContent);
             if (stats && this._view) {
-                console.log('📊 Successfully extracted token stats from panel:', stats);
+                logger.debug('📊 Successfully extracted token stats from panel:', stats);
                 
                 // Send stats to webview
                 this._view.webview.postMessage({
@@ -516,7 +544,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
             const chatInfo = this.extractChatInfoFromPanel(panelContent);
             if (chatInfo) {
-                console.log('🎯 Found dynamic Chat Session panel, sending chatReady');
+                logger.debug('🎯 Found dynamic Chat Session panel, sending chatReady');
                 
                 // Send dynamic chat info instead of mock
                 this._view.webview.postMessage({
@@ -524,7 +552,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                     chatInfo: chatInfo
                 });
             } else {
-                console.log('⚠️ Chat info extraction failed, sending fallback chatReady');
+                logger.warn('⚠️ Chat info extraction failed, sending fallback chatReady');
                 
                 // Send fallback to ensure loading is removed
                 this._view.webview.postMessage({
@@ -548,7 +576,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             accumulatedOutput.includes('╰───') &&
             accumulatedOutput.includes('───╯')) {
             
-            console.log(`🎯 Found complete ${panelTitle} panel`);
+            logger.debug(`🎯 Found complete ${panelTitle} panel`);
             onPanelFound(accumulatedOutput);
         }
     }
@@ -581,7 +609,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                 };
             }
         } catch (error) {
-            console.error('❌ Failed to extract stats from Token Usage panel:', error);
+            logger.error('❌ Failed to extract stats from Token Usage panel:', error);
         }
         
         return null;
@@ -621,22 +649,22 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                 const finalContent = contentLines.join('\n').trim();
                 
                 if (finalContent && finalContent.length > 10) {
-                    console.log('📝 Extracted chat info from panel:', finalContent.substring(0, 100) + '...');
+                    logger.debug('📝 Extracted chat info from panel:', finalContent.substring(0, 100) + '...');
                     return finalContent;
                 }
             }
             
-            console.log('⚠️ Could not extract chat info from panel, using fallback');
+            logger.warn('⚠️ Could not extract chat info from panel, using fallback');
             return null;
             
         } catch (error) {
-            console.error('❌ Failed to extract chat info from panel:', error);
+            logger.error('❌ Failed to extract chat info from panel:', error);
             return null;
         }
     }
 
     private _resetState(): void {
-        console.log('🔄 Resetting ChatViewProvider state');
+        logger.debug('🔄 Resetting ChatViewProvider state');
         this._isInitializing = false;
         this._isProcessing = false;
         this._chatInitialized = false;
@@ -650,43 +678,43 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     private _ensureCleanState(): void {
         if (this._isProcessDead()) {
-            console.log('🧹 Process is dead, cleaning state');
+            logger.debug('🧹 Process is dead, cleaning state');
             this._chatProcess = null;
             this._resetState();
         }
     }
 
     private _cleanupProcess(): void {
-        console.log('🗑️ Cleaning up chat process');
+        logger.debug('🗑️ Cleaning up chat process');
         if (this._chatProcess && this._chatProcess.pid) {
             try {
-                console.log(`💀 Killing process PID ${this._chatProcess.pid} immediately`);
+                logger.debug(`💀 Killing process PID ${this._chatProcess.pid} immediately`);
                 // Kill immediately with SIGKILL - no timeouts, no delays
                 this._chatProcess.kill('SIGKILL');
             } catch (error) {
-                console.log('⚠️ Error killing process:', error);
+                logger.error('⚠️ Error killing process:', error);
             }
         }
         
         // Always null the reference regardless of kill success
         this._chatProcess = null;
-        console.log('✅ Process cleanup completed');
+        logger.debug('✅ Process cleanup completed');
     }
 
     private async _ensureProcessRunning(): Promise<void> {
-        console.log('🔍 Ensuring chat process is running...');
+        logger.debug('🔍 Ensuring chat process is running...');
         
         // Clean up any dead processes first
         this._ensureCleanState();
         
         // Check if we already have a healthy, initialized process
         if (!this._isProcessDead() && this._chatInitialized) {
-            console.log('✅ Process already running and initialized, skipping');
+            logger.debug('✅ Process already running and initialized, skipping');
             return;
         }
         
         if (this._isInitializing) {
-            console.log('⏳ Process is already being initialized, waiting...');
+            logger.debug('⏳ Process is already being initialized, waiting...');
             // Wait for current initialization to complete
             while (this._isInitializing) {
                 await new Promise(resolve => setTimeout(resolve, 100));
@@ -694,16 +722,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             return;
         }
         
-        console.log('🚀 Starting new chat process...');
+        logger.info('🚀 Starting new chat process...');
         await this._initializeChatProcess();
     }
 
     private async _forceReinitializeProcess(): Promise<void> {
-        console.log('🔥 Force reinitializing chat process...');
+        logger.info('🔥 Force reinitializing chat process...');
         
         // Always cleanup existing process first
         if (this._chatProcess) {
-            console.log('🗑️ Cleaning up existing process before reinitialization');
+            logger.debug('🗑️ Cleaning up existing process before reinitialization');
             this._cleanupProcess();
         }
         
@@ -715,12 +743,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         await new Promise(resolve => setTimeout(resolve, 500));
         
         // Force new initialization
-        console.log('🚀 Starting fresh chat process...');
+        logger.info('🚀 Starting fresh chat process...');
         await this._initializeChatProcess();
     }
 
     public dispose() {
-        console.log('🗑️ Disposing ChatViewProvider');
+        logger.info('🗑️ Disposing ChatViewProvider');
         
         this._cleanupProcess();
         this._resetState();
@@ -743,10 +771,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // Use a nonce to only allow specific scripts to be run
         const nonce = getNonce();
         
-        console.log('🔧 DEBUG: Creating webview HTML');
-        console.log('🔧 bundledScriptUri:', bundledScriptUri.toString());
-        console.log('🔧 styleUri:', styleUri.toString());
-        console.log('🔧 nonce:', nonce);
+        logger.debug('🔧 DEBUG: Creating webview HTML');
+        logger.debug('🔧 bundledScriptUri:', bundledScriptUri.toString());
+        logger.debug('🔧 styleUri:', styleUri.toString());
+        logger.debug('🔧 nonce:', nonce);
 
         return `<!DOCTYPE html>
             <html lang="en">
