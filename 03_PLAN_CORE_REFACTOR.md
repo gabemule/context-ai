@@ -36,20 +36,394 @@ FASE 1: Chunking Refactor → FASE 2: Embeddings Extensibility → FASE 3: Query
 
 ## 📊 **SITUAÇÃO ATUAL IDENTIFICADA:**
 
-### **🧩 CHUNKING - MELHORAR**
+### **🧩 CHUNKING - MELHORAR + REGISTRY PATTERN**
 - **Protocol + models misturados** no mesmo arquivo
 - **Language detection simples** - não usa extends/additional_separators
 - **Token counting já centralizado**
+- **❌ SEM REGISTRY:** Hardcoded LangChain, difícil extensão para Tree-sitter
+- **❌ SEM PROVIDERS:** Não é possível trocar chunking algorithm facilmente
 
-### **🤖 EMBEDDINGS - POUCO EXTENSÍVEL**
+### **🤖 EMBEDDINGS - POUCO EXTENSÍVEL + REGISTRY PATTERN**
 - **Hardcoded model list** - não configurável
 - **ChromaDB coupling** - sem abstração
 - **Single provider** - só sentence-transformers
+- **❌ SEM REGISTRY:** Não é extensível para OpenAI, Cohere, HuggingFace
+- **❌ SEM FACTORY:** Criação manual de providers
 
-### **🔍 QUERY - DISPERSO**  
+### **🔍 QUERY - DISPERSO (MANTER SIMPLES)**
 - **Context formatter** em módulo separado (deveria estar em query)
 - **Data classes** espalhadas
 - **Token counting já centralizado** - usar get_token_manager()
+
+---
+
+## 🏭 FASE 0: REGISTRY PATTERN FOUNDATION
+
+### **🚀 FASE 0.1: CRIAR CHUNKING REGISTRY**
+
+#### **📦 0.1.1 Criar registry.py para Chunking**
+
+- [ ] Criar arquivo `src/core/chunking/registry.py`
+- [ ] Implementar ChunkingRegistry com factory pattern
+
+```python
+"""
+Chunking provider registry for Context-AI.
+
+Manages different chunking implementations (LangChain, Tree-sitter, etc.)
+with intelligent provider selection and fallback mechanisms.
+"""
+
+from abc import ABC, abstractmethod
+from enum import Enum
+from typing import Dict, List, Optional, Type
+
+from .protocol import ChunkerProtocol, ChunkingStrategy
+from utils.logging import get_logger
+
+class ChunkingProviders(Enum):
+    """Available chunking providers."""
+    LANGCHAIN = "langchain"
+    TREESITTER = "treesitter"  # Future implementation
+
+class ChunkingRegistry:
+    """
+    Registry for chunking providers with intelligent selection.
+    
+    Manages different chunking implementations and provides
+    factory methods for creating appropriate chunkers.
+    """
+    
+    def __init__(self):
+        """Initialize registry."""
+        self.logger = get_logger(__name__)
+        self._providers: Dict[str, Type[ChunkerProtocol]] = {}
+        self._default_provider = ChunkingProviders.LANGCHAIN.value
+        self._register_builtin_providers()
+    
+    def register_provider(self, name: str, chunker_class: Type[ChunkerProtocol]):
+        """Register a new chunking provider."""
+        self._providers[name] = chunker_class
+        self.logger.info(f"Registered chunking provider: {name}")
+    
+    def get_chunker(self, provider: str = None, strategy: ChunkingStrategy = None) -> ChunkerProtocol:
+        """
+        Factory method to create chunker instance.
+        
+        Args:
+            provider: Provider name (defaults to default_provider)
+            strategy: Chunking strategy configuration
+            
+        Returns:
+            Configured chunker instance
+        """
+        provider = provider or self._default_provider
+        
+        if provider not in self._providers:
+            available = list(self._providers.keys())
+            raise ValueError(f"Unknown chunking provider: {provider}. Available: {available}")
+        
+        chunker_class = self._providers[provider]
+        return chunker_class(strategy=strategy)
+    
+    def get_optimal_chunker(self, language: str = None, strategy: ChunkingStrategy = None) -> ChunkerProtocol:
+        """
+        Get optimal chunker based on language and requirements.
+        
+        Args:
+            language: Programming language (for provider selection)
+            strategy: Chunking strategy configuration
+            
+        Returns:
+            Optimal chunker instance
+        """
+        # Linguagens com melhor suporte no Tree-sitter (futuro)
+        TREESITTER_PREFERRED = {
+            "python", "javascript", "typescript", "go", "rust", 
+            "java", "cpp", "c", "php", "ruby", "swift", "kotlin"
+        }
+        
+        # Try Tree-sitter for supported languages (when available)
+        if (language in TREESITTER_PREFERRED and 
+            self._is_provider_available(ChunkingProviders.TREESITTER.value)):
+            return self.get_chunker(ChunkingProviders.TREESITTER.value, strategy)
+        
+        # Fallback to LangChain
+        return self.get_chunker(ChunkingProviders.LANGCHAIN.value, strategy)
+    
+    def get_available_providers(self) -> List[str]:
+        """Get list of available provider names."""
+        return list(self._providers.keys())
+    
+    def _is_provider_available(self, provider_name: str) -> bool:
+        """Check if provider is available."""
+        return provider_name in self._providers
+    
+    def _register_builtin_providers(self):
+        """Register built-in providers."""
+        # Register LangChain provider
+        from .langchain_adapter import LangChainChunker
+        self.register_provider(ChunkingProviders.LANGCHAIN.value, LangChainChunker)
+        
+        # Tree-sitter provider will be registered when available
+        # from .treesitter_adapter import TreeSitterChunker
+        # self.register_provider(ChunkingProviders.TREESITTER.value, TreeSitterChunker)
+
+# Global registry instance
+_chunking_registry: Optional[ChunkingRegistry] = None
+
+def get_chunking_registry() -> ChunkingRegistry:
+    """Get global chunking registry instance (singleton)."""
+    global _chunking_registry
+    if _chunking_registry is None:
+        _chunking_registry = ChunkingRegistry()
+    return _chunking_registry
+
+def create_chunker(provider: str = None, strategy: ChunkingStrategy = None) -> ChunkerProtocol:
+    """Convenience function to create chunker instance."""
+    registry = get_chunking_registry()
+    return registry.get_chunker(provider, strategy)
+
+def create_optimal_chunker(language: str = None, strategy: ChunkingStrategy = None) -> ChunkerProtocol:
+    """Convenience function to create optimal chunker."""
+    registry = get_chunking_registry()
+    return registry.get_optimal_chunker(language, strategy)
+
+__all__ = [
+    'ChunkingProviders',
+    'ChunkingRegistry', 
+    'get_chunking_registry',
+    'create_chunker',
+    'create_optimal_chunker',
+]
+```
+
+#### **📦 0.1.2 Atualizar chunking/__init__.py**
+
+- [ ] Abrir `core/chunking/__init__.py`
+- [ ] Adicionar registry exports:
+
+```python
+from .protocol import ChunkerProtocol
+from .models import TextChunk, ChunkingStrategy, ChunkingMetadata
+from .langchain_adapter import LangChainChunker
+from .registry import (
+    ChunkingProviders,
+    ChunkingRegistry, 
+    get_chunking_registry,
+    create_chunker,
+    create_optimal_chunker,
+)
+
+__all__ = [
+    # Core interfaces and models
+    'ChunkerProtocol',
+    'TextChunk',
+    'ChunkingStrategy',
+    'ChunkingMetadata',
+    
+    # Implementations
+    'LangChainChunker',
+    
+    # Registry system
+    'ChunkingProviders',
+    'ChunkingRegistry',
+    'get_chunking_registry', 
+    'create_chunker',
+    'create_optimal_chunker',
+]
+```
+
+---
+
+### **🔧 FASE 0.2: EXPANDIR EMBEDDINGS REGISTRY**
+
+#### **📦 0.2.1 Criar registry.py para Embeddings**
+
+- [ ] Criar arquivo `src/core/embeddings/registry.py`
+- [ ] Implementar EmbeddingsRegistry com provider pattern
+
+```python
+"""
+Embeddings provider registry for Context-AI.
+
+Manages different embedding providers (SentenceTransformers, OpenAI, etc.)
+with intelligent provider selection and configuration.
+"""
+
+from enum import Enum
+from typing import Dict, List, Optional, Type
+
+from .model_protocol import EmbeddingModelProtocol
+from .vector_protocol import VectorStoreProtocol
+from utils.logging import get_logger
+
+class EmbeddingProviders(Enum):
+    """Available embedding providers."""
+    SENTENCE_TRANSFORMERS = "sentence_transformers"
+    OPENAI = "openai"  # Future implementation
+    COHERE = "cohere"  # Future implementation
+
+class VectorStoreProviders(Enum):
+    """Available vector store providers."""
+    CHROMADB = "chromadb"
+    PINECONE = "pinecone"  # Future implementation
+
+class EmbeddingsRegistry:
+    """
+    Registry for embedding and vector store providers.
+    
+    Manages different implementations and provides factory methods
+    for creating appropriate providers based on requirements.
+    """
+    
+    def __init__(self):
+        """Initialize registry."""
+        self.logger = get_logger(__name__)
+        self._embedding_providers: Dict[str, Type[EmbeddingModelProtocol]] = {}
+        self._vector_providers: Dict[str, Type[VectorStoreProtocol]] = {}
+        self._default_embedding_provider = EmbeddingProviders.SENTENCE_TRANSFORMERS.value
+        self._default_vector_provider = VectorStoreProviders.CHROMADB.value
+        self._register_builtin_providers()
+    
+    def register_embedding_provider(self, name: str, provider_class: Type[EmbeddingModelProtocol]):
+        """Register a new embedding provider."""
+        self._embedding_providers[name] = provider_class
+        self.logger.info(f"Registered embedding provider: {name}")
+    
+    def register_vector_provider(self, name: str, provider_class: Type[VectorStoreProtocol]):
+        """Register a new vector store provider."""
+        self._vector_providers[name] = provider_class
+        self.logger.info(f"Registered vector store provider: {name}")
+    
+    def get_embedding_provider(self, provider: str = None) -> EmbeddingModelProtocol:
+        """Get embedding provider instance."""
+        provider = provider or self._default_embedding_provider
+        
+        if provider not in self._embedding_providers:
+            available = list(self._embedding_providers.keys())
+            raise ValueError(f"Unknown embedding provider: {provider}. Available: {available}")
+        
+        provider_class = self._embedding_providers[provider]
+        return provider_class()
+    
+    def get_vector_provider(self, provider: str = None) -> VectorStoreProtocol:
+        """Get vector store provider instance."""
+        provider = provider or self._default_vector_provider
+        
+        if provider not in self._vector_providers:
+            available = list(self._vector_providers.keys())
+            raise ValueError(f"Unknown vector store provider: {provider}. Available: {available}")
+        
+        provider_class = self._vector_providers[provider]
+        return provider_class()
+    
+    def get_optimal_embedding_provider(self, use_case: str = None, performance: str = "balanced") -> EmbeddingModelProtocol:
+        """
+        Get optimal embedding provider based on use case.
+        
+        Args:
+            use_case: Use case type ("code", "text", "multilingual")
+            performance: Performance preference ("fast", "balanced", "quality")
+        """
+        # For now, use SentenceTransformers as default
+        # Future: intelligent selection based on use_case and performance
+        return self.get_embedding_provider(EmbeddingProviders.SENTENCE_TRANSFORMERS.value)
+    
+    def get_available_embedding_providers(self) -> List[str]:
+        """Get available embedding providers."""
+        return list(self._embedding_providers.keys())
+    
+    def get_available_vector_providers(self) -> List[str]:
+        """Get available vector store providers."""
+        return list(self._vector_providers.keys())
+    
+    def _register_builtin_providers(self):
+        """Register built-in providers."""
+        # Register SentenceTransformers
+        from .sentence_transformers_adapter import SentenceTransformersProvider
+        self.register_embedding_provider(
+            EmbeddingProviders.SENTENCE_TRANSFORMERS.value, 
+            SentenceTransformersProvider
+        )
+        
+        # Register ChromaDB
+        from .vector_store import VectorStoreManager
+        self.register_vector_provider(
+            VectorStoreProviders.CHROMADB.value,
+            VectorStoreManager
+        )
+
+# Global registry instance
+_embeddings_registry: Optional[EmbeddingsRegistry] = None
+
+def get_embeddings_registry() -> EmbeddingsRegistry:
+    """Get global embeddings registry instance (singleton)."""
+    global _embeddings_registry
+    if _embeddings_registry is None:
+        _embeddings_registry = EmbeddingsRegistry()
+    return _embeddings_registry
+
+__all__ = [
+    'EmbeddingProviders',
+    'VectorStoreProviders', 
+    'EmbeddingsRegistry',
+    'get_embeddings_registry',
+]
+```
+
+#### **📦 0.2.2 Atualizar embeddings/__init__.py**
+
+- [ ] Abrir `core/embeddings/__init__.py`
+- [ ] Adicionar registry exports:
+
+```python
+from .model_protocol import EmbeddingModelProtocol, ModelInfo
+from .vector_protocol import VectorStoreProtocol
+from .model_manager import EmbeddingModelManager
+from .vector_store import VectorStoreManager
+from .registry import (
+    EmbeddingProviders,
+    VectorStoreProviders,
+    EmbeddingsRegistry,
+    get_embeddings_registry,
+)
+
+__all__ = [
+    # Protocols
+    'EmbeddingModelProtocol',
+    'ModelInfo',
+    'VectorStoreProtocol',
+    
+    # Implementations
+    'EmbeddingModelManager',
+    'VectorStoreManager',
+    
+    # Registry system
+    'EmbeddingProviders',
+    'VectorStoreProviders',
+    'EmbeddingsRegistry',
+    'get_embeddings_registry',
+]
+```
+
+---
+
+### **🧪 FASE 0.3: TESTES DE REGISTRY FOUNDATION**
+
+#### **🔍 0.3.1 Testes de Chunking Registry**
+
+- [ ] Testar criação de registry: `get_chunking_registry()`
+- [ ] Testar provider registration: `registry.register_provider()`
+- [ ] Testar factory methods: `create_chunker()`, `create_optimal_chunker()`
+- [ ] Testar fallback logic (quando Tree-sitter não disponível)
+
+#### **🔍 0.3.2 Testes de Embeddings Registry**  
+
+- [ ] Testar criação de registry: `get_embeddings_registry()`
+- [ ] Testar provider creation: `get_embedding_provider()`, `get_vector_provider()`
+- [ ] Testar optimal selection: `get_optimal_embedding_provider()`
+- [ ] Verificar backward compatibility com código existente
 
 ---
 

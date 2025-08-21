@@ -190,6 +190,48 @@ class LangChainChunker(ChunkerProtocol):
                 return HTMLSemanticPreservingSplitter(
                     chunk_size=chunk_size, chunk_overlap=chunk_overlap
                 )
+            
+            # @TODO: Expand text splitters for more programming languages
+            # 
+            # LangChain provides many more language-specific splitters that we could integrate:
+            #
+            # HIGH PRIORITY (Enterprise Common):
+            # - JavaTextSplitter: for Java enterprise applications
+            # - GoTextSplitter: for Go microservices and backend systems  
+            # - CppTextSplitter: for C/C++ systems programming
+            # - LatexTextSplitter: for LaTeX documentation
+            #
+            # MEDIUM PRIORITY (Growing Usage):
+            # - RustTextSplitter: for Rust systems programming
+            # - PhpTextSplitter: for PHP web applications
+            # - SwiftTextSplitter: for iOS/macOS development
+            # - RubyTextSplitter: for Ruby applications
+            #
+            # LOW PRIORITY (Niche/Specialized):
+            # - ScalaTextSplitter: for Scala applications
+            # - ProtoTextSplitter: for Protocol Buffers
+            # - SolTextSplitter: for Solidity blockchain contracts
+            # - RstTextSplitter: for reStructuredText documentation
+            #
+            # IMPLEMENTATION EXAMPLE:
+            # elif language == "java":
+            #     from langchain_text_splitters import JavaTextSplitter
+            #     return JavaTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+            # elif language == "go":
+            #     from langchain_text_splitters import GoTextSplitter  
+            #     return GoTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+            #
+            # STEPS TO ADD NEW LANGUAGE:
+            # 1. Import the appropriate splitter from langchain_text_splitters
+            # 2. Add elif condition for the language
+            # 3. Update supported extensions in languages registry
+            # 4. Test with sample code files
+            # 5. Update documentation
+            #
+            # References:
+            # - LangChain Text Splitters: https://python.langchain.com/docs/modules/data_connection/document_transformers/
+            # - Supported splitters: https://github.com/langchain-ai/langchain/tree/master/libs/text-splitters
+            
             else:
                 # Use recursive splitter with language-appropriate separators
                 separators = self.languages_registry.get_language_separators(
@@ -267,6 +309,7 @@ class LangChainChunker(ChunkerProtocol):
         else:
             return "code"
 
+# @TODO CHANGE FOR CONFIG TOKEN COUNT
     def _estimate_token_count(self, text: str) -> int:
         """
         Estimate token count for text.
