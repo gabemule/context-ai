@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, Dict, List
 
 from config.settings import get_settings_manager
 from core.ai.claude_client import get_claude_client
-from core.formatting.context_formatter import count_tokens
+from core.ai.token_manager import get_token_manager
 
 # LAZY IMPORT: from services.embedding_service import QueryService
 from utils.exceptions import APIError, ConfigurationError
@@ -34,58 +34,6 @@ class ChatTurn:
     context_used: str = ""
     context_summary: str = ""
     tokens_used: int = 0
-
-
-class TokenCalculator:
-    """Handles token calculations and allocations (SRP)."""
-
-    @staticmethod
-    def calculate_context_allocation(
-        question: str, include_history: bool
-    ) -> Dict[str, int]:
-        """Calculate token allocation for context and history."""
-        from config.constants import CHAT_HISTORY_TOKEN_RATIO, CONTEXT_TOKEN_RATIO
-        from config.providers.registry import get_provider_registry
-
-        registry = get_provider_registry()
-        get_max_tokens = registry.get_max_tokens
-
-        question_tokens = count_tokens(question)
-        total_context_tokens = int(get_max_tokens() * CONTEXT_TOKEN_RATIO)
-
-        if include_history:
-            history_tokens = int(total_context_tokens * CHAT_HISTORY_TOKEN_RATIO)
-            code_context_tokens = total_context_tokens - history_tokens
-        else:
-            history_tokens = 0
-            code_context_tokens = total_context_tokens
-
-        return {
-            "question_tokens": question_tokens,
-            "total_context_tokens": total_context_tokens,
-            "history_tokens": history_tokens,
-            "code_context_tokens": code_context_tokens,
-        }
-
-    @staticmethod
-    def calculate_response_tokens(input_tokens: int, context_tokens: int) -> int:
-        """Calculate maximum response tokens."""
-        from config.constants import MIN_RESPONSE_TOKENS, RESPONSE_TOKEN_RATIO
-        from config.providers.registry import get_provider_registry
-
-        registry = get_provider_registry()
-        get_max_tokens = registry.get_max_tokens
-        get_max_output_tokens = registry.get_max_output_tokens
-
-        model_max_tokens = get_max_tokens()
-        model_max_output = get_max_output_tokens()
-
-        available_tokens = model_max_tokens - input_tokens
-        max_response_tokens = min(
-            available_tokens * RESPONSE_TOKEN_RATIO,
-            max(MIN_RESPONSE_TOKENS, context_tokens // 2),
-        )
-        return int(min(max_response_tokens, model_max_output))
 
 
 class ContextManager:
@@ -349,7 +297,7 @@ class ChatHistoryManager:
 
         for i, turn in enumerate(reversed(self.history)):
             turn_context = f"\n### Previous Q&A #{len(self.history) - i}\n**User:** {turn.question}\n**Assistant:** {turn.response}\n"
-            turn_tokens = count_tokens(turn_context)
+            turn_tokens = get_token_manager().count_tokens(turn_context)
 
             if i < CHAT_MIN_HISTORY_TURNS:
                 context_parts.insert(0, turn_context)
@@ -724,7 +672,7 @@ class AIService:
                 )
 
             # Calculate token allocations
-            token_allocation = TokenCalculator.calculate_context_allocation(
+            token_allocation = get_token_manager().calculate_context_allocation(
                 question, include_history
             )
 
@@ -737,7 +685,7 @@ class AIService:
             input_tokens = (
                 contexts["total_tokens"] + token_allocation["question_tokens"]
             )
-            max_tokens = TokenCalculator.calculate_response_tokens(
+            max_tokens = get_token_manager().calculate_response_tokens(
                 input_tokens, contexts["total_tokens"]
             )
 
@@ -871,7 +819,7 @@ class AIService:
             chat_context = self.chat_history.get_history_context(
                 token_allocation["history_tokens"]
             )
-            chat_context_tokens = count_tokens(chat_context) if chat_context else 0
+            chat_context_tokens = get_token_manager().count_tokens(chat_context) if chat_context else 0
 
             if verbose and chat_context:
                 self.logger.info(
@@ -883,7 +831,7 @@ class AIService:
         # Combine contexts
         if chat_context:
             combined_context = chat_context + "\n\n" + code_context
-            separator_tokens = count_tokens("\n\n")
+            separator_tokens = get_token_manager().count_tokens("\n\n")
             total_tokens = (
                 chat_context_tokens
                 + separator_tokens

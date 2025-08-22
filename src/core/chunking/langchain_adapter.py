@@ -17,6 +17,7 @@ from langchain_text_splitters import (
 )
 
 from config.languages.registry import get_languages_registry
+from core.ai.token_manager import get_token_manager
 from utils.logging import get_logger
 
 from .protocol import ChunkerProtocol, ChunkingMetadata, ChunkingStrategy, TextChunk
@@ -83,7 +84,7 @@ class LangChainChunker(ChunkerProtocol):
                         ChunkingMetadata.CHUNK_TYPE: self._detect_chunk_type(
                             chunk_text, language
                         ),
-                        ChunkingMetadata.TOKEN_COUNT: self._estimate_token_count(
+                        ChunkingMetadata.TOKEN_COUNT: get_token_manager().count_tokens(
                             chunk_text
                         ),
                         ChunkingMetadata.FILE_SIZE: len(text),
@@ -309,19 +310,6 @@ class LangChainChunker(ChunkerProtocol):
         else:
             return "code"
 
-# @TODO CHANGE FOR CONFIG TOKEN COUNT
-    def _estimate_token_count(self, text: str) -> int:
-        """
-        Estimate token count for text.
-
-        Args:
-            text: Text to estimate
-
-        Returns:
-            Estimated token count
-        """
-        # Simple estimation: ~4 characters per token
-        return len(text) // 4
 
     def _fallback_chunk(self, text: str, file_path: str) -> List[TextChunk]:
         """
