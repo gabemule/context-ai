@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional
 
 from config.constants import CONTEXT_DEFAULT_CHUNKS
 from config.providers.registry import get_provider_function
+from core.ai.token_manager import get_token_manager
 from core.query.result_merger import QueryResult
 from utils.logging import get_logger
 
@@ -18,67 +19,6 @@ RESULT_HEADER_TEMPLATE = "## Result {index} (score: {score:.3f}, source: {source
 SOURCE_HEADER_TEMPLATE = "## From {source} (similarity: {similarity:.2f}):"
 FILE_INFO_TEMPLATE = "**File:** {file_path} ({language})"
 
-# Token calculation with caching for performance
-_token_cache = {}
-
-try:
-    import tiktoken
-
-    # cl100k_base provides good approximation for Claude token counting
-    _token_encoder = tiktoken.get_encoding("cl100k_base")
-
-    def count_tokens(text: str) -> int:
-        """Count tokens using tiktoken with caching for performance."""
-        from config.constants import ENABLE_TOKEN_CACHE, TOKEN_CACHE_SIZE
-
-        if not ENABLE_TOKEN_CACHE:
-            return len(_token_encoder.encode(text))
-
-        # Use hash of text as cache key for memory efficiency
-        text_hash = hash(text)
-
-        if text_hash in _token_cache:
-            return _token_cache[text_hash]
-
-        # Calculate tokens
-        token_count = len(_token_encoder.encode(text))
-
-        # Cache with size limit (LRU-style)
-        if len(_token_cache) >= TOKEN_CACHE_SIZE:
-            # Remove oldest entry (simple FIFO for now)
-            oldest_key = next(iter(_token_cache))
-            del _token_cache[oldest_key]
-
-        _token_cache[text_hash] = token_count
-        return token_count
-
-except ImportError:
-    AVG_CHARS_PER_TOKEN = 4
-
-    def count_tokens(text: str) -> int:
-        """Fallback token estimation with caching when tiktoken unavailable."""
-        from config.constants import ENABLE_TOKEN_CACHE, TOKEN_CACHE_SIZE
-
-        if not ENABLE_TOKEN_CACHE:
-            clean_text = re.sub(r"[#*`\[\](){}]", "", text)
-            char_count = len(clean_text)
-            return max(1, char_count // AVG_CHARS_PER_TOKEN)
-
-        text_hash = hash(text)
-
-        if text_hash in _token_cache:
-            return _token_cache[text_hash]
-
-        clean_text = re.sub(r"[#*`\[\](){}]", "", text)
-        char_count = len(clean_text)
-        token_count = max(1, char_count // AVG_CHARS_PER_TOKEN)
-
-        if len(_token_cache) >= TOKEN_CACHE_SIZE:
-            oldest_key = next(iter(_token_cache))
-            del _token_cache[oldest_key]
-
-        _token_cache[text_hash] = token_count
-        return token_count
 
 
 @dataclass
@@ -236,7 +176,7 @@ class ContextFormatter:
         # Start XML context
         content_parts = ["<context>"]
         sources = set()
-        token_count = count_tokens("<context>")
+        token_count = get_token_manager().count_tokens("<context>")
         truncated = False
         results_sent = 0
         source_stats = {}
@@ -244,7 +184,7 @@ class ContextFormatter:
         # 1. Context Overview (moved to beginning)
         overview = self._generate_context_overview_xml(results)
         content_parts.append(overview)
-        token_count += count_tokens(overview)
+        token_count += get_token_manager().count_tokens(overview)
 
         # Collect sources for tracking
         for result in results:
@@ -256,7 +196,7 @@ class ContextFormatter:
         )
         if project_structure:
             content_parts.append(project_structure)
-            token_count += count_tokens(project_structure)
+            token_count += get_token_manager().count_tokens(project_structure)
 
         # 3. Similarity Matches
         matches_result = self._generate_similarity_matches_xml(
@@ -270,7 +210,7 @@ class ContextFormatter:
 
         # Close XML context
         content_parts.append("</context>")
-        token_count += count_tokens("</context>")
+        token_count += get_token_manager().count_tokens("</context>")
 
         # Log results
         if truncated:
@@ -327,7 +267,7 @@ class ContextFormatter:
             content_parts.append(section)
 
         content = "\n".join(content_parts)
-        token_count = count_tokens(content)
+        token_count = get_token_manager().count_tokens(content)
 
         return FormattedContext(
             content=content,
@@ -365,7 +305,7 @@ class ContextFormatter:
             content_parts.append(section)
 
         content = "\n".join(content_parts)
-        token_count = count_tokens(content)
+        token_count = get_token_manager().count_tokens(content)
 
         return FormattedContext(
             content=content,
@@ -540,7 +480,7 @@ class ContextFormatter:
     ) -> Dict:
         """Generate XML-structured similarity matches with token management."""
         matches_parts = ["<similarity_matches>"]
-        token_count = count_tokens("<similarity_matches>")
+        token_count = get_token_manager().count_tokens("<similarity_matches>")
         results_sent = 0
         truncated = False
 
@@ -549,7 +489,7 @@ class ContextFormatter:
 
             # Create match XML
             match_xml = self._create_match_xml(result)
-            match_tokens = count_tokens(match_xml)
+            match_tokens = get_token_manager().count_tokens(match_xml)
 
             # Check token limit
             if token_count + match_tokens > remaining_tokens:
@@ -567,7 +507,7 @@ class ContextFormatter:
             source_stats[source]["tokens"] += match_tokens
 
         matches_parts.append("</similarity_matches>")
-        token_count += count_tokens("</similarity_matches>")
+        token_count += get_token_manager().count_tokens("</similarity_matches>")
 
         return {
             "content": "\n".join(matches_parts),
@@ -630,7 +570,7 @@ class ContextFormatter:
         }
 
         content = json.dumps(output_data, indent=2, ensure_ascii=False)
-        token_count = count_tokens(content)
+        token_count = get_token_manager().count_tokens(content)
 
         return FormattedContext(
             content=content,
@@ -699,7 +639,7 @@ class ContextFormatter:
         # Remove empty lines
         content = "\n".join([line for line in content.split("\n") if line.strip()])
 
-        token_count = count_tokens(content)
+        token_count = get_token_manager().count_tokens(content)
 
         return FormattedContext(
             content=content,

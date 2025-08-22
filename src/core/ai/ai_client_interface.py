@@ -121,18 +121,6 @@ class AIClientInterface(ABC):
             "details": "No additional information available",
         }
 
-    def estimate_tokens(self, text: str) -> int:
-        """
-        Estimate token count for text (optional to implement).
-
-        Args:
-            text: Text to estimate
-
-        Returns:
-            Estimated token count
-        """
-        # Simple fallback estimation
-        return len(text.split()) * 1.3  # Rough approximation
 
 
 class AIClientFactory:

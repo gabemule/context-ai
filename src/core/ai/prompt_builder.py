@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional
 
 import yaml
 
+from core.ai.token_manager import get_token_manager
 from utils.logging import get_logger
 
 
@@ -831,10 +832,6 @@ class PromptBuilder:
             return
 
         try:
-            # Count tokens (simple approximation)
-            def count_tokens(text: str) -> int:
-                return len(text.split()) + len(text) // 4
-
             # Get all sections for logging
             mode_dir = self._prompt_base_dir / mode
 
@@ -888,7 +885,7 @@ class PromptBuilder:
                     "features": config.features,
                 },
                 "prompt_mode": mode,
-                "token_count": count_tokens(final_prompt),
+                "token_count": get_token_manager().count_tokens(final_prompt),
             }
 
             # Send to session logger

@@ -20,6 +20,7 @@ from config.providers.claude import (
     get_max_tokens,
 )
 from core.ai.ai_client_interface import AIClientFactory, AIClientInterface, AIResponse
+from core.ai.token_manager import get_token_manager
 from utils.exceptions import APIError, ConfigurationError
 from utils.logging import get_logger
 
@@ -218,10 +219,9 @@ class ClaudeClient(AIClientInterface):
     def _should_use_streaming(self, prompt: str) -> bool:
         """Determine if streaming should be used based on input size."""
         from config.constants import STREAMING_THRESHOLD_TOKENS
-        from core.formatting.context_formatter import count_tokens
 
         # Use streaming for large contexts to avoid timeouts
-        input_tokens = count_tokens(prompt)
+        input_tokens = get_token_manager().count_tokens(prompt)
 
         should_stream = input_tokens > STREAMING_THRESHOLD_TOKENS
         if should_stream:
