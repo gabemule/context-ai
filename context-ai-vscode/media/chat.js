@@ -538,10 +538,39 @@ Special commands:
         
         let currentSection = '';
         
-        for (const line of lines) {
-            const trimmed = line.trim();
+        for (let i = 0; i < lines.length; i++) {
+            const trimmed = lines[i].trim();
             if (trimmed.startsWith('Using embeddings:')) {
-                embeddings = trimmed.replace('Using embeddings:', '').trim();
+                // Capture embeddings line and potential continuation lines
+                let embeddingsText = trimmed.replace('Using embeddings:', '').trim();
+                
+                // Look ahead for continuation lines (lines that don't start with special patterns)
+                let j = i + 1;
+                while (j < lines.length) {
+                    const nextLine = lines[j].trim();
+                    // Stop if we hit a new section or empty line
+                    if (nextLine.includes('Ask questions about') || 
+                        nextLine.includes('Special commands:') || 
+                        nextLine.startsWith('/') ||
+                        nextLine.includes('exit') ||
+                        nextLine === '') {
+                        break;
+                    }
+                    // Add continuation line
+                    embeddingsText += ' ' + nextLine;
+                    j++;
+                }
+                
+                // Clean up the embeddings text - remove line breaks, normalize spaces, fix commas
+                embeddings = embeddingsText
+                    .replace(/\n\s*/g, ' ')     // Remove line breaks
+                    .replace(/,\s*,/g, ',')     // Remove duplicate commas
+                    .replace(/\s+/g, ' ')       // Normalize multiple spaces
+                    .trim();
+                
+                // Skip the processed continuation lines
+                i = j - 1;
+                
             } else if (trimmed.includes('Ask questions about')) {
                 description = trimmed;
             } else if (trimmed.includes('Special commands:')) {
