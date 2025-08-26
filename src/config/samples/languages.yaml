@@ -198,6 +198,8 @@ languages:
     name: "C/C++"
     extensions:
       - ".cpp"
+      - ".cs"
+      - ".csproj"
       - ".cc"
       - ".cxx"
       - ".c++"
