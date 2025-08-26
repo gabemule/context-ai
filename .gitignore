@@ -63,6 +63,7 @@ htmlcov/
 dmypy.json
 
 # Application specific
+@todo/
 ~/.context-ai/
 .context-ai/
 *.log
